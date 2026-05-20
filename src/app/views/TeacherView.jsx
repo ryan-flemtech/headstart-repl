@@ -12,6 +12,13 @@ import SplitPane from '../../shared/SplitPane'
 import ExplainerPanel from '../components/ExplainerPanel'
 import StudentGrid from '../components/StudentGrid'
 
+function resolveAssetsPath(rawPath) {
+  if (!rawPath) return ''
+  const base = import.meta.env.BASE_URL.replace(/\/$/, '')
+  const encoded = rawPath.split('/').map(s => (s ? encodeURIComponent(s) : s)).join('/')
+  return window.location.origin + base + encoded
+}
+
 export default function TeacherView({ lessonId }) {
   const {
     session, loading,
@@ -97,7 +104,10 @@ export default function TeacherView({ lessonId }) {
       setRunStatus(result.status)
     } else {
       const task = lesson.tasks.find(t => t.id === currentTaskId)
-      const src = buildIframeSrc(files, task?.entryFile ?? 'index.html')
+      const src = buildIframeSrc(files, task?.entryFile ?? 'index.html', {
+        assets: lesson.assets ?? [],
+        assetsPath: resolveAssetsPath(lesson.assetsPath),
+      })
       setIframeSrc(src)
       setRunStatus('success')
     }
@@ -239,6 +249,8 @@ export default function TeacherView({ lessonId }) {
                     onFileChange={(name, content) =>
                       setFiles(prev => prev.map(f => f.name === name ? { ...f, content } : f))
                     }
+                    assetsPath={resolveAssetsPath(lesson.assetsPath) || undefined}
+                    assets={lesson.assets}
                   />
                   <div style={{ display: 'flex', gap: 8, flexShrink: 0, padding: '8px 0 4px' }}>
                     <button
