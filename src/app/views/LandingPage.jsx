@@ -1,6 +1,5 @@
 import React, { useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
-import StandaloneSandbox from './StandaloneSandbox'
 
 export default function LandingPage() {
   const [searchParams] = useSearchParams()
@@ -8,17 +7,12 @@ export default function LandingPage() {
   const isTeacher = searchParams.get('teacher') === 'true'
 
   const [lessonCode, setLessonCode] = useState('')
-  const [showSandbox, setShowSandbox] = useState(false)
 
   function handleGo(e) {
     e.preventDefault()
     const id = lessonCode.trim()
     if (!id) return
     navigate(`/lesson/${id}${isTeacher ? '?teacher=true' : ''}`)
-  }
-
-  if (showSandbox) {
-    return <StandaloneSandbox onBack={() => setShowSandbox(false)} />
   }
 
   return (
@@ -54,23 +48,7 @@ export default function LandingPage() {
           </div>
         </form>
 
-        {isTeacher && (
-          <div style={s.dividerWrap}>
-            <span style={s.dividerLine} />
-            <span style={s.dividerText}>or</span>
-            <span style={s.dividerLine} />
-          </div>
-        )}
 
-        {isTeacher && (
-          <button
-            className="btn-secondary"
-            style={s.sandboxBtn}
-            onClick={() => setShowSandbox(true)}
-          >
-            Open standalone sandbox
-          </button>
-        )}
       </div>
     </div>
   )
@@ -143,25 +121,5 @@ const s = {
     padding: '9px 22px',
     fontSize: '0.95rem',
   },
-  dividerWrap: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 10,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    background: '#e5e7eb',
-  },
-  dividerText: {
-    fontFamily: 'var(--font-body)',
-    fontSize: '0.82rem',
-    color: '#9ca3af',
-  },
-  sandboxBtn: {
-    width: '100%',
-    padding: '10px 0',
-    fontSize: '0.95rem',
-    textAlign: 'center',
-  },
+
 }

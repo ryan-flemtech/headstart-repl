@@ -3,10 +3,18 @@ import SplitPane from '../../shared/SplitPane'
 import { CodeEditor } from '../../shared/CodeEditor'
 import { initPyodide, runPython, provideInput, isPyodideReady } from '../../shared/pyodide'
 import { buildIframeSrc, getIframeText } from '../../shared/iframe'
+import AssetBrowser from '../../shared/AssetBrowser'
 import ExplainerEditor from './ExplainerEditor'
 import FileManager from './FileManager'
 import BuilderOutputPanel from './BuilderOutputPanel'
 import IframePreview from '../../app/components/IframePreview'
+
+function resolveAssetsPath(rawPath) {
+  if (!rawPath) return ''
+  const base = import.meta.env.BASE_URL.replace(/\/$/, '')
+  const encoded = rawPath.split('/').map(s => (s ? encodeURIComponent(s) : s)).join('/')
+  return window.location.origin + base + encoded
+}
 
 export default function TaskEditor({ task, lesson, onUpdate }) {
   const [output, setOutput]             = useState('')
@@ -57,7 +65,10 @@ export default function TaskEditor({ task, lesson, onUpdate }) {
         set('_checkTested', true)
       }
     } else {
-      const src = buildIframeSrc(task.starterFiles ?? [], task.entryFile ?? 'index.html')
+      const src = buildIframeSrc(task.starterFiles ?? [], task.entryFile ?? 'index.html', {
+        assets: lesson.assets ?? [],
+        assetsPath: resolveAssetsPath(lesson.assetsPath),
+      })
       setIframeSrc(src)
       setRunStatus('success')
 
@@ -176,7 +187,8 @@ export default function TaskEditor({ task, lesson, onUpdate }) {
           />
         </>
       ) : (
-        /* HTML — editor left, preview right */
+        <>
+        {/* HTML — editor left, preview right */}
         <div style={s.htmlSplit}>
           <span style={s.htmlSplitLabel}>Files &amp; Preview</span>
           <SplitPane
@@ -239,6 +251,18 @@ export default function TaskEditor({ task, lesson, onUpdate }) {
             }
           />
         </div>
+
+        {/* Asset browser — shown when lesson has assets configured */}
+        {lesson.assetsPath && lesson.assets?.length > 0 && (
+          <Field label="Asset browser (read-only — copy paths to use in starter code)">
+            <AssetBrowser
+              assetsPath={resolveAssetsPath(lesson.assetsPath)}
+              assets={lesson.assets}
+              copyMode="full"
+            />
+          </Field>
+        )}
+        </>
       )}
     </div>
   )

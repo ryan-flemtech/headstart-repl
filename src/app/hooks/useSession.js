@@ -2,6 +2,17 @@ import { useState, useEffect, useRef } from 'react'
 import { ref, onValue, set, update, remove, serverTimestamp, onDisconnect } from 'firebase/database'
 import { db } from '../../shared/firebase'
 
+// Firebase keys cannot contain dots — encode/decode file names like "index.html"
+function encodeFileKeys(files) {
+  return Object.fromEntries(
+    Object.entries(files).map(([k, v]) => [k.replace(/\./g, '__dot__'), v])
+  )
+}
+
+export function decodeFileKey(key) {
+  return key.replace(/__dot__/g, '.')
+}
+
 /**
  * Subscribes to a Firebase session and exposes helpers for reading/writing state.
  * Used by both the teacher view and the student view.
@@ -139,7 +150,7 @@ export function useSession(lessonId) {
       lastRunAt:     Date.now(),
     }
     if (code  != null) updates.currentCode   = code
-    if (files != null) updates.currentFiles  = files
+    if (files != null) updates.currentFiles  = encodeFileKeys(files)
     if (output != null) updates.currentOutput = output
     await update(ref(db, `sessions/${lessonId}/students/${anonymousId}`), updates)
   }
@@ -149,7 +160,7 @@ export function useSession(lessonId) {
   }
 
   async function writeStudentFiles(anonymousId, files) {
-    await set(ref(db, `sessions/${lessonId}/students/${anonymousId}/currentFiles`), files)
+    await set(ref(db, `sessions/${lessonId}/students/${anonymousId}/currentFiles`), encodeFileKeys(files))
   }
 
   async function writeStudentOutput(anonymousId, output) {

@@ -13,7 +13,7 @@ export default function IframePreview({ src, iframeRef, height = 300, fill = fal
         ref={iframeRef}
         src={src ?? 'about:blank'}
         style={s.frame}
-        sandbox="allow-scripts allow-same-origin"
+        sandbox="allow-scripts allow-same-origin allow-modals"
         title="Output preview"
       />
     </div>

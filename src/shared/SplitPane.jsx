@@ -37,7 +37,7 @@ export default function SplitPane({ left, right, defaultSplit = 50, style }) {
 
   return (
     <div ref={containerRef} style={{ display: 'flex', minHeight: 0, overflow: 'hidden', ...style }}>
-      <div style={{ width: `${splitPct}%`, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', ...paneStyle }}>
+      <div style={{ width: `${splitPct}%`, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'auto', ...paneStyle }}>
         {left}
       </div>
       <div

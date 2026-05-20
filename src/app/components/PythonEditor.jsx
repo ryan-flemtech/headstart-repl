@@ -28,7 +28,7 @@ const s = {
     display: 'flex',
     flexDirection: 'column',
     flex: 1,
-    minHeight: 0,
+    minHeight: 240,
     gap: 6,
   },
   pyBanner: {

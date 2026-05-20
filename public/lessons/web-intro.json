@@ -3,6 +3,10 @@
   "type": "html",
   "title": "Introduction to HTML & CSS",
   "description": "Build your first webpage with headings, paragraphs, and styles.",
+  "assetsPath": "/assets/lesson-1/",
+  "assets": [
+    "images/images.jpg"
+  ],
   "tasks": [
     {
       "id": 1,

@@ -3,6 +3,7 @@ import { CodeEditor } from '../../shared/CodeEditor'
 import OutputPanel from './OutputPanel'
 import IframePreview from './IframePreview'
 import { buildIframeSrc } from '../../shared/iframe'
+import { decodeFileKey } from '../hooks/useSession'
 
 export default function StudentModal({ student, lesson, session, isLive, onGoLive, onStopLive, onClose }) {
   const overlayRef = useRef(null)
@@ -17,7 +18,10 @@ export default function StudentModal({ student, lesson, session, isLive, onGoLiv
 
   const isPython  = lesson?.type === 'python'
   const files     = student.currentFiles
-    ? Object.entries(student.currentFiles).map(([name, content]) => ({ name, content, type: name.endsWith('.css') ? 'css' : name.endsWith('.js') ? 'javascript' : 'html' }))
+    ? Object.entries(student.currentFiles).map(([key, content]) => {
+        const name = decodeFileKey(key)
+        return { name, content, type: name.endsWith('.css') ? 'css' : name.endsWith('.js') ? 'javascript' : 'html' }
+      })
     : []
   const task      = lesson?.tasks?.find(t => t.id === session?.currentTaskId)
   const iframeSrc = !isPython && files.length

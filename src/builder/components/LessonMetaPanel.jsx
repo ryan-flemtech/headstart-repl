@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 
 export default function LessonMetaPanel({ lesson, onUpdate }) {
   function set(field, value) {
@@ -52,7 +52,67 @@ export default function LessonMetaPanel({ lesson, onUpdate }) {
             ))}
           </div>
         </Field>
+
+        {lesson.type === 'html' && (
+          <>
+            <Field label="Assets path" hint="e.g. /assets/web-intro/">
+              <input
+                style={s.input}
+                value={lesson.assetsPath ?? ''}
+                onChange={e => {
+                  const v = e.target.value
+                  set('assetsPath', v || undefined)
+                }}
+                placeholder="/assets/lesson-id/"
+              />
+            </Field>
+
+            <AssetManager
+              assets={lesson.assets ?? []}
+              onChange={assets => set('assets', assets.length ? assets : undefined)}
+            />
+          </>
+        )}
       </div>
+    </div>
+  )
+}
+
+function AssetManager({ assets, onChange }) {
+  const [draft, setDraft] = useState('')
+
+  function add() {
+    const v = draft.trim().replace(/^\//, '')
+    if (!v || assets.includes(v)) return
+    onChange([...assets, v])
+    setDraft('')
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <span style={s.fieldLabel}>Asset files</span>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <input
+          style={{ ...s.input, flex: 1 }}
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && add()}
+          placeholder="images/logo.png"
+        />
+        <button style={s.addBtn} onClick={add}>Add</button>
+      </div>
+      {assets.map(path => (
+        <div key={path} style={s.assetRow}>
+          <span style={s.assetPath}>{path}</span>
+          <button
+            style={s.removeBtn}
+            onClick={() => onChange(assets.filter(a => a !== path))}
+            title="Remove"
+          >
+            ×
+          </button>
+        </div>
+      ))}
     </div>
   )
 }
@@ -131,5 +191,45 @@ const s = {
     background: 'var(--colour-primary)',
     color: '#fff',
     borderColor: 'var(--colour-primary)',
+  },
+  addBtn: {
+    padding: '7px 12px',
+    background: 'var(--colour-primary)',
+    color: '#fff',
+    border: 'none',
+    borderRadius: 6,
+    fontFamily: 'var(--font-body)',
+    fontWeight: 600,
+    fontSize: '0.82rem',
+    cursor: 'pointer',
+    flexShrink: 0,
+  },
+  assetRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    background: '#f5f5f5',
+    border: '1px solid #e5e7eb',
+    borderRadius: 5,
+    padding: '4px 8px',
+  },
+  assetPath: {
+    flex: 1,
+    fontFamily: 'var(--font-code)',
+    fontSize: '0.78rem',
+    color: 'var(--colour-text)',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  removeBtn: {
+    flexShrink: 0,
+    background: 'none',
+    border: 'none',
+    color: '#ef4444',
+    fontSize: '1rem',
+    cursor: 'pointer',
+    padding: '0 2px',
+    lineHeight: 1,
   },
 }

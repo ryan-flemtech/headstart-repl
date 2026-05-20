@@ -1,12 +1,15 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { CodeEditor } from '../../shared/CodeEditor'
+import AssetBrowser from '../../shared/AssetBrowser'
 
-export default function HtmlEditor({ files = [], activeFile, onTabChange, onFileChange, readOnly = false }) {
+export default function HtmlEditor({ files = [], activeFile, onTabChange, onFileChange, readOnly = false, assetsPath, assets }) {
+  const [showAssets, setShowAssets] = useState(false)
   const current = files.find(f => f.name === activeFile) ?? files[0]
+  const hasAssets = !!(assetsPath && assets?.length)
 
   return (
     <div style={s.wrap}>
-      {/* File tabs */}
+      {/* File tabs + Assets toggle */}
       <div style={s.tabs}>
         {files.map(f => (
           <button
@@ -20,7 +23,26 @@ export default function HtmlEditor({ files = [], activeFile, onTabChange, onFile
             {f.name}
           </button>
         ))}
+        {hasAssets && (
+          <button
+            style={{
+              ...s.tab,
+              ...s.assetsTab,
+              ...(showAssets ? s.assetsTabActive : {}),
+            }}
+            onClick={() => setShowAssets(o => !o)}
+          >
+            Assets
+          </button>
+        )}
       </div>
+
+      {/* Asset panel */}
+      {showAssets && hasAssets && (
+        <div style={s.assetPanel}>
+          <AssetBrowser assetsPath={assetsPath} assets={assets} copyMode="relative" />
+        </div>
+      )}
 
       {/* Editor */}
       {current && (
@@ -42,6 +64,7 @@ const s = {
     display: 'flex',
     flexDirection: 'column',
     flex: 1,
+    minHeight: 240,
   },
   tabs: {
     display: 'flex',
@@ -67,5 +90,22 @@ const s = {
     background: '#fafafa',
     opacity: 1,
     fontWeight: 700,
+  },
+  assetsTab: {
+    marginLeft: 'auto',
+    opacity: 0.75,
+    background: 'transparent',
+  },
+  assetsTabActive: {
+    background: 'var(--colour-primary)',
+    color: '#fff',
+    opacity: 1,
+    borderRadius: '6px 6px 0 0',
+  },
+  assetPanel: {
+    maxHeight: 200,
+    overflowY: 'auto',
+    flexShrink: 0,
+    borderBottom: '1px solid #e5e7eb',
   },
 }

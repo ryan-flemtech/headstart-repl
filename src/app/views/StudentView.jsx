@@ -13,6 +13,16 @@ import HtmlEditor from '../components/HtmlEditor'
 import OutputPanel from '../components/OutputPanel'
 import IframePreview from '../components/IframePreview'
 import SplitPane from '../../shared/SplitPane'
+import JoinSessionPrompt from '../components/JoinSessionPrompt'
+
+// Returns a full absolute URL for the assets base so blob-URL iframes can load
+// resources without ambiguity (root-relative paths don't resolve in blob docs).
+function resolveAssetsPath(rawPath) {
+  if (!rawPath) return ''
+  const base = import.meta.env.BASE_URL.replace(/\/$/, '')
+  const encoded = rawPath.split('/').map(s => (s ? encodeURIComponent(s) : s)).join('/')
+  return window.location.origin + base + encoded
+}
 
 const LS_KEY = (lessonId, taskId, anonymousId) =>
   `headstart_${lessonId}_${taskId}_${anonymousId}`
@@ -53,10 +63,14 @@ export default function StudentView({ lessonId }) {
   const [iframeSrc, setIframeSrc]       = useState(null)
   const [inputPrompt, setInputPrompt]   = useState(null)
   const [checkPassed, setCheckPassed]   = useState(false)
+  const [showJoinPrompt, setShowJoinPrompt] = useState(false)
   const iframeRef = useRef(null)
   const appendOutputRef = useRef(null)
   const identityRef = useRef(identity)
   identityRef.current = identity
+  const phaseRef = useRef(phase)
+  phaseRef.current = phase
+  const declinedSessionRef = useRef(null)
 
   // Load lesson JSON
   useEffect(() => {
@@ -83,6 +97,7 @@ export default function StudentView({ lessonId }) {
     if (!session || session.state === 'ended') {
       // No live session — go straight to solo, no prompts
       if (!identity) createIdentity('Solo', Date.now())
+      setShowJoinPrompt(false)
       setPhase('solo')
       return
     }
@@ -90,7 +105,18 @@ export default function StudentView({ lessonId }) {
     // Verify the session belongs to this lesson before proceeding
     if (session.lessonId && session.lessonId !== lessonId) {
       if (!identity) createIdentity('Solo', Date.now())
+      setShowJoinPrompt(false)
       setPhase('solo')
+      return
+    }
+
+    // Student is working solo and a new session just appeared — prompt rather than auto-transition
+    if (phaseRef.current === 'solo') {
+      if (declinedSessionRef.current === session.createdAt) {
+        // Already declined this session — stay in solo
+        return
+      }
+      setShowJoinPrompt(true)
       return
     }
 
@@ -266,7 +292,10 @@ export default function StudentView({ lessonId }) {
       }
     } else {
       // HTML — build iframe
-      const src = buildIframeSrc(files, task?.entryFile ?? 'index.html')
+      const src = buildIframeSrc(files, task?.entryFile ?? 'index.html', {
+        assets: lesson.assets ?? [],
+        assetsPath: resolveAssetsPath(lesson.assetsPath),
+      })
       setIframeSrc(src)
       setRunStatus('success')
 
@@ -328,6 +357,26 @@ export default function StudentView({ lessonId }) {
     setPhase('solo')
   }
 
+  function handleJoinFromSolo() {
+    setShowJoinPrompt(false)
+    // Persist current solo work before transitioning
+    if (lesson?.type === 'python') {
+      saveCode(lessonId, currentTaskId, identity.anonymousId, { code, output, runStatus })
+    } else {
+      files.forEach(f => saveFile(lessonId, currentTaskId, f.name, identity.anonymousId, f.content))
+    }
+    if (session?.state === 'waiting') {
+      setPhase('waiting')
+    } else {
+      setPhase('name-entry')
+    }
+  }
+
+  function handleDeclineSolo() {
+    declinedSessionRef.current = session?.createdAt
+    setShowJoinPrompt(false)
+  }
+
   if (phase === 'name-entry') {
     return (
       <NameEntry
@@ -359,6 +408,13 @@ export default function StudentView({ lessonId }) {
 
   return (
     <div style={styles.page}>
+      {showJoinPrompt && lesson && (
+        <JoinSessionPrompt
+          lessonTitle={lesson.title}
+          onJoin={handleJoinFromSolo}
+          onDecline={handleDeclineSolo}
+        />
+      )}
       <TopBar
         lessonTitle={lesson.title}
         displayName={identity?.displayName}
@@ -397,7 +453,7 @@ export default function StudentView({ lessonId }) {
         </div>
       )}
 
-      <div style={{ ...styles.body, ...(lesson.type === 'html' ? { overflow: 'hidden' } : {}) }}>
+      <div style={styles.body}>
         {task?.explainer && !isSandbox && (
           <ExplainerPanel content={task.explainer} />
         )}
@@ -436,7 +492,7 @@ export default function StudentView({ lessonId }) {
             </>
           ) : (
             <SplitPane
-              style={{ flex: 1, minHeight: 0 }}
+              style={{ flex: 1, minHeight: 320 }}
               left={
                 <div style={styles.htmlLeft}>
                   <HtmlEditor
@@ -445,6 +501,8 @@ export default function StudentView({ lessonId }) {
                     onTabChange={setActiveFile}
                     onFileChange={isViewingPrev ? undefined : handleFileChange}
                     readOnly={isViewingPrev}
+                    assetsPath={resolveAssetsPath(lesson.assetsPath) || undefined}
+                    assets={lesson.assets}
                   />
                   {!isViewingPrev && (
                     <button
@@ -519,13 +577,12 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     gap: '8px',
-    minHeight: 0,
   },
   htmlLeft: {
     display: 'flex',
     flexDirection: 'column',
     height: '100%',
-    overflow: 'hidden',
+    overflow: 'auto',
     gap: 8,
     paddingBottom: 4,
   },
