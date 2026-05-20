@@ -22,7 +22,7 @@ function resolveAssetsPath(rawPath) {
 export default function TeacherView({ lessonId }) {
   const {
     session, loading,
-    createSession, startSession, endSession,
+    createSession, restartSession, startSession, endSession,
     setTaskId, enterSandbox, exitSandbox, pushSandboxCode,
     setActiveStudentView, renameStudent, removeStudent,
   } = useSession(lessonId)
@@ -179,13 +179,13 @@ export default function TeacherView({ lessonId }) {
                 Start Session
               </button>
             )}
-            {session?.state === 'active' && (
+            {(session?.state === 'active' || session?.state === 'sandbox') && (
               <button className="btn-danger" style={{ fontSize: 13, padding: '5px 12px' }} onClick={endSession}>
                 End Session
               </button>
             )}
             {session?.state === 'ended' && (
-              <button className="btn-primary" style={{ fontSize: 13, padding: '5px 12px' }} onClick={createSession}>
+              <button className="btn-primary" style={{ fontSize: 13, padding: '5px 12px' }} onClick={restartSession}>
                 Restart Session
               </button>
             )}

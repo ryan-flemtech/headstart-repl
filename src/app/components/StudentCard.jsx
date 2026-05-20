@@ -15,6 +15,8 @@ export default function StudentCard({ student, lesson, lessonId, session, onRena
     student.lastRunStatus === 'error'   ? '#ef4444' : '#9ca3af'
 
   const hasCheck = lesson?.tasks?.find(t => t.id === session?.currentTaskId)?.check != null
+  const presenceClass = student.online ? 'presence-badge presence-badge--online' : 'presence-badge presence-badge--offline'
+  const presenceLabel = student.online ? 'Online' : 'Offline'
 
   return (
     <div style={s.card} className="card">
@@ -41,9 +43,10 @@ export default function StudentCard({ student, lesson, lessonId, session, onRena
         >
           ✏️
         </button>
-        {student.online && (
-          <span className="online-dot" title="Connected now" />
-        )}
+        <span className={presenceClass} title={student.online ? 'Student is connected now' : 'Student is offline'}>
+          <span className="presence-badge__dot" />
+          {presenceLabel}
+        </span>
         {hasCheck && student.checkPassed && (
           <span style={s.checkBadge} title="Check passed">✅</span>
         )}

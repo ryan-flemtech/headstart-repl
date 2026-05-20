@@ -44,6 +44,13 @@ export default function StudentModal({ student, lesson, session, isLive, onGoLiv
         <div style={s.header}>
           <div style={s.headerLeft}>
             <span style={s.name}>{student.displayName}</span>
+            <span
+              className={student.online ? 'presence-badge presence-badge--online' : 'presence-badge presence-badge--offline'}
+              title={student.online ? 'Student is connected now' : 'Student is offline'}
+            >
+              <span className="presence-badge__dot" />
+              {student.online ? 'Online' : 'Offline'}
+            </span>
             {isLive && <span style={s.liveBadge}>● LIVE</span>}
             {student.checkPassed && <span style={s.checkBadge}>✅</span>}
           </div>

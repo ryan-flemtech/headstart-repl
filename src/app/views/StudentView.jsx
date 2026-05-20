@@ -85,6 +85,23 @@ export default function StudentView({ lessonId }) {
   const lessonRef = useRef(lesson)
   lessonRef.current = lesson
 
+  function saveCurrentWorkSnapshot() {
+    const id = identityRef.current
+    const currentLesson = lessonRef.current
+    const taskId = currentTaskIdRef.current
+    if (!id || !currentLesson) return
+
+    if (currentLesson.type === 'python') {
+      saveCode(lessonId, taskId, id.anonymousId, {
+        code: codeRef.current,
+        output: outputRef.current,
+        runStatus: runStatusRef.current,
+      })
+    } else {
+      filesRef.current.forEach(f => saveFile(lessonId, taskId, f.name, id.anonymousId, f.content))
+    }
+  }
+
   // Load lesson JSON
   useEffect(() => {
     const base = import.meta.env.BASE_URL
@@ -110,20 +127,7 @@ export default function StudentView({ lessonId }) {
     if (!session || session.state === 'ended') {
       // Was the student actively coding? Save their work and show the ended screen.
       if (phaseRef.current === 'lesson' || phaseRef.current === 'sandbox') {
-        const id = identityRef.current
-        const taskId = currentTaskIdRef.current
-        const currentLesson = lessonRef.current
-        if (id && currentLesson) {
-          if (currentLesson.type === 'python') {
-            saveCode(lessonId, taskId, id.anonymousId, {
-              code: codeRef.current,
-              output: outputRef.current,
-              runStatus: runStatusRef.current,
-            })
-          } else {
-            filesRef.current.forEach(f => saveFile(lessonId, taskId, f.name, id.anonymousId, f.content))
-          }
-        }
+        saveCurrentWorkSnapshot()
         setShowJoinPrompt(false)
         setPhase('ended')
         return
@@ -180,6 +184,7 @@ export default function StudentView({ lessonId }) {
   useEffect(() => {
     if (!session?.currentTaskId || phase !== 'lesson') return
     if (session.currentTaskId !== currentTaskId) {
+      saveCurrentWorkSnapshot()
       setCurrentTaskId(session.currentTaskId)
       setViewingTaskId(null)
       setOutput('')
@@ -356,6 +361,9 @@ export default function StudentView({ lessonId }) {
 
   function handleCodeChange(newCode) {
     setCode(newCode)
+    if (identity && lesson?.type === 'python') {
+      saveCode(lessonId, currentTaskId, identity.anonymousId, { code: newCode, output, runStatus })
+    }
     if (session?.activeStudentView === identity?.anonymousId) {
       writeStudentCode(identity.anonymousId, newCode)
     }
@@ -363,6 +371,9 @@ export default function StudentView({ lessonId }) {
 
   function handleFileChange(filename, content) {
     setFiles(prev => prev.map(f => f.name === filename ? { ...f, content } : f))
+    if (identity && lesson?.type === 'html') {
+      saveFile(lessonId, currentTaskId, filename, identity.anonymousId, content)
+    }
     if (session?.activeStudentView === identity?.anonymousId) {
       const filesMap = Object.fromEntries(
         files.map(f => [f.name, f.name === filename ? content : f.content])

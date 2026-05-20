@@ -57,6 +57,10 @@ export function useSession(lessonId) {
     })
   }
 
+  async function restartSession() {
+    await createSession()
+  }
+
   async function startSession() {
     await update(ref(db, `sessions/${lessonId}`), { state: 'active' })
   }
@@ -174,7 +178,7 @@ export function useSession(lessonId) {
     loading,
     connected,
     // teacher
-    createSession, startSession, endSession,
+    createSession, restartSession, startSession, endSession,
     setTaskId, enterSandbox, exitSandbox, pushSandboxCode,
     setActiveStudentView, renameStudent, removeStudent,
     // student
