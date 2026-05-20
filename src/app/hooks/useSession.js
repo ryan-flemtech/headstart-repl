@@ -63,9 +63,11 @@ export function useSession(lessonId) {
 
   async function endSession() {
     await update(ref(db, `sessions/${lessonId}`), {
-      state:             'ended',
-      activeStudentView: null,
-      sandboxCode:       null,
+      state:              'ended',
+      activeStudentView:  null,
+      sandboxCode:        null,
+      sandboxCodePushedAt: null,
+      students:           null,
     })
     // When the teacher closes the tab, remove the session entirely so the
     // lesson becomes available for solo study without a stale "ended" record.

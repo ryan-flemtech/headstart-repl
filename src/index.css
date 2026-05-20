@@ -113,3 +113,27 @@ button:disabled {
   border-radius: 10px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
+
+/* ── Syntax highlighting in markdown explainers (rehype-highlight / hljs) ─── */
+/* Colors mirror the CodeMirror headstartHighlight palette in codemirror.js    */
+.hljs { background: transparent; color: var(--colour-text); }
+.hljs-keyword                       { color: #7c3aed; font-weight: bold; }
+.hljs-built_in                      { color: #2563eb; }
+.hljs-type                          { color: #b45309; }
+.hljs-literal                       { color: #7c3aed; }
+.hljs-number                        { color: #0284c7; }
+.hljs-string, .hljs-template-string { color: #059669; }
+.hljs-comment                       { color: #9ca3af; font-style: italic; }
+.hljs-operator                      { color: #374151; }
+.hljs-variable, .hljs-params        { color: #111827; }
+.hljs-title.function_               { color: #2563eb; }
+.hljs-title.class_                  { color: #b45309; }
+.hljs-property                      { color: #2563eb; }
+.hljs-attr, .hljs-attribute         { color: #0284c7; }
+.hljs-tag                           { color: #b91c1c; }
+.hljs-name                          { color: #b91c1c; }
+.hljs-selector-tag                  { color: #b91c1c; }
+.hljs-selector-class                { color: #b45309; }
+.hljs-selector-id                   { color: #2563eb; }
+.hljs-selector-attr                 { color: #0284c7; }
+.hljs-meta                          { color: #9ca3af; }

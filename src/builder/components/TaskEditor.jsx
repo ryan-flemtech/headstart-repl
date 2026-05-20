@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import SplitPane from '../../shared/SplitPane'
 import { CodeEditor } from '../../shared/CodeEditor'
 import { initPyodide, runPython, provideInput, isPyodideReady } from '../../shared/pyodide'
-import { buildIframeSrc, getIframeText } from '../../shared/iframe'
+import { buildIframeSrc, waitForIframeText } from '../../shared/iframe'
 import AssetBrowser from '../../shared/AssetBrowser'
 import ExplainerEditor from './ExplainerEditor'
 import FileManager from './FileManager'
@@ -73,12 +73,11 @@ export default function TaskEditor({ task, lesson, onUpdate }) {
       setRunStatus('success')
 
       if (task.check?.value) {
-        setTimeout(() => {
-          const text = getIframeText(iframeRef.current)
+        waitForIframeText().then(text => {
           const passes = text.toLowerCase().includes(task.check.value.toLowerCase())
           setCheckResult(passes ? 'pass' : 'fail')
           set('_checkTested', true)
-        }, 400)
+        })
       }
     }
     setRunning(false)

@@ -2,6 +2,7 @@
   "id": "web-intro",
   "type": "html",
   "title": "Introduction to HTML & CSS",
+  "level": "Level 1",
   "description": "Build your first webpage with headings, paragraphs, and styles.",
   "assetsPath": "/assets/lesson-1/",
   "assets": [

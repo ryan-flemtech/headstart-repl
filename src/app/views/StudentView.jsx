@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react'
 import { useSession } from '../hooks/useSession'
 import { useIdentity } from '../hooks/useIdentity'
 import { initPyodide, runPython, provideInput, isPyodideReady } from '../../shared/pyodide'
-import { buildIframeSrc, getIframeText } from '../../shared/iframe'
+import { buildIframeSrc, waitForIframeText } from '../../shared/iframe'
 import TopBar from '../components/TopBar'
 import NameEntry from '../components/NameEntry'
 import WaitingRoom from '../components/WaitingRoom'
@@ -71,6 +71,19 @@ export default function StudentView({ lessonId }) {
   const phaseRef = useRef(phase)
   phaseRef.current = phase
   const declinedSessionRef = useRef(null)
+  // Live refs so the session-end effect can read current editor state without stale closures
+  const codeRef = useRef(code)
+  codeRef.current = code
+  const filesRef = useRef(files)
+  filesRef.current = files
+  const outputRef = useRef(output)
+  outputRef.current = output
+  const runStatusRef = useRef(runStatus)
+  runStatusRef.current = runStatus
+  const currentTaskIdRef = useRef(currentTaskId)
+  currentTaskIdRef.current = currentTaskId
+  const lessonRef = useRef(lesson)
+  lessonRef.current = lesson
 
   // Load lesson JSON
   useEffect(() => {
@@ -95,7 +108,27 @@ export default function StudentView({ lessonId }) {
     if (sessionLoading || !identityLoaded || lessonLoading) return
 
     if (!session || session.state === 'ended') {
-      // No live session — go straight to solo, no prompts
+      // Was the student actively coding? Save their work and show the ended screen.
+      if (phaseRef.current === 'lesson' || phaseRef.current === 'sandbox') {
+        const id = identityRef.current
+        const taskId = currentTaskIdRef.current
+        const currentLesson = lessonRef.current
+        if (id && currentLesson) {
+          if (currentLesson.type === 'python') {
+            saveCode(lessonId, taskId, id.anonymousId, {
+              code: codeRef.current,
+              output: outputRef.current,
+              runStatus: runStatusRef.current,
+            })
+          } else {
+            filesRef.current.forEach(f => saveFile(lessonId, taskId, f.name, id.anonymousId, f.content))
+          }
+        }
+        setShowJoinPrompt(false)
+        setPhase('ended')
+        return
+      }
+      // Not mid-lesson — go straight to solo
       if (!identity) createIdentity('Solo', Date.now())
       setShowJoinPrompt(false)
       setPhase('solo')
@@ -110,10 +143,9 @@ export default function StudentView({ lessonId }) {
       return
     }
 
-    // Student is working solo and a new session just appeared — prompt rather than auto-transition
-    if (phaseRef.current === 'solo') {
+    // Student is working solo (or on the ended screen) and a new session appeared — prompt rather than auto-transition
+    if (phaseRef.current === 'solo' || phaseRef.current === 'ended') {
       if (declinedSessionRef.current === session.createdAt) {
-        // Already declined this session — stay in solo
         return
       }
       setShowJoinPrompt(true)
@@ -287,7 +319,7 @@ export default function StudentView({ lessonId }) {
       setCheckPassed(passed)
 
       saveCode(lessonId, currentTaskId, identity.anonymousId, { code, output: accumulated, runStatus: status })
-      if (phase === 'lesson' || isWatched) {
+      if (phase === 'lesson' || phase === 'sandbox' || isWatched) {
         await writeStudentRun(identity.anonymousId, { code, output: accumulated, status, checkPassed: passed })
       }
     } else {
@@ -299,21 +331,18 @@ export default function StudentView({ lessonId }) {
       setIframeSrc(src)
       setRunStatus('success')
 
-      // Check after a short render delay
-      setTimeout(() => {
-        let passed = false
-        if (task?.check) {
-          const text = getIframeText(iframeRef.current)
-          passed = text.toLowerCase().includes(task.check.value.toLowerCase())
-          setCheckPassed(passed)
-        }
-        if (phase === 'lesson' || isWatched) {
+      // Wait for the iframe to report its body text via postMessage, then run checks
+      waitForIframeText().then(text => {
+        const passed = task?.check
+          ? text.toLowerCase().includes(task.check.value.toLowerCase())
+          : false
+        setCheckPassed(passed)
+        if (phase === 'lesson' || phase === 'sandbox' || isWatched) {
           const filesMap = Object.fromEntries(files.map(f => [f.name, f.content]))
           writeStudentRun(identity.anonymousId, { files: filesMap, status: 'success', checkPassed: passed })
         }
-        // Save each file to localStorage
         files.forEach(f => saveFile(lessonId, currentTaskId, f.name, identity.anonymousId, f.content))
-      }, 300)
+      })
     }
 
     setRunning(false)
@@ -396,7 +425,19 @@ export default function StudentView({ lessonId }) {
     return (
       <div style={styles.centreScreen}>
         <h2 style={styles.title}>Session ended</h2>
-        <p>Thanks for joining! Great work today.</p>
+        <p style={{ color: 'var(--colour-text)', fontFamily: 'var(--font-body)', marginBottom: 8 }}>
+          Great work today! Your progress has been saved.
+        </p>
+        <p style={{ color: '#6b7280', fontFamily: 'var(--font-body)', fontSize: '0.9rem', marginBottom: 24 }}>
+          Want to keep practising on your own?
+        </p>
+        <button
+          className="btn-primary"
+          style={{ padding: '12px 32px', fontSize: 15 }}
+          onClick={() => setPhase('solo')}
+        >
+          Continue Solo
+        </button>
       </div>
     )
   }
@@ -417,6 +458,7 @@ export default function StudentView({ lessonId }) {
       )}
       <TopBar
         lessonTitle={lesson.title}
+        lessonLevel={lesson.level}
         displayName={identity?.displayName}
         isSandbox={isSandbox}
         isSolo={isSolo}

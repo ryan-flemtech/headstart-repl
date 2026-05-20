@@ -2,6 +2,7 @@
   "id": "python-intro",
   "type": "python",
   "title": "Introduction to Python",
+  "level": "Level 1",
   "description": "Your first steps with Python — printing, variables, and input.",
   "tasks": [
     {

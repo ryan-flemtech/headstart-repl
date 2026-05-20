@@ -27,6 +27,18 @@ export default function LessonMetaPanel({ lesson, onUpdate }) {
           />
         </Field>
 
+        <Field label="Level" hint="optional, e.g. Level 1">
+          <input
+            style={s.input}
+            value={lesson.level ?? ''}
+            onChange={e => {
+              const v = e.target.value
+              set('level', v || undefined)
+            }}
+            placeholder="Level 1"
+          />
+        </Field>
+
         <Field label="Description">
           <textarea
             style={{ ...s.input, resize: 'vertical', minHeight: 60 }}

@@ -73,7 +73,7 @@ export function MarkdownRenderer({ content, style }) {
         remarkPlugins={[remarkBreaks]}
         rehypePlugins={[rehypeHighlight]}
         components={components}
-        allowedElements={['p', 'strong', 'em', 'code', 'pre', 'br']}
+        allowedElements={['p', 'strong', 'em', 'code', 'pre', 'br', 'span']}
         unwrapDisallowed
       >
         {content}

@@ -53,10 +53,10 @@ export default function TeacherView({ lessonId }) {
       .catch(() => setLessonLoading(false))
   }, [lessonId])
 
-  // Create session if none exists, or if the previous session has ended
+  // Create session only if none exists — don't auto-restart an ended session
   useEffect(() => {
     if (loading || !lesson) return
-    if (!session || session.state === 'ended') createSession()
+    if (!session) createSession()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, lesson])
 
@@ -141,6 +141,7 @@ export default function TeacherView({ lessonId }) {
     <div style={s.page}>
       <TopBar
         lessonTitle={lesson.title}
+        lessonLevel={lesson.level}
         isSandbox={isSandbox}
         right={
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -181,6 +182,11 @@ export default function TeacherView({ lessonId }) {
             {session?.state === 'active' && (
               <button className="btn-danger" style={{ fontSize: 13, padding: '5px 12px' }} onClick={endSession}>
                 End Session
+              </button>
+            )}
+            {session?.state === 'ended' && (
+              <button className="btn-primary" style={{ fontSize: 13, padding: '5px 12px' }} onClick={createSession}>
+                Restart Session
               </button>
             )}
           </div>

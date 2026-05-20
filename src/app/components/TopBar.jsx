@@ -1,12 +1,13 @@
 import React from 'react'
 
 // isSolo: true = solo, false = live teacher session, undefined = don't show badge (teacher view)
-export default function TopBar({ lessonTitle, displayName, isSandbox, isSolo, right }) {
+export default function TopBar({ lessonTitle, lessonLevel, displayName, isSandbox, isSolo, right }) {
   return (
     <header style={s.bar}>
       <div style={s.left}>
         <span style={s.logo}>Headstart Coding</span>
         <span style={s.divider}>·</span>
+        {lessonLevel && <span style={s.level}>{lessonLevel}</span>}
         <span style={s.title}>{lessonTitle}</span>
         {isSandbox && <span style={s.sandboxBadge}>SANDBOX</span>}
         {!isSandbox && isSolo === true  && <span style={{ ...s.modeBadge, background: '#6b7280' }}>SOLO</span>}
@@ -47,7 +48,17 @@ const s = {
     fontWeight: 700,
     fontSize: '1rem',
     whiteSpace: 'nowrap',
-    color: 'var(--colour-secondary)',
+    color: '#ffffff',
+  },
+  level: {
+    fontFamily: 'var(--font-body)',
+    fontWeight: 600,
+    fontSize: '0.75rem',
+    whiteSpace: 'nowrap',
+    background: 'rgba(255,255,255,0.15)',
+    color: '#ffffff',
+    padding: '2px 8px',
+    borderRadius: 4,
   },
   divider: {
     opacity: 0.4,

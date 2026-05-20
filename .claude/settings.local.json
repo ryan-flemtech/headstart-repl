@@ -22,7 +22,13 @@
       "Bash(New-Item -ItemType Directory -Force \"C:\\\\Users\\\\rflem\\\\Documents\\\\HSC Repl\\\\public\\\\assets\")",
       "Bash(Out-Null)",
       "Bash(New-Item -ItemType File -Force \"C:\\\\Users\\\\rflem\\\\Documents\\\\HSC Repl\\\\public\\\\assets\\\\.gitkeep\")",
-      "Bash(Write-Host \"done\")"
+      "Bash(Write-Host \"done\")",
+      "Skill(anthropic-skills:pptx)",
+      "Skill(anthropic-skills:pptx:*)",
+      "Bash(python -m markitdown \"C:\\\\Users\\\\rflem\\\\Downloads\\\\4 - for loops.pptx\")",
+      "Bash(pip install *)",
+      "PowerShell(pip install \"markitdown[pptx]\" -q)",
+      "PowerShell(python -m markitdown \"C:\\\\Users\\\\rflem\\\\Downloads\\\\4 - for loops.pptx\")"
     ]
   }
 }

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { CodeEditor } from '../../shared/CodeEditor'
 import OutputPanel from './OutputPanel'
 import IframePreview from './IframePreview'
@@ -8,13 +8,6 @@ import { decodeFileKey } from '../hooks/useSession'
 export default function StudentModal({ student, lesson, session, isLive, onGoLive, onStopLive, onClose }) {
   const overlayRef = useRef(null)
   const iframeRef  = useRef(null)
-
-  // Close on Escape
-  useEffect(() => {
-    function onKey(e) { if (e.key === 'Escape') onClose?.() }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
 
   const isPython  = lesson?.type === 'python'
   const files     = student.currentFiles
@@ -27,6 +20,16 @@ export default function StudentModal({ student, lesson, session, isLive, onGoLiv
   const iframeSrc = !isPython && files.length
     ? buildIframeSrc(files, task?.entryFile ?? 'index.html')
     : null
+
+  const [activeFile, setActiveFile] = useState(task?.entryFile ?? files[0]?.name ?? '')
+  const activeFileObj = files.find(f => f.name === activeFile) ?? files[0]
+
+  // Close on Escape
+  useEffect(() => {
+    function onKey(e) { if (e.key === 'Escape') onClose?.() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
 
   return (
     <div
@@ -64,7 +67,7 @@ export default function StudentModal({ student, lesson, session, isLive, onGoLiv
         </div>
 
         {/* Content */}
-        <div style={s.body}>
+        <div style={isPython ? s.bodyPython : s.bodyHtml}>
           {isPython ? (
             <>
               <div style={s.editorWrap}>
@@ -84,20 +87,40 @@ export default function StudentModal({ student, lesson, session, isLive, onGoLiv
             </>
           ) : (
             <>
-              <div style={s.editorWrap}>
-                {files.map(f => (
-                  <div key={f.name}>
-                    <div style={s.fileLabel}>{f.name}</div>
-                    <CodeEditor
-                      value={f.content}
-                      language={f.type}
-                      readOnly
-                      style={{ height: 120 }}
-                    />
+              {/* Left: tabbed file editor */}
+              <div style={s.htmlEditorPane}>
+                {files.length > 1 && (
+                  <div style={s.tabBar}>
+                    {files.map(f => (
+                      <button
+                        key={f.name}
+                        style={{ ...s.tab, ...(f.name === activeFile ? s.tabActive : {}) }}
+                        onClick={() => setActiveFile(f.name)}
+                      >
+                        {f.name}
+                      </button>
+                    ))}
                   </div>
-                ))}
+                )}
+                {files.length === 1 && (
+                  <div style={s.singleFileLabel}>{files[0]?.name}</div>
+                )}
+                <div style={s.editorWrap}>
+                  {activeFileObj && (
+                    <CodeEditor
+                      key={activeFileObj.name}
+                      value={activeFileObj.content}
+                      language={activeFileObj.type}
+                      readOnly
+                      style={{ height: '100%' }}
+                    />
+                  )}
+                </div>
               </div>
-              <IframePreview src={iframeSrc} iframeRef={iframeRef} height={240} />
+              {/* Right: iframe preview */}
+              <div style={s.iframePane}>
+                <IframePreview src={iframeSrc} iframeRef={iframeRef} fill />
+              </div>
             </>
           )}
         </div>
@@ -120,9 +143,8 @@ const s = {
   modal: {
     background: '#fff',
     borderRadius: 12,
-    width: '100%',
-    maxWidth: 720,
-    maxHeight: '90vh',
+    width: 'min(1200px, 92vw)',
+    height: '88vh',
     display: 'flex',
     flexDirection: 'column',
     overflow: 'hidden',
@@ -152,27 +174,71 @@ const s = {
     letterSpacing: '0.05em',
   },
   checkBadge: { fontSize: '1rem' },
-  body: {
+  bodyPython: {
     flex: 1,
-    overflow: 'auto',
+    overflow: 'hidden',
     padding: 16,
     display: 'flex',
     flexDirection: 'column',
     gap: 12,
   },
-  editorWrap: {
+  bodyHtml: {
     flex: 1,
-    minHeight: 200,
-    maxHeight: 320,
-    overflow: 'auto',
+    overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'row',
+    gap: 0,
+  },
+  htmlEditorPane: {
+    flex: 1,
     display: 'flex',
     flexDirection: 'column',
-    gap: 8,
+    overflow: 'hidden',
+    borderRight: '1px solid #e5e7eb',
   },
-  fileLabel: {
+  iframePane: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+  },
+  tabBar: {
+    display: 'flex',
+    flexShrink: 0,
+    borderBottom: '1px solid #e5e7eb',
+    background: '#f9fafb',
+    overflowX: 'auto',
+  },
+  tab: {
+    fontFamily: 'var(--font-code)',
+    fontSize: '0.8rem',
+    padding: '7px 14px',
+    border: 'none',
+    borderBottom: '2px solid transparent',
+    background: 'transparent',
+    color: '#6b7280',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+  },
+  tabActive: {
+    color: 'var(--colour-primary)',
+    borderBottom: '2px solid var(--colour-primary)',
+    background: '#fff',
+    fontWeight: 600,
+  },
+  singleFileLabel: {
     fontFamily: 'var(--font-code)',
     fontSize: '0.78rem',
     color: '#6b7280',
-    marginBottom: 2,
+    padding: '6px 12px',
+    borderBottom: '1px solid #e5e7eb',
+    background: '#f9fafb',
+    flexShrink: 0,
+  },
+  editorWrap: {
+    flex: 1,
+    overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column',
   },
 }

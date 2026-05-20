@@ -207,7 +207,7 @@ const s = {
     fontFamily: 'var(--font-title)',
     fontWeight: 700,
     fontSize: '1rem',
-    color: 'var(--colour-secondary)',
+    color: '#ffffff',
   },
   dirtyDot: {
     width: 8,
