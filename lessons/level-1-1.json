@@ -1,0 +1,15 @@
+{
+  "id": "level-1-1",
+  "type": "python",
+  "title": "Introduction to Python",
+  "description": "",
+  "tasks": [
+    {
+      "id": 1,
+      "title": "Print!",
+      "explainer": "We can print a message to the screen using `print(\"\")`. \nWhatever we put inside the quotation marks will be shown in the **output**!",
+      "carryCodeFrom": null,
+      "starterCode": "print()"
+    }
+  ]
+}

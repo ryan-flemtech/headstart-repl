@@ -1,0 +1,100 @@
+import React, { useEffect, useState } from 'react'
+
+export default function WaitingRoom({ lessonTitle, onGoSolo }) {
+  const [dots, setDots] = useState('.')
+
+  useEffect(() => {
+    const t = setInterval(() => setDots(d => d.length < 3 ? d + '.' : '.'), 600)
+    return () => clearInterval(t)
+  }, [])
+
+  return (
+    <div style={s.page}>
+      <div style={s.card} className="card">
+        <div style={s.header}>
+          <span style={s.logo}>Headstart Coding</span>
+          <h1 style={s.title}>{lessonTitle}</h1>
+        </div>
+        <div style={s.body}>
+          <p style={s.waiting}>Your teacher is getting ready{dots}</p>
+          <p style={s.sub}>The session will start shortly. Sit tight!</p>
+          {onGoSolo && (
+            <button
+              onClick={onGoSolo}
+              style={s.soloBtn}
+            >
+              Work Solo instead
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const s = {
+  page: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: '100%',
+    background: 'var(--colour-primary)',
+  },
+  card: {
+    width: 400,
+    overflow: 'hidden',
+    borderRadius: 12,
+  },
+  header: {
+    background: 'var(--colour-primary)',
+    padding: '24px 28px 20px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+  },
+  logo: {
+    fontFamily: 'var(--font-title)',
+    fontWeight: 700,
+    fontSize: '0.85rem',
+    color: 'var(--colour-secondary)',
+  },
+  title: {
+    fontFamily: 'var(--font-title)',
+    fontWeight: 700,
+    fontSize: '1.4rem',
+    color: '#fff',
+  },
+  body: {
+    padding: '28px',
+    background: '#fff',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 12,
+    alignItems: 'center',
+    textAlign: 'center',
+  },
+  waiting: {
+    fontFamily: 'var(--font-title)',
+    fontWeight: 700,
+    fontSize: '1.1rem',
+    color: 'var(--colour-primary)',
+    minHeight: '1.5em',
+  },
+  sub: {
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.95rem',
+    color: 'var(--colour-text)',
+    lineHeight: 1.6,
+  },
+  soloBtn: {
+    marginTop: 8,
+    background: 'none',
+    border: 'none',
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.85rem',
+    color: '#9ca3af',
+    cursor: 'pointer',
+    textDecoration: 'underline',
+    padding: 0,
+  },
+}

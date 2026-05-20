@@ -1,0 +1,154 @@
+import React, { useState } from 'react'
+
+function applySuffix(name, existing) {
+  if (!existing.includes(name)) return name
+  let n = 2
+  while (existing.includes(`${name}-${n}`)) n++
+  return `${name}-${n}`
+}
+
+export default function NameEntry({ lessonTitle, existingNames = [], onSubmit, onGoSolo }) {
+  const [value, setValue]       = useState('')
+  const [confirmed, setConfirmed] = useState(null)
+
+  function handleSubmit(e) {
+    e.preventDefault()
+    const trimmed = value.trim()
+    if (!trimmed) return
+    const final = applySuffix(trimmed, existingNames)
+    if (final !== trimmed && !confirmed) {
+      setConfirmed(final)
+      return
+    }
+    onSubmit(confirmed ?? final)
+  }
+
+  return (
+    <div style={s.page}>
+      <div style={s.card} className="card">
+        <div style={s.header}>
+          <span style={s.logo}>Headstart Coding</span>
+          <h1 style={s.title}>{lessonTitle}</h1>
+        </div>
+        <div style={s.body}>
+          {confirmed ? (
+            <>
+              <p style={s.note}>
+                The name <strong>{value.trim()}</strong> is already taken.
+                You&apos;ll join as <strong>{confirmed}</strong>.
+              </p>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button className="btn-primary" onClick={() => onSubmit(confirmed)}>
+                  Join as {confirmed}
+                </button>
+                <button className="btn-ghost" style={{ color: 'var(--colour-primary)', border: '1px solid var(--colour-primary)' }}
+                  onClick={() => setConfirmed(null)}>
+                  Choose a different name
+                </button>
+              </div>
+            </>
+          ) : (
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <label style={s.label}>
+                What&apos;s your name?
+                <input
+                  style={s.input}
+                  autoFocus
+                  type="text"
+                  placeholder="e.g. Jamie"
+                  value={value}
+                  onChange={e => setValue(e.target.value)}
+                  maxLength={30}
+                />
+              </label>
+              <button className="btn-primary" type="submit" disabled={!value.trim()}>
+                Join
+              </button>
+              {onGoSolo && (
+                <button type="button" onClick={onGoSolo} style={s.soloLink}>
+                  Work Solo instead
+                </button>
+              )}
+            </form>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const s = {
+  page: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: '100%',
+    background: 'var(--colour-primary)',
+  },
+  card: {
+    width: 400,
+    overflow: 'hidden',
+    borderRadius: 12,
+  },
+  header: {
+    background: 'var(--colour-primary)',
+    padding: '24px 28px 20px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+  },
+  logo: {
+    fontFamily: 'var(--font-title)',
+    fontWeight: 700,
+    fontSize: '0.85rem',
+    color: 'var(--colour-secondary)',
+  },
+  title: {
+    fontFamily: 'var(--font-title)',
+    fontWeight: 700,
+    fontSize: '1.4rem',
+    color: '#fff',
+  },
+  body: {
+    padding: '24px 28px',
+    background: '#fff',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 16,
+  },
+  label: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+    fontFamily: 'var(--font-body)',
+    fontWeight: 600,
+    fontSize: '0.95rem',
+    color: 'var(--colour-text)',
+  },
+  input: {
+    padding: '10px 12px',
+    border: '2px solid #e5e7eb',
+    borderRadius: 8,
+    fontFamily: 'var(--font-body)',
+    fontSize: '1rem',
+    outline: 'none',
+  },
+  note: {
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.95rem',
+    color: 'var(--colour-text)',
+    lineHeight: 1.6,
+    marginBottom: 4,
+  },
+  soloLink: {
+    background: 'none',
+    border: 'none',
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.85rem',
+    color: '#9ca3af',
+    cursor: 'pointer',
+    textDecoration: 'underline',
+    padding: 0,
+    textAlign: 'center',
+  },
+}

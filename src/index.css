@@ -1,0 +1,115 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@700&family=Quicksand:wght@400;600&family=JetBrains+Mono&display=swap');
+
+:root {
+  --colour-primary:          #6222CC;
+  --colour-primary-dark:     #4e1aa3;
+  --colour-secondary:        #FBA504;
+  --colour-secondary-dark:   #e09400;
+  --colour-text:             rgb(58, 59, 60);
+  --colour-text-on-primary:  #ffffff;
+  --colour-text-on-secondary:#ffffff;
+
+  --font-title:  'Montserrat', sans-serif;
+  --font-body:   'Quicksand', sans-serif;
+  --font-code:   'JetBrains Mono', monospace;
+
+  --font-weight-title:       700;
+  --font-weight-body:        400;
+  --font-weight-body-medium: 600;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  height: 100%;
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-body);
+  color: var(--colour-text);
+  background: #f5f5f5;
+}
+
+button {
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-body-medium);
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 14px;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--colour-secondary);
+  color: var(--colour-text-on-secondary);
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--colour-secondary-dark);
+}
+
+.btn-secondary {
+  background: var(--colour-primary);
+  color: var(--colour-text-on-primary);
+}
+.btn-secondary:hover:not(:disabled) {
+  background: var(--colour-primary-dark);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--colour-text-on-primary);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+.btn-ghost:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.btn-danger {
+  background: #ef4444;
+  color: #fff;
+}
+.btn-danger:hover:not(:disabled) {
+  background: #dc2626;
+}
+
+/* Status dot colours */
+.status-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.status-dot--success { background: #22c55e; }
+.status-dot--error   { background: #ef4444; }
+.status-dot--idle    { background: #9ca3af; }
+
+/* Online presence dot */
+@keyframes online-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.55; transform: scale(0.82); }
+}
+.online-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  flex-shrink: 0;
+  animation: online-pulse 1.6s ease-in-out infinite;
+}
+
+/* Shared card style */
+.card {
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}

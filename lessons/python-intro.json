@@ -1,0 +1,63 @@
+{
+  "id": "python-intro",
+  "type": "python",
+  "title": "Introduction to Python",
+  "description": "Your first steps with Python — printing, variables, and input.",
+  "tasks": [
+    {
+      "id": 1,
+      "title": "Hello World",
+      "explainer": "Every programmer starts here. Use `print()` to show text on screen.\n\nPut your message inside the brackets and wrap it in quotes:\n\n```python\nprint('Hello, world!')\n```\n\nRun the code to see the output below. Then try changing the message!",
+      "starterCode": "# Write your first line of Python below\nprint('Hello, world!')\n",
+      "carryCodeFrom": null,
+      "check": {
+        "type": "output_contains",
+        "value": "Hello"
+      }
+    },
+    {
+      "id": 2,
+      "title": "Variables",
+      "explainer": "A **variable** stores a piece of information so you can use it later.\n\n```python\nname = 'Jamie'\nage = 12\nprint(name)\nprint(age)\n```\n\nCreate a variable called `name` and set it to your name, then print a greeting using it.",
+      "starterCode": "name = 'Your name here'\nprint('Hello,', name)\n",
+      "carryCodeFrom": null,
+      "check": {
+        "type": "output_contains",
+        "value": "Hello"
+      }
+    },
+    {
+      "id": 3,
+      "title": "Getting Input",
+      "explainer": "Use `input()` to ask the user to type something.\n\n```python\nname = input('What is your name? ')\nprint('Nice to meet you,', name)\n```\n\nAsk for the user's name, then print a greeting using their answer.",
+      "starterCode": "name = input('What is your name? ')\nprint('Nice to meet you,', name)\n",
+      "carryCodeFrom": null,
+      "check": {
+        "type": "output_contains",
+        "value": "Nice to meet you"
+      }
+    },
+    {
+      "id": 4,
+      "title": "Numbers and Maths",
+      "explainer": "Python can do maths! Try these operators:\n\n```python\nprint(10 + 3)   # addition\nprint(10 - 3)   # subtraction\nprint(10 * 3)   # multiplication\nprint(10 / 3)   # division\n```\n\nAsk the user for two numbers and print their **sum**. Use `int()` to convert the input to a number:\n\n```python\na = int(input('First number: '))\n```",
+      "starterCode": "a = int(input('First number: '))\nb = int(input('Second number: '))\nprint(a + b)\n",
+      "carryCodeFrom": null,
+      "check": {
+        "type": "output_contains",
+        "value": ""
+      }
+    },
+    {
+      "id": 5,
+      "title": "Making Decisions",
+      "explainer": "An `if` statement lets your program choose what to do.\n\n```python\nage = int(input('How old are you? '))\nif age >= 18:\n    print('You can vote!')\nelse:\n    print('Not old enough yet.')\n```\n\nAsk the user to enter a number. If it's greater than 10, print `Big number!`. Otherwise print `Small number!`.",
+      "starterCode": "number = int(input('Enter a number: '))\nif number > 10:\n    print('Big number!')\nelse:\n    print('Small number!')\n",
+      "carryCodeFrom": null,
+      "check": {
+        "type": "output_contains",
+        "value": "number"
+      }
+    }
+  ]
+}
