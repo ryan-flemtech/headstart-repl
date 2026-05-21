@@ -8,7 +8,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig({
   plugins: [react()],
-  base: '/headstart-repl/',
+  base: '/editor/',
   resolve: {
     dedupe: ['react', 'react-dom'],
   },
