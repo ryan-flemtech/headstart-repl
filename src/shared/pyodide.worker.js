@@ -76,7 +76,11 @@ _g = {
     '__name__': '__main__',
 }
 exec(compile(_mod, '<student>', 'exec'), _g)
-await _g['__hs_run__']()
+try:
+    await _g['__hs_run__']()
+finally:
+    sys.stdout.flush()
+    sys.stderr.flush()
 `
 
 // Expose input handler on the worker global so Python can call it via `import js`
@@ -111,19 +115,63 @@ self.onmessage = async ({ data }) => {
 
     _inputResolve = null
 
+    let _stdoutBuf = ''
+    let _stderrBuf = ''
+    let _flushPending = false
+
+    const flushBuffers = () => {
+      _flushPending = false
+      if (_stdoutBuf) {
+        self.postMessage({ type: 'output', text: _stdoutBuf, kind: 'stdout' })
+        _stdoutBuf = ''
+      }
+      if (_stderrBuf) {
+        self.postMessage({ type: 'output', text: _stderrBuf, kind: 'stderr' })
+        _stderrBuf = ''
+      }
+    }
+
+    const scheduleFlush = () => {
+      if (_flushPending) return
+      _flushPending = true
+      setTimeout(flushBuffers, 0)
+    }
+
     pyodide.setStdout({
-      batched: line => self.postMessage({ type: 'output', text: line + '\n', kind: 'stdout' }),
+      raw: (charCode) => {
+        const ch = String.fromCharCode(charCode)
+        _stdoutBuf += ch
+        if (ch === '\n') {
+          self.postMessage({ type: 'output', text: _stdoutBuf, kind: 'stdout' })
+          _stdoutBuf = ''
+          _flushPending = false
+        } else {
+          scheduleFlush()
+        }
+      },
     })
     pyodide.setStderr({
-      batched: line => self.postMessage({ type: 'output', text: line + '\n', kind: 'stderr' }),
+      raw: (charCode) => {
+        const ch = String.fromCharCode(charCode)
+        _stderrBuf += ch
+        if (ch === '\n') {
+          self.postMessage({ type: 'output', text: _stderrBuf, kind: 'stderr' })
+          _stderrBuf = ''
+          _flushPending = false
+        } else {
+          scheduleFlush()
+        }
+      },
     })
 
     pyodide.globals.set('_hs_user_code', data.code)
 
     try {
       await pyodide.runPythonAsync(WRAPPER)
+      flushBuffers()
       self.postMessage({ type: 'done', status: 'success' })
     } catch (err) {
+      flushBuffers()
       const msg = String(err).replace(/^PythonError:\s*/, '')
       self.postMessage({ type: 'output', text: msg + '\n', kind: 'stderr' })
       self.postMessage({ type: 'done', status: 'error' })

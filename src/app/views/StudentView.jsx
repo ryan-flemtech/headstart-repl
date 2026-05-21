@@ -4,6 +4,7 @@ import { useSession, decodeFileKey } from '../hooks/useSession'
 import { useIdentity } from '../hooks/useIdentity'
 import { initPyodide, runPython, stopPython, provideInput, isPyodideReady } from '../../shared/pyodide'
 import { buildIframeSrc, waitForIframeText } from '../../shared/iframe'
+import { evaluateCheck } from '../../shared/checks'
 import TopBar from '../components/TopBar'
 import NameEntry from '../components/NameEntry'
 import WaitingRoom from '../components/WaitingRoom'
@@ -399,9 +400,7 @@ export default function StudentView({ lessonId }) {
       const status = result.status
       setRunStatus(status)
 
-      const passed = task?.check
-        ? accumulated.toLowerCase().includes(task.check.value.toLowerCase())
-        : false
+      const passed = evaluateCheck(task?.check, accumulated)
       setCheckPassed(passed)
 
       saveCode(lessonId, currentTaskId, identity.anonymousId, { code, output: accumulated, runStatus: status })
@@ -422,9 +421,7 @@ export default function StudentView({ lessonId }) {
 
     // Wait for the iframe to report its body text via postMessage, then run checks
     waitForIframeText().then(text => {
-      const passed = task?.check
-        ? text.toLowerCase().includes(task.check.value.toLowerCase())
-        : false
+      const passed = evaluateCheck(task?.check, text)
       setCheckPassed(passed)
       if (phase === 'lesson' || phase === 'sandbox' || isWatched) {
         const filesMap = Object.fromEntries(files.map(f => [f.name, f.content]))

@@ -115,7 +115,7 @@ export default function BuilderView({ lesson, dirty, onUpdate, onNew, onMarkSave
     setSelectedTaskId(newId)
   }
 
-  const { errors } = validateLesson(lesson)
+  const { errors, warnings } = validateLesson(lesson)
   const selectedTask = lesson.tasks.find(t => t.id === selectedTaskId)
 
   return (
@@ -139,9 +139,12 @@ export default function BuilderView({ lesson, dirty, onUpdate, onNew, onMarkSave
       </header>
 
       <div style={s.body}>
-        {/* Left panel */}
-        <aside style={s.left}>
+        <aside style={s.metaPane}>
           <LessonMetaPanel lesson={lesson} onUpdate={onUpdate} />
+          <ValidationPanel errors={errors} warnings={warnings} />
+        </aside>
+
+        <aside style={s.taskPane}>
           <TaskList
             tasks={lesson.tasks}
             selectedTaskId={selectedTaskId}
@@ -166,7 +169,6 @@ export default function BuilderView({ lesson, dirty, onUpdate, onNew, onMarkSave
           />
         </aside>
 
-        {/* Main panel */}
         <main style={s.main}>
           {selectedTask ? (
             <TaskEditor
@@ -188,6 +190,45 @@ export default function BuilderView({ lesson, dirty, onUpdate, onNew, onMarkSave
         </main>
       </div>
     </div>
+  )
+}
+
+function ValidationPanel({ errors, warnings }) {
+  const [activeTab, setActiveTab] = useState(errors.length ? 'errors' : 'warnings')
+  const items = activeTab === 'errors' ? errors : warnings
+  const count = activeTab === 'errors' ? errors.length : warnings.length
+
+  return (
+    <section style={s.validation}>
+      <div style={s.validationTabs}>
+        <button
+          style={{ ...s.validationTab, ...(activeTab === 'errors' ? s.validationTabActive : {}) }}
+          onClick={() => setActiveTab('errors')}
+        >
+          Errors <span style={s.countBadge}>{errors.length}</span>
+        </button>
+        <button
+          style={{ ...s.validationTab, ...(activeTab === 'warnings' ? s.validationTabActive : {}) }}
+          onClick={() => setActiveTab('warnings')}
+        >
+          Warnings <span style={s.countBadge}>{warnings.length}</span>
+        </button>
+      </div>
+
+      <div style={s.validationBody}>
+        {count === 0 ? (
+          <p style={s.validationEmpty}>
+            No {activeTab === 'errors' ? 'errors' : 'warnings'} found.
+          </p>
+        ) : (
+          items.map((item, i) => (
+            <div key={`${activeTab}-${i}`} style={activeTab === 'errors' ? s.errorItem : s.warningItem}>
+              {item}
+            </div>
+          ))
+        )}
+      </div>
+    </section>
   )
 }
 
@@ -219,20 +260,29 @@ const s = {
   body: {
     flex: 1,
     display: 'grid',
-    gridTemplateColumns: '260px 1fr',
+    gridTemplateColumns: '320px 280px minmax(0, 1fr)',
     overflow: 'hidden',
   },
-  left: {
+  metaPane: {
     background: '#fff',
     borderRight: '1px solid #e5e7eb',
     overflow: 'auto',
     display: 'flex',
     flexDirection: 'column',
   },
+  taskPane: {
+    background: '#fff',
+    borderRight: '1px solid #e5e7eb',
+    overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column',
+    minWidth: 0,
+  },
   main: {
     overflow: 'auto',
     background: '#f5f5f5',
-    padding: 16,
+    padding: 20,
+    minWidth: 0,
   },
   empty: {
     display: 'flex',
@@ -242,5 +292,80 @@ const s = {
     color: '#9ca3af',
     fontFamily: 'var(--font-body)',
     fontSize: '0.95rem',
+  },
+  validation: {
+    borderTop: '1px solid #e5e7eb',
+    display: 'flex',
+    flexDirection: 'column',
+    minHeight: 180,
+  },
+  validationTabs: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    padding: 10,
+    gap: 6,
+    borderBottom: '1px solid #e5e7eb',
+    background: '#fafafa',
+  },
+  validationTab: {
+    border: '1px solid #e5e7eb',
+    background: '#fff',
+    color: 'var(--colour-text)',
+    borderRadius: 6,
+    padding: '7px 8px',
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.82rem',
+    fontWeight: 700,
+    cursor: 'pointer',
+  },
+  validationTabActive: {
+    borderColor: 'var(--colour-primary)',
+    color: 'var(--colour-primary)',
+    background: '#f7f2ff',
+  },
+  countBadge: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 20,
+    height: 20,
+    marginLeft: 6,
+    padding: '0 6px',
+    borderRadius: 999,
+    background: '#eef2ff',
+    color: 'var(--colour-primary)',
+    fontSize: '0.72rem',
+  },
+  validationBody: {
+    padding: 12,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+  },
+  validationEmpty: {
+    margin: 0,
+    color: '#6b7280',
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.86rem',
+  },
+  errorItem: {
+    border: '1px solid #fecaca',
+    background: '#fef2f2',
+    color: '#991b1b',
+    borderRadius: 6,
+    padding: '8px 10px',
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.84rem',
+    lineHeight: 1.45,
+  },
+  warningItem: {
+    border: '1px solid #fde68a',
+    background: '#fffbeb',
+    color: '#92400e',
+    borderRadius: 6,
+    padding: '8px 10px',
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.84rem',
+    lineHeight: 1.45,
   },
 }

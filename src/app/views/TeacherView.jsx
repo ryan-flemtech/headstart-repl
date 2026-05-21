@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useSession } from '../hooks/useSession'
+import { useSession, decodeFileKey } from '../hooks/useSession'
 import { initPyodide, runPython, provideInput, isPyodideReady } from '../../shared/pyodide'
 import { buildIframeSrc } from '../../shared/iframe'
 import TopBar from '../components/TopBar'
@@ -18,6 +18,21 @@ function resolveAssetsPath(rawPath) {
   const base = import.meta.env.BASE_URL.replace(/\/$/, '')
   const encoded = rawPath.split('/').map(s => (s ? encodeURIComponent(s) : s)).join('/')
   return window.location.origin + base + encoded
+}
+
+function getFileType(name) {
+  if (name.endsWith('.html')) return 'html'
+  if (name.endsWith('.css')) return 'css'
+  if (name.endsWith('.js')) return 'javascript'
+  return 'text'
+}
+
+function decodeSessionFiles(sessionFiles) {
+  if (!sessionFiles) return []
+  return Object.entries(sessionFiles).map(([key, content]) => {
+    const name = decodeFileKey(key)
+    return { name, content, type: getFileType(name) }
+  })
 }
 
 export default function TeacherView({ lessonId }) {
@@ -80,9 +95,46 @@ export default function TeacherView({ lessonId }) {
     setIframeSrc(null)
   }
 
+  function getSandboxStarterCode() {
+    const task = lesson?.tasks.find(t => t.id === currentTaskId)
+    if (session?.state === 'sandbox' && session.sandboxCode != null) return session.sandboxCode
+    if (lesson?.sandboxStarter != null) return lesson.sandboxStarter
+    if (code) return code
+    return task?.starterCode ?? ''
+  }
+
+  function getSandboxStarterFiles() {
+    const task = lesson?.tasks.find(t => t.id === currentTaskId)
+    const liveFiles = session?.state === 'sandbox' ? decodeSessionFiles(session.sandboxFiles) : []
+    if (liveFiles.length > 0) return liveFiles
+    if (lesson?.sandboxStarterFiles?.length > 0) return lesson.sandboxStarterFiles
+    if (files.length > 0) return files
+    return task?.starterFiles ?? []
+  }
+
   // Load task content when task changes
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { loadCurrentTaskContent(currentTaskId) }, [currentTaskId, lesson])
+  useEffect(() => {
+    if (sandboxStaging || session?.state === 'sandbox') return
+    loadCurrentTaskContent(currentTaskId)
+  }, [currentTaskId, lesson, sandboxStaging, session?.state])
+
+  // If the teacher opens/reloads while the sandbox is already live, show the
+  // live sandbox payload instead of the normal task starter.
+  useEffect(() => {
+    if (!lesson || sandboxStaging || session?.state !== 'sandbox') return
+    if (lesson.type === 'python') {
+      setCode(getSandboxStarterCode())
+    } else {
+      const starterFiles = getSandboxStarterFiles()
+      setFiles(starterFiles)
+      setActiveFile(starterFiles[0]?.name ?? '')
+    }
+    setOutput('')
+    setRunStatus(null)
+    setIframeSrc(null)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lesson, sandboxStaging, session?.state, session?.sandboxCodePushedAt, session?.sandboxFilesUpdatedAt])
 
   // Warm up Pyodide
   useEffect(() => {
@@ -128,9 +180,9 @@ export default function TeacherView({ lessonId }) {
 
   function handleEnterSandbox() {
     if (lesson.type === 'python') {
-      setCode(lesson.sandboxStarter ?? '')
+      setCode(getSandboxStarterCode())
     } else {
-      const starterFiles = lesson.sandboxStarterFiles ?? []
+      const starterFiles = getSandboxStarterFiles()
       setFiles(starterFiles)
       setActiveFile(starterFiles[0]?.name ?? '')
     }

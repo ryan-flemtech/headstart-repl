@@ -1,0 +1,73 @@
+{
+  "id": "python-2-6",
+  "type": "python",
+  "title": "Hangman",
+  "level": "Level 3",
+  "description": "Build a Hangman game step by step, combining loops, lists, and conditions.",
+  "tasks": [
+    {
+      "id": 1,
+      "title": "Print Each Letter",
+      "explainer": "Time to start building **Hangman**!\n\nWe already have two variables set up:\n\n```python\nsecret_word = \"pokemon\"\nguessed = [\"m\", \"o\"]\n```\n\n`secret_word` is the word the player has to guess. `guessed` is a list of letters they've already found — we'll use this later.\n\n**Your task:** Loop through `secret_word` and print each letter on the **same line**, with a space after each one.\n\nSample output:\n```\np o k e m o n\n```\n\n**Hint:** `print()` normally adds a newline at the end. You can change this using the `end` parameter:\n```python\nprint(letter, end=\" \")\n```",
+      "starterCode": "secret_word = \"pokemon\"\nguessed = [\"m\", \"o\"]\n\n# Loop through secret_word and print each letter with a space after it\n",
+      "carryCodeFrom": null,
+      "check": {
+        "type": "output_contains",
+        "value": "p o k e m o n"
+      }
+    },
+    {
+      "id": 2,
+      "title": "Hide the Unguessed Letters",
+      "explainer": "Great! Now let's make it look like a real Hangman game.\n\nInstead of showing every letter, we only want to reveal the letters that are in the `guessed` list. Everything else should show as `_`.\n\n**Your task:** Inside your loop, add an `if`/`else`:\n- If the letter is in `guessed`, print the letter\n- Otherwise, print `\"_\"`\n\nWith `guessed = [\"m\", \"o\"]`, the output should look like:\n```\n_ o _ _ m o _\n```\n\n**Hint:** To check if something is in a list:\n```python\nif letter in guessed:\n```",
+      "starterCode": "secret_word = \"pokemon\"\nguessed = [\"m\", \"o\"]\n\nfor letter in secret_word:\n    print(letter, end=\" \")\n",
+      "carryCodeFrom": 1,
+      "check": {
+        "type": "output_contains",
+        "value": "_ o _ _ m o _"
+      }
+    },
+    {
+      "id": 3,
+      "title": "Add Lives and Get Input",
+      "explainer": "The hidden word is showing. Now let's let the player make a guess!\n\n**Your task — two changes:**\n\n1. Before the loop, add a `lives` variable:\n```python\nlives = 4\n```\n\n2. After the loop finishes printing, ask the player for a letter:\n```python\nuser_input = input(\"Enter a letter: \")\n```\n\nRun your code and try entering a letter — for now, nothing will happen with it yet. That's coming next!",
+      "starterCode": "secret_word = \"pokemon\"\nguessed = [\"m\", \"o\"]\n\nfor letter in secret_word:\n    if letter in guessed:\n        print(letter, end=\" \")\n    else:\n        print(\"_\", end=\" \")\n",
+      "carryCodeFrom": 2
+    },
+    {
+      "id": 4,
+      "title": "Check the Guess",
+      "explainer": "Now let's actually do something with the player's guess!\n\nAfter receiving `user_input`, add an `if`/`else`:\n\n- If `user_input` is in `secret_word`:\n  - Print `\"You're slayin! Bestie!\"`\n  - Add the letter to `guessed` using `.append()`\n- Otherwise:\n  - Take away a life: `lives = lives - 1`\n  - Print a message like `\"WRONG! 3 lives remaining\"`\n\n**Hint:** To include the number of lives in your message:\n```python\nprint(\"WRONG! \" + str(lives) + \" lives remaining\")\n```\n\nTry running and entering a letter — does it respond correctly?",
+      "starterCode": "secret_word = \"pokemon\"\nguessed = [\"m\", \"o\"]\n\nlives = 4\nfor letter in secret_word:\n    if letter in guessed:\n        print(letter, end=\" \")\n    else:\n        print(\"_\", end=\" \")\n\nuser_input = input(\"Enter a letter: \")\n",
+      "carryCodeFrom": 3
+    },
+    {
+      "id": 5,
+      "title": "Show the Word Again",
+      "explainer": "After the player guesses, they need to see the updated word — otherwise how do they know if they guessed right?\n\n**Your task:** After your `if`/`else` block, paste the word-printing loop again:\n\n```python\nfor letter in secret_word:\n    if letter in guessed:\n        print(letter, end=\" \")\n    else:\n        print(\"_\", end=\" \")\n```\n\nNow try guessing a correct letter — you should see it revealed in the second print!\n\nFor example, guess `p` and the output should update to:\n```\np o _ _ m o _\n```",
+      "starterCode": "secret_word = \"pokemon\"\nguessed = [\"m\", \"o\"]\n\nlives = 4\nfor letter in secret_word:\n    if letter in guessed:\n        print(letter, end=\" \")\n    else:\n        print(\"_\", end=\" \")\n\nuser_input = input(\"Enter a letter: \")\n\nif user_input in secret_word:\n    print(\"You're slayin! Bestie!\")\n    guessed.append(user_input)\nelse:\n    lives = lives - 1\n    print(\"WRONG! \" + str(lives) + \" lives remaining\")\n",
+      "carryCodeFrom": 4
+    },
+    {
+      "id": 6,
+      "title": "Loop the Game with while True",
+      "explainer": "Right now you can only make one guess. Let's keep the game going!\n\n**Your task:** Wrap everything from `user_input = input(...)` onwards in a `while True:` loop — but **not** the initial word print at the top.\n\nThe structure should look like this:\n\n```python\nlives = 4\n# First print of the word\nfor letter in secret_word:\n    ...\n\nwhile True:\n    user_input = input(\"Enter a letter: \")\n\n    # check the guess\n    if user_input in secret_word:\n        ...\n    else:\n        ...\n\n    # print the word again\n    for letter in secret_word:\n        ...\n```\n\nNow you can keep guessing! (You'll need to stop it manually for now — the game never ends yet.)",
+      "starterCode": "secret_word = \"pokemon\"\nguessed = [\"m\", \"o\"]\n\nlives = 4\nfor letter in secret_word:\n    if letter in guessed:\n        print(letter, end=\" \")\n    else:\n        print(\"_\", end=\" \")\n\nuser_input = input(\"Enter a letter: \")\n\nif user_input in secret_word:\n    print(\"You're slayin! Bestie!\")\n    guessed.append(user_input)\nelse:\n    lives = lives - 1\n    print(\"WRONG! \" + str(lives) + \" lives remaining\")\n\nfor letter in secret_word:\n    if letter in guessed:\n        print(letter, end=\" \")\n    else:\n        print(\"_\", end=\" \")\n",
+      "carryCodeFrom": 5
+    },
+    {
+      "id": 7,
+      "title": "Add a Losing Condition",
+      "explainer": "The game loops forever — let's add a way to lose!\n\n**Your task:** After the `if`/`else` that checks the guess, add another check:\n\n```python\nif lives == 0:\n    print(\"You lost!\")\n    break\n```\n\n`break` exits the `while True` loop immediately, ending the game.\n\nPut this check **before** you print the word again — there's no point showing the word if the game is already over!\n\nTest it: enter wrong letters until you run out of lives. The game should end with `\"You lost!\"`.",
+      "starterCode": "secret_word = \"pokemon\"\nguessed = [\"m\", \"o\"]\n\nlives = 4\nfor letter in secret_word:\n    if letter in guessed:\n        print(letter, end=\" \")\n    else:\n        print(\"_\", end=\" \")\n\nwhile True:\n    user_input = input(\"Enter a letter: \")\n\n    if user_input in secret_word:\n        print(\"You're slayin! Bestie!\")\n        guessed.append(user_input)\n    else:\n        lives = lives - 1\n        print(\"WRONG! \" + str(lives) + \" lives remaining\")\n\n    for letter in secret_word:\n        if letter in guessed:\n            print(letter, end=\" \")\n        else:\n            print(\"_\", end=\" \")\n",
+      "carryCodeFrom": 6
+    },
+    {
+      "id": 8,
+      "title": "Add a Winning Condition",
+      "explainer": "Last step — let's add a way to **win**!\n\nThe trick: replace the word-printing loop at the bottom of `while True` with this version:\n\n```python\ndash = False\nfor letter in secret_word:\n    if letter in guessed:\n        print(letter, end=\" \")\n    else:\n        print(\"_\", end=\" \")\n        dash = True\n```\n\n`dash` starts as `False`. It only gets set to `True` when a `_` is printed. If the whole word prints with no dashes, `dash` stays `False` — meaning all letters are guessed!\n\nAfter the loop, add:\n\n```python\nif dash == False:\n    print(\"You win!!!\")\n    break\n```\n\nNow test the full game — guess `p`, `k`, `e`, `n` to reveal the whole word and win!",
+      "starterCode": "secret_word = \"pokemon\"\nguessed = [\"m\", \"o\"]\n\nlives = 4\nfor letter in secret_word:\n    if letter in guessed:\n        print(letter, end=\" \")\n    else:\n        print(\"_\", end=\" \")\n\nwhile True:\n    user_input = input(\"Enter a letter: \")\n\n    if user_input in secret_word:\n        print(\"You're slayin! Bestie!\")\n        guessed.append(user_input)\n    else:\n        lives = lives - 1\n        print(\"WRONG! \" + str(lives) + \" lives remaining\")\n\n    if lives == 0:\n        print(\"You lost!\")\n        break\n\n    for letter in secret_word:\n        if letter in guessed:\n            print(letter, end=\" \")\n        else:\n            print(\"_\", end=\" \")\n",
+      "carryCodeFrom": 7
+    }
+  ]
+}
