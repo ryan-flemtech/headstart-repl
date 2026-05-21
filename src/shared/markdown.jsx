@@ -60,11 +60,44 @@ function categorize(text) {
 }
 
 function renderBlockText(text) {
-  // Wrap numbers and quoted strings in a value-pill (mimics Scratch input bubbles)
-  const parts = text.split(/(\b\d+(?:\.\d+)?\b|"[^"]*"|'[^']*')/g)
+  // Matches condition pills wrapped in <<...>> OR numbers/quoted strings
+  // Regex Breakdown: (<<[^>]+>>) catches << anything inside double angle brackets >>
+  const parts = text.split(/(<<.+?>>|\b\d+(?:\.\d+)?\b|"[^"]*"|'[^']*')/g);
+  
   return parts.map((part, i) => {
-    const isNum = /^\d+(?:\.\d+)?$/.test(part)
-    const isStr = /^["'].*["']$/.test(part)
+    // 1. Check if it's a Condition Pill <<...>>
+    if (part.startsWith('<<') && part.endsWith('>>')) {
+      const innerText = part.slice(2, -2).trim(); // Strip the << and >>
+      const t = innerText.toLowerCase();
+
+      // Determine pill color: Sensing Blue vs Operators Green
+      const isSensing = t.includes('touching') || t.includes('key') || t.includes('mouse') || t.includes('pressed');
+      const pillColor = isSensing ? '#5CB1D6' : '#5CB345'; 
+
+      return (
+        <span
+          key={i}
+          style={{
+            background: pillColor,
+            borderRadius: '12px',  // Pointed pill shape
+            padding: '2px 8px',
+            margin: '0 3px',
+            fontSize: '12px',
+            border: '1px solid rgba(0,0,0,0.15)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            color: 'white',
+          }}
+        >
+          {/* Recursively render text inside so numbers like '5' still get white bubbles */}
+          {renderBlockText(innerText)}
+        </span>
+      );
+    }
+
+    // 2. Existing logic for Numbers or Strings (White Bubbles)
+    const isNum = /^\d+(?:\.\d+)?$/.test(part);
+    const isStr = /^["'].*["']$/.test(part);
     if (isNum || isStr) {
       return (
         <span
@@ -74,14 +107,17 @@ function renderBlockText(text) {
             borderRadius: '8px',
             padding: '0 5px',
             margin: '0 1px',
+            color: isStr ? 'white' : 'inherit'
           }}
         >
           {isStr ? part.slice(1, -1) : part}
         </span>
-      )
+      );
     }
-    return part
-  })
+
+    // 3. Plain text
+    return part;
+  });
 }
 
 function ScratchBlock({ text, color, hat, c }) {
