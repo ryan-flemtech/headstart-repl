@@ -1,0 +1,907 @@
+import React, { useEffect, useRef, useState, useCallback } from 'react'
+import {
+  loadBlocklyModules,
+  DEFAULT_TOOLBOX,
+  DEFAULT_SPRITES,
+  buildAlwaysOpenToolbox,
+  createRunSignal,
+  runAllSprites,
+  runAllSpritesEvent,
+  runBlockInContext,
+  normalizeKey,
+  saveWorkspace,
+  loadWorkspace,
+  evaluateScratchCheck,
+  setSpriteContext,
+  setBackdropContext,
+  setCostumeContext,
+} from '../../shared/scratch'
+
+const STAGE_W = 480
+const STAGE_H = 360
+const SYNC_DEBOUNCE = 1000
+
+const toCanvasX = x => STAGE_W / 2 + x
+const toCanvasY = y => STAGE_H / 2 - y
+
+export const SPRITE_TYPES = ['cat', 'ball', 'star', 'arrow', 'bat', 'parrot']
+
+const SPRITE_TYPE_COLOR = { cat: '#FFA500', ball: '#4C97FF', star: '#FFD700', arrow: '#9966FF', bat: '#374151', parrot: '#22c55e' }
+
+function normaliseInitialStates(raw, sprites) {
+  if (!raw) return {}
+  if (sprites[0] && Object.prototype.hasOwnProperty.call(raw, sprites[0].id)) return raw
+  return sprites[0] ? { [sprites[0].id]: raw } : {}
+}
+
+function defaultSpriteState(sp) {
+  return { x: sp.x ?? 0, y: sp.y ?? 0, size: sp.size ?? 100, direction: sp.direction ?? 90, visible: true, bubble: '', bubbleType: 'say', rotationStyle: 'all around', costume: sp.costumes?.[0]?.name ?? null }
+}
+
+function initSpriteStates(sprites) {
+  const out = {}
+  for (const sp of sprites) out[sp.id] = defaultSpriteState(sp)
+  return out
+}
+
+// ── Canvas drawing ────────────────────────────────────────────────────────────
+
+function drawSpriteShape(ctx, s, type) {
+  const cx = toCanvasX(s.x)
+  const cy = toCanvasY(s.y)
+  const r  = Math.max(4, (s.size / 100) * 24)
+  const dir = Number.isFinite(Number(s.direction)) ? Number(s.direction) : 90
+  const rs  = s.rotationStyle ?? 'all around'
+  const rot = rs === "don't rotate" ? 0 : rs === 'left-right' ? (dir > 90 && dir < 270 ? Math.PI : 0) : (dir - 90) * (Math.PI / 180)
+
+  ctx.save()
+  ctx.translate(cx, cy)
+  ctx.rotate(rot)
+  switch (type) {
+    case 'ball':
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2)
+      ctx.fillStyle = '#4C97FF'; ctx.fill()
+      ctx.strokeStyle = '#2244aa'; ctx.lineWidth = 1.5; ctx.stroke()
+      break
+    case 'star': {
+      ctx.beginPath()
+      for (let i = 0; i < 10; i++) {
+        const a = (i * Math.PI) / 5 - Math.PI / 2
+        const rad = i % 2 === 0 ? r : r * 0.42
+        i === 0 ? ctx.moveTo(Math.cos(a) * rad, Math.sin(a) * rad) : ctx.lineTo(Math.cos(a) * rad, Math.sin(a) * rad)
+      }
+      ctx.closePath(); ctx.fillStyle = '#FFD700'; ctx.fill()
+      ctx.strokeStyle = '#CC9900'; ctx.lineWidth = 1.5; ctx.stroke()
+      break
+    }
+    case 'arrow':
+      ctx.beginPath()
+      ctx.moveTo(0, -r); ctx.lineTo(r * 0.65, r * 0.5); ctx.lineTo(0, r * 0.1); ctx.lineTo(-r * 0.65, r * 0.5)
+      ctx.closePath(); ctx.fillStyle = '#9966FF'; ctx.fill()
+      ctx.strokeStyle = '#6633cc'; ctx.lineWidth = 1.5; ctx.stroke()
+      break
+    case 'bat':
+      ctx.beginPath(); ctx.arc(0, 0, r * 0.55, 0, Math.PI * 2)
+      ctx.fillStyle = '#374151'; ctx.fill()
+      ctx.beginPath(); ctx.ellipse(-r * 0.9, -r * 0.1, r * 0.55, r * 0.3, -0.3, 0, Math.PI * 2)
+      ctx.fillStyle = '#374151'; ctx.fill()
+      ctx.beginPath(); ctx.ellipse(r * 0.9, -r * 0.1, r * 0.55, r * 0.3, 0.3, 0, Math.PI * 2)
+      ctx.fillStyle = '#374151'; ctx.fill()
+      break
+    case 'parrot':
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2)
+      ctx.fillStyle = '#22c55e'; ctx.fill()
+      ctx.strokeStyle = '#166534'; ctx.lineWidth = 1.5; ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(r * 0.3, -r * 0.1); ctx.lineTo(r * 0.8, r * 0.1); ctx.lineTo(r * 0.3, r * 0.25)
+      ctx.closePath(); ctx.fillStyle = '#FBA504'; ctx.fill()
+      break
+    default: { // cat
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2)
+      ctx.fillStyle = '#FFA500'; ctx.fill(); ctx.strokeStyle = '#cc6600'; ctx.lineWidth = 1.5; ctx.stroke()
+      const er = Math.max(2, r * 0.18)
+      ctx.beginPath(); ctx.arc(-r * 0.3, -r * 0.2, er, 0, Math.PI * 2); ctx.arc(r * 0.3, -r * 0.2, er, 0, Math.PI * 2)
+      ctx.fillStyle = '#222'; ctx.fill()
+      ctx.beginPath(); ctx.arc(0, r * 0.15, r * 0.35, 0, Math.PI)
+      ctx.strokeStyle = '#222'; ctx.lineWidth = 1.5; ctx.stroke()
+      break
+    }
+  }
+  ctx.restore()
+}
+
+function drawBubble(ctx, s) {
+  if (!s.bubble) return
+  const cx = toCanvasX(s.x)
+  const cy = toCanvasY(s.y)
+  const r  = Math.max(4, (s.size / 100) * 24)
+  const fontSize = Math.max(11, r * 0.6)
+  ctx.font = `${fontSize}px Quicksand, sans-serif`
+  const bw = Math.min(ctx.measureText(s.bubble).width + 20, 200)
+  const bh = Math.max(fontSize + 16, 30)
+  const bx = Math.min(STAGE_W - bw - 4, cx + r + 6)
+  const by = Math.max(4, cy - bh - r - 6)
+  const isThink = s.bubbleType === 'think'
+  ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 10)
+  ctx.fillStyle = '#fff'; ctx.fill(); ctx.strokeStyle = '#bbb'; ctx.lineWidth = 1.5; ctx.stroke()
+  if (isThink) {
+    const dotEndX = bx + bw * 0.25; const dotEndY = by + bh
+    const dotStartX = cx + r * 0.5; const dotStartY = cy - r * 0.6
+    for (let i = 0; i < 3; i++) {
+      const t = i / 2
+      const dx = dotStartX + (dotEndX - dotStartX) * t; const dy = dotStartY + (dotEndY - dotStartY) * t
+      ctx.beginPath(); ctx.arc(dx, dy, 2 + i * 1.2, 0, Math.PI * 2)
+      ctx.fillStyle = '#fff'; ctx.fill(); ctx.strokeStyle = '#bbb'; ctx.lineWidth = 1.5; ctx.stroke()
+    }
+  } else {
+    const tailX = bx + Math.min(18, bw * 0.2); const tailY = by + bh
+    const tipX = cx + r * 0.4; const tipY = cy - r * 0.2
+    ctx.beginPath(); ctx.moveTo(tailX - 6, tailY); ctx.lineTo(tailX + 6, tailY); ctx.lineTo(tipX, tipY)
+    ctx.closePath(); ctx.fillStyle = '#fff'; ctx.fill()
+    ctx.beginPath(); ctx.moveTo(tailX - 6, tailY); ctx.lineTo(tipX, tipY); ctx.lineTo(tailX + 6, tailY)
+    ctx.strokeStyle = '#bbb'; ctx.lineWidth = 1.5; ctx.stroke()
+    ctx.beginPath(); ctx.moveTo(tailX - 5, tailY); ctx.lineTo(tailX + 5, tailY)
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5; ctx.stroke()
+  }
+  ctx.fillStyle = '#222'; ctx.font = `${fontSize}px Quicksand, sans-serif`
+  ctx.fillText(s.bubble, bx + 10, by + bh / 2 + fontSize * 0.35)
+}
+
+function drawSpriteImage(ctx, s, img) {
+  const cx = toCanvasX(s.x)
+  const cy = toCanvasY(s.y)
+  const r  = Math.max(4, (s.size / 100) * 24)
+  const dir = Number.isFinite(Number(s.direction)) ? Number(s.direction) : 90
+  const rs  = s.rotationStyle ?? 'all around'
+  const rot = rs === "don't rotate" ? 0 : rs === 'left-right' ? (dir > 90 && dir < 270 ? Math.PI : 0) : (dir - 90) * (Math.PI / 180)
+  const drawSize = r * 2
+  ctx.save()
+  ctx.translate(cx, cy)
+  ctx.rotate(rot)
+  ctx.drawImage(img, -drawSize / 2, -drawSize / 2, drawSize, drawSize)
+  ctx.restore()
+}
+
+function spriteRadius(s) { return Math.max(4, (s.size / 100) * 24) }
+
+function hitTest(s, canvasX, canvasY) {
+  const cx = toCanvasX(s.x); const cy = toCanvasY(s.y)
+  return Math.hypot(canvasX - cx, canvasY - cy) <= spriteRadius(s) + 8
+}
+
+// ── Check helpers ─────────────────────────────────────────────────────────────
+
+function evalSingleCheck(check, spriteWorkspaces, signal) {
+  if (!check?.type) return false
+  try {
+    if (check.type === 'block_used') {
+      return spriteWorkspaces.some(sp => sp.workspace?.getAllBlocks(false).some(b => b.type === check.opcode))
+    }
+    if (check.type === 'variable_equals') {
+      return evaluateScratchCheck(check, null, null, signal)
+    }
+    // sprite_property: match by name or fall back to first
+    const target = spriteWorkspaces.find(sp => sp.name === check.spriteName) ?? spriteWorkspaces[0]
+    return target ? evaluateScratchCheck(check, target.workspace, target.state, signal) : false
+  } catch { return false }
+}
+
+function normalizeScratchChecks(check) {
+  if (!check) return []
+  if (Array.isArray(check)) return check.filter(c => c?.type)
+  if (check.type) return [check]
+  return []
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
+export default function ScratchWorkspace({
+  task,
+  readOnly = false,
+  unrestricted = false,
+  assetsPath = '',
+  initialStates = null,
+  initialState  = null,      // legacy single-sprite alias
+  initialSpriteStates = null,
+  onStateChange,
+  onCheckResult,
+  externalStates = null,
+  externalState  = null,     // legacy alias
+  syncNowKey = null,
+}) {
+  const sprites = task?.sprites?.length > 0 ? task.sprites : DEFAULT_SPRITES
+  const backdrops = task?.backdrops?.length > 0 ? task.backdrops : []
+  setSpriteContext(sprites)
+  setBackdropContext(backdrops)
+
+  const normInitStates  = normaliseInitialStates(initialStates ?? initialState, sprites)
+  const normExtStates   = externalStates ?? (externalState ? normaliseInitialStates(externalState, sprites) : null)
+
+  const blocksDivRefs       = useRef({})
+  const workspaceRefs       = useRef({})
+  const spriteStatesRef     = useRef(initSpriteStates(sprites))
+  const BlocklyRef          = useRef(null)
+  const signalRef           = useRef(null)
+  const syncTimerRef        = useRef(null)
+  const suppressChangeRef   = useRef(false)
+  const lastCheckRef        = useRef(null)
+  const lastEmittedStateRef = useRef(null)
+  const statusRef           = useRef('loading')
+  const runningRef          = useRef(false)
+  const onStateChangeRef    = useRef(onStateChange)
+  const onCheckResultRef    = useRef(onCheckResult)
+  const askResolveRef       = useRef(null)
+  const inputStateRef       = useRef({ keysPressed: new Set(), mouseDown: false, mouseX: 0, mouseY: 0 })
+  const isDraggingRef       = useRef(false)
+  const dragStartRef        = useRef(null)
+  const dragMovedRef        = useRef(false)
+  const draggingSpriteIdRef = useRef(null)
+  const backdropNameRef     = useRef(backdrops[0]?.name ?? null)
+  const imageCacheRef       = useRef({})
+
+  const [selectedSpriteId, setSelectedSpriteId] = useState(sprites[0]?.id ?? 'sprite1')
+  setCostumeContext((sprites.find(sp => sp.id === selectedSpriteId) ?? sprites[0])?.costumes ?? [])
+
+  const [status, setStatus]         = useState('loading')
+  const [running, setRunning]       = useState(false)
+  const [checkPassed, setCheckPassed] = useState(false)
+  const [spriteStates, setSpriteStates] = useState(() => initSpriteStates(sprites))
+  const [askPrompt, setAskPrompt]   = useState(null)
+  const [askValue, setAskValue]     = useState('')
+  const [stageCursor, setStageCursor] = useState('default')
+  const [stageScale, setStageScale] = useState(1)
+  const [backdropName, setBackdropName] = useState(backdrops[0]?.name ?? null)
+  const [imageVersion, setImageVersion] = useState(0)
+  const canvasRef = useRef(null)
+  const rootRef   = useRef(null)
+
+  statusRef.current = status
+  runningRef.current = running
+  onStateChangeRef.current = onStateChange
+  onCheckResultRef.current = onCheckResult
+
+  // ── Draw stage ──────────────────────────────────────────────────────────────
+  const drawStage = useCallback((states) => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    ctx.clearRect(0, 0, STAGE_W, STAGE_H)
+
+    const currentName = backdropNameRef.current
+    const backdrop = (currentName ? backdrops.find(b => b.name === currentName) : null) ?? backdrops[0]
+
+    if (backdrop?.image && assetsPath) {
+      const url = assetsPath.replace(/\/$/, '') + '/' + backdrop.image.replace(/^\//, '')
+      const img = imageCacheRef.current[url]
+      if (img) {
+        ctx.drawImage(img, 0, 0, STAGE_W, STAGE_H)
+      } else {
+        ctx.fillStyle = '#ffffff'
+        ctx.fillRect(0, 0, STAGE_W, STAGE_H)
+      }
+    } else {
+      ctx.fillStyle = backdrop?.colour ?? '#ffffff'
+      ctx.fillRect(0, 0, STAGE_W, STAGE_H)
+    }
+
+    for (const sp of sprites) {
+      const state = states[sp.id]
+      if (!state?.visible) continue
+      const costumeEntry = sp.costumes?.length > 0
+        ? (sp.costumes.find(c => c.name === state.costume) ?? sp.costumes[0])
+        : null
+      if (costumeEntry?.image && assetsPath) {
+        const url = assetsPath.replace(/\/$/, '') + '/' + costumeEntry.image.replace(/^\//, '')
+        const img = imageCacheRef.current[url]
+        if (img) { drawSpriteImage(ctx, state, img); continue }
+      }
+      drawSpriteShape(ctx, state, sp.type ?? 'cat')
+    }
+    for (const sp of sprites) {
+      const state = states[sp.id]
+      if (state?.bubble) drawBubble(ctx, state)
+    }
+  }, [sprites, backdrops, assetsPath])
+
+  useEffect(() => { drawStage(spriteStates) }, [spriteStates, backdropName, imageVersion, drawStage])
+
+  // ── Preload backdrop images ──────────────────────────────────────────────────
+  useEffect(() => {
+    if (!assetsPath) return
+    for (const backdrop of backdrops) {
+      if (!backdrop.image) continue
+      const url = assetsPath.replace(/\/$/, '') + '/' + backdrop.image.replace(/^\//, '')
+      if (imageCacheRef.current[url] !== undefined) continue
+      imageCacheRef.current[url] = null
+      const img = new Image()
+      img.onload = () => {
+        imageCacheRef.current[url] = img
+        setImageVersion(v => v + 1)
+      }
+      img.src = url
+    }
+  }, [assetsPath, backdrops])
+
+  // ── Preload sprite costume images ────────────────────────────────────────────
+  useEffect(() => {
+    if (!assetsPath) return
+    for (const sp of sprites) {
+      for (const costume of sp.costumes ?? []) {
+        if (!costume.image) continue
+        const url = assetsPath.replace(/\/$/, '') + '/' + costume.image.replace(/^\//, '')
+        if (imageCacheRef.current[url] !== undefined) continue
+        imageCacheRef.current[url] = null
+        const img = new Image()
+        img.onload = () => {
+          imageCacheRef.current[url] = img
+          setImageVersion(v => v + 1)
+        }
+        img.src = url
+      }
+    }
+  }, [assetsPath, sprites])
+
+  // ── Emit workspace states ────────────────────────────────────────────────────
+  const emitWorkspaceState = useCallback(() => {
+    if (!BlocklyRef.current || suppressChangeRef.current) return
+    try {
+      const states = {}
+      for (const [id, ws] of Object.entries(workspaceRefs.current)) {
+        states[id] = saveWorkspace(BlocklyRef.current, ws)
+      }
+      lastEmittedStateRef.current = states
+      onStateChangeRef.current?.(states)
+    } catch {}
+  }, [])
+
+  // ── Build sprite workspace array for run calls ───────────────────────────────
+  const buildSpriteWorkspaces = useCallback(() => {
+    return sprites.map(sp => ({
+      id: sp.id,
+      name: sp.name,
+      workspace: workspaceRefs.current[sp.id],
+      state: spriteStatesRef.current[sp.id],
+      costumes: sp.costumes ?? [],
+      onUpdate: s => {
+        spriteStatesRef.current = { ...spriteStatesRef.current, [sp.id]: s }
+        setSpriteStates(prev => ({ ...prev, [sp.id]: s }))
+      },
+    })).filter(sp => sp.workspace)
+  }, [sprites])
+
+  // ── Initialise Blockly (one workspace per sprite) ────────────────────────────
+  useEffect(() => {
+    let cancelled = false
+
+    async function init() {
+      try {
+        const { Blockly } = await loadBlocklyModules()
+        if (cancelled) return
+        BlocklyRef.current = Blockly
+
+        await new Promise(r => requestAnimationFrame(r))
+        if (cancelled) return
+
+        const toolboxConfig = buildAlwaysOpenToolbox(unrestricted ? DEFAULT_TOOLBOX : (task?.toolbox ?? DEFAULT_TOOLBOX))
+
+        for (const sp of sprites) {
+          const div = blocksDivRefs.current[sp.id]
+          if (!div) continue
+
+          const ws = Blockly.inject(div, {
+            toolbox: toolboxConfig,
+            renderer: 'zelos',
+            grid: { spacing: 24, length: 2, colour: '#eee', snap: true },
+            trashcan: true,
+            readOnly,
+          })
+          workspaceRefs.current[sp.id] = ws
+          Blockly.svgResize(ws)
+
+          // Load initial state for this sprite
+          const initState = normInitStates[sp.id]
+          if (initState) {
+            try {
+              suppressChangeRef.current = true
+              loadWorkspace(Blockly, ws, initState)
+              requestAnimationFrame(() => { suppressChangeRef.current = false })
+            } catch { suppressChangeRef.current = false }
+          }
+
+          if (!readOnly) {
+            ws.addChangeListener((event) => {
+              if (
+                (event?.type === Blockly.Events.CLICK || event?.type === 'click') &&
+                event.targetType === 'block' &&
+                event.blockId
+              ) {
+                const clicked =
+                  ws.getBlockById(event.blockId) ??
+                  ws.getFlyout?.()?.getWorkspace?.()?.getBlockById?.(event.blockId)
+                if (clicked) runClickedBlock(clicked, sp.id)
+                return
+              }
+              if (suppressChangeRef.current) return
+              clearTimeout(syncTimerRef.current)
+              syncTimerRef.current = setTimeout(emitWorkspaceState, SYNC_DEBOUNCE)
+            })
+
+            div.addEventListener('click', (event) => {
+              if (event.button !== 0) return
+              if (!event.target?.closest?.('.blocklyDraggable')) return
+              setTimeout(() => {
+                const selected = Blockly.getSelected?.()
+                const flyoutWs = ws.getFlyout?.()?.getWorkspace?.()
+                if (
+                  selected?.type &&
+                  (selected.workspace === ws || selected.workspace === flyoutWs)
+                ) {
+                  runClickedBlock(selected, sp.id)
+                }
+              }, 0)
+            })
+          }
+        }
+
+        if (!cancelled) setStatus('ready')
+      } catch (err) {
+        console.error('Scratch init error:', err)
+        if (!cancelled) setStatus('error')
+      }
+    }
+
+    init()
+
+    return () => {
+      cancelled = true
+      clearTimeout(syncTimerRef.current)
+      signalRef.current && (signalRef.current.stopped = true)
+      for (const ws of Object.values(workspaceRefs.current)) ws?.dispose?.()
+      workspaceRefs.current = {}
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // ── Resize active workspace when sprite selection changes ────────────────────
+  useEffect(() => {
+    if (status !== 'ready' || !BlocklyRef.current) return
+    const ws = workspaceRefs.current[selectedSpriteId]
+    if (ws) requestAnimationFrame(() => { try { BlocklyRef.current.svgResize(ws) } catch {} })
+  }, [selectedSpriteId, status, stageScale])
+
+  // ── Update toolbox when task.toolbox changes ─────────────────────────────────
+  useEffect(() => {
+    if (status !== 'ready' || !BlocklyRef.current) return
+    try {
+      const toolboxConfig = buildAlwaysOpenToolbox(unrestricted ? DEFAULT_TOOLBOX : (task?.toolbox ?? DEFAULT_TOOLBOX))
+      for (const ws of Object.values(workspaceRefs.current)) ws.updateToolbox(toolboxConfig)
+    } catch {}
+  }, [task?.toolbox, unrestricted, status])
+
+  // ── Load external state (teacher push) ───────────────────────────────────────
+  useEffect(() => {
+    if (!normExtStates || status !== 'ready' || !BlocklyRef.current) return
+    if (normExtStates === lastEmittedStateRef.current) return
+    try {
+      suppressChangeRef.current = true
+      for (const [id, state] of Object.entries(normExtStates)) {
+        const ws = workspaceRefs.current[id]
+        if (ws && state) loadWorkspace(BlocklyRef.current, ws, state)
+      }
+      requestAnimationFrame(() => { suppressChangeRef.current = false })
+    } catch { suppressChangeRef.current = false }
+  }, [normExtStates, status])
+
+  useEffect(() => {
+    if (!syncNowKey || status !== 'ready' || readOnly) return
+    clearTimeout(syncTimerRef.current)
+    emitWorkspaceState()
+  }, [syncNowKey, status, readOnly, emitWorkspaceState])
+
+  // Responsive stage scaling — shrink canvas CSS size to keep editor visible
+  useEffect(() => {
+    const el = rootRef.current
+    if (!el) return
+    const obs = new ResizeObserver(([entry]) => {
+      const w = entry.contentRect.width
+      // Reserve at least 280px for the block editor + 8px gap; scale stage to fit the rest
+      const scale = Math.min(1, Math.max(0.5, (w - 288) / (STAGE_W + 2)))
+      setStageScale(scale)
+    })
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [])
+
+  // ── Signal factory ───────────────────────────────────────────────────────────
+  const createSignal = useCallback(() => {
+    const signal = createRunSignal()
+    signal.keysPressed = inputStateRef.current.keysPressed
+    signal.mouseDown   = inputStateRef.current.mouseDown
+    signal.mouseX      = inputStateRef.current.mouseX
+    signal.mouseY      = inputStateRef.current.mouseY
+    signal.backdrop    = backdropNameRef.current
+    signal.backdrops   = backdrops
+    signal.onBackdropChange = name => {
+      backdropNameRef.current = name
+      setBackdropName(name)
+    }
+    signal.ask = q => new Promise(resolve => {
+      askResolveRef.current = resolve
+      setAskValue('')
+      setAskPrompt(q)
+    })
+    return signal
+  }, [backdrops])
+
+  // ── Check helpers ────────────────────────────────────────────────────────────
+  const check = task?.check
+  const scratchChecks = normalizeScratchChecks(check)
+  const hasAfterRunCheck = scratchChecks.some(c => c.evaluation !== 'manual')
+
+  const notifyCheck = useCallback((passed, force = false) => {
+    setCheckPassed(passed)
+    if (!force && lastCheckRef.current === passed) return
+    lastCheckRef.current = passed
+    let workspaceStates = null
+    try {
+      if (BlocklyRef.current) {
+        workspaceStates = {}
+        for (const [id, ws] of Object.entries(workspaceRefs.current)) {
+          workspaceStates[id] = saveWorkspace(BlocklyRef.current, ws)
+        }
+      }
+    } catch {}
+    onCheckResultRef.current?.(passed, {
+      workspaceStates,
+      spriteStates: { ...spriteStatesRef.current },
+    })
+  }, [])
+
+  function finishRun(signal) {
+    if (!signal.stopped) {
+      runningRef.current = false
+      setRunning(false)
+      if (scratchChecks.length > 0 && hasAfterRunCheck) {
+        const sws = buildSpriteWorkspaces()
+        notifyCheck(scratchChecks.every(c => evalSingleCheck(c, sws, signal)))
+      }
+    }
+  }
+
+  // ── Run / Stop ────────────────────────────────────────────────────────────────
+  async function handleRun() {
+    if (status !== 'ready') return
+    if (signalRef.current) signalRef.current.stopped = true
+    lastCheckRef.current = null
+    runningRef.current = true
+    setRunning(true)
+    const signal = createSignal()
+    signalRef.current = signal
+    try { await runAllSprites(buildSpriteWorkspaces(), signal) } catch {}
+    finishRun(signal)
+  }
+
+  async function runClickedBlock(block, spriteId) {
+    if (runningRef.current || statusRef.current !== 'ready') return
+    if (signalRef.current) signalRef.current.stopped = true
+    lastCheckRef.current = null
+    runningRef.current = true
+    setRunning(true)
+    const signal = createSignal()
+    signalRef.current = signal
+    const startBlock = block.type === 'event_whenflagclicked' ? block.getNextBlock() : block
+    try { await runBlockInContext(startBlock, buildSpriteWorkspaces(), spriteId, signal) } catch {}
+    finishRun(signal)
+  }
+
+  async function runHatForAll(eventType, option = null) {
+    if (statusRef.current !== 'ready' || runningRef.current) return
+    if (signalRef.current) signalRef.current.stopped = true
+    lastCheckRef.current = null
+    runningRef.current = true
+    setRunning(true)
+    const signal = createSignal()
+    signalRef.current = signal
+    try { await runAllSpritesEvent(buildSpriteWorkspaces(), eventType, signal, option) } catch {}
+    finishRun(signal)
+  }
+
+  function handleStop() {
+    if (signalRef.current) signalRef.current.stopped = true
+    runningRef.current = false
+    setRunning(false)
+    setAskPrompt(null)
+    askResolveRef.current?.('')
+    askResolveRef.current = null
+  }
+
+  function handleResetStage() {
+    handleStop()
+    const reset = initSpriteStates(sprites)
+    spriteStatesRef.current = reset
+    setSpriteStates(reset)
+    const defaultBackdrop = backdrops[0]?.name ?? null
+    backdropNameRef.current = defaultBackdrop
+    setBackdropName(defaultBackdrop)
+    lastCheckRef.current = null
+    setCheckPassed(false)
+  }
+
+  function handleCheck() {
+    const sws = buildSpriteWorkspaces()
+    notifyCheck(scratchChecks.every(c => evalSingleCheck(c, sws, signalRef.current)), true)
+  }
+
+  // ── Pointer events on canvas ─────────────────────────────────────────────────
+  function handleCanvasPointerDown(event) {
+    inputStateRef.current.mouseDown = true
+    if (signalRef.current) signalRef.current.mouseDown = true
+
+    const rect = event.currentTarget.getBoundingClientRect()
+    const x = (event.clientX - rect.left) * (STAGE_W / rect.width)
+    const y = (event.clientY - rect.top)  * (STAGE_H / rect.height)
+
+    // Find top-most sprite under pointer (reverse order = drawn last = on top)
+    for (let i = sprites.length - 1; i >= 0; i--) {
+      const sp = sprites[i]
+      const state = spriteStatesRef.current[sp.id]
+      if (state && hitTest(state, x, y)) {
+        isDraggingRef.current = true
+        dragMovedRef.current  = false
+        draggingSpriteIdRef.current = sp.id
+        dragStartRef.current = { canvasX: x, canvasY: y, spriteX: state.x, spriteY: state.y }
+        event.currentTarget.setPointerCapture(event.pointerId)
+        setStageCursor('grabbing')
+        return
+      }
+    }
+  }
+
+  function handleCanvasPointerMove(event) {
+    const rect = event.currentTarget.getBoundingClientRect()
+    const x = (event.clientX - rect.left) * (STAGE_W / rect.width)
+    const y = (event.clientY - rect.top)  * (STAGE_H / rect.height)
+
+    if (isDraggingRef.current && dragStartRef.current && draggingSpriteIdRef.current) {
+      const dx = x - dragStartRef.current.canvasX
+      const dy = y - dragStartRef.current.canvasY
+      if (!dragMovedRef.current && Math.hypot(dx, dy) > 3) dragMovedRef.current = true
+      if (dragMovedRef.current) {
+        const id = draggingSpriteIdRef.current
+        const newX = Math.max(-240, Math.min(240, dragStartRef.current.spriteX + dx))
+        const newY = Math.max(-180, Math.min(180, dragStartRef.current.spriteY - dy))
+        const updated = { ...spriteStatesRef.current[id], x: newX, y: newY }
+        spriteStatesRef.current = { ...spriteStatesRef.current, [id]: updated }
+        setSpriteStates(prev => ({ ...prev, [id]: updated }))
+      }
+      return
+    }
+
+    const scratchX = x - STAGE_W / 2
+    const scratchY = STAGE_H / 2 - y
+    inputStateRef.current.mouseX = scratchX
+    inputStateRef.current.mouseY = scratchY
+    if (signalRef.current) { signalRef.current.mouseX = scratchX; signalRef.current.mouseY = scratchY }
+
+    let overSprite = false
+    for (let i = sprites.length - 1; i >= 0; i--) {
+      const state = spriteStatesRef.current[sprites[i].id]
+      if (state && hitTest(state, x, y)) { overSprite = true; break }
+    }
+    setStageCursor(overSprite ? 'grab' : 'default')
+  }
+
+  function handleCanvasPointerUp() {
+    inputStateRef.current.mouseDown = false
+    if (signalRef.current) signalRef.current.mouseDown = false
+
+    const wasDragging = isDraggingRef.current
+    const wasMoved    = dragMovedRef.current
+    const draggedId   = draggingSpriteIdRef.current
+    isDraggingRef.current       = false
+    dragStartRef.current        = null
+    dragMovedRef.current        = false
+    draggingSpriteIdRef.current = null
+    setStageCursor('default')
+
+    if (wasDragging && !wasMoved && draggedId) {
+      // Click on sprite — fire event only for that sprite
+      if (statusRef.current === 'ready' && !runningRef.current) {
+        if (signalRef.current) signalRef.current.stopped = true
+        lastCheckRef.current = null
+        runningRef.current = true
+        setRunning(true)
+        const signal = createSignal()
+        signalRef.current = signal
+        const sws = buildSpriteWorkspaces().filter(s => s.id === draggedId)
+        runAllSpritesEvent(sws, 'event_whenthisspriteclicked', signal)
+          .then(() => finishRun(signal))
+          .catch(() => finishRun(signal))
+      }
+    }
+  }
+
+  function handleCanvasPointerLeave() {
+    if (!isDraggingRef.current) setStageCursor('default')
+  }
+
+  function handleAskSubmit(event) {
+    event.preventDefault()
+    askResolveRef.current?.(askValue)
+    askResolveRef.current = null
+    setAskPrompt(null)
+    setAskValue('')
+  }
+
+  // ── Key events ────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (readOnly) return
+    function onKeyDown(event) {
+      const key = normalizeKey(event.key)
+      if (!key) return
+      inputStateRef.current.keysPressed.add(key)
+      if (signalRef.current) signalRef.current.keysPressed.add(key)
+      runHatForAll('event_whenkeypressed', key)
+    }
+    function onKeyUp(event) {
+      const key = normalizeKey(event.key)
+      if (key) inputStateRef.current.keysPressed.delete(key)
+      if (key && signalRef.current) signalRef.current.keysPressed.delete(key)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keyup', onKeyUp)
+    return () => { window.removeEventListener('keydown', onKeyDown); window.removeEventListener('keyup', onKeyUp) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [readOnly])
+
+  const showManualCheck = scratchChecks.some(c => c.evaluation === 'manual')
+
+  // ── Render ────────────────────────────────────────────────────────────────────
+  return (
+    <div className="scratch-workspace" style={s.root} ref={rootRef}>
+      {status !== 'ready' && (
+        <div style={s.overlay}>
+          <div style={s.centre}>
+            {status === 'loading'
+              ? <p style={s.loadingText}>Getting Scratch ready…</p>
+              : <p style={s.errorText}>Scratch failed to load. Please refresh the page.</p>
+            }
+          </div>
+        </div>
+      )}
+
+      {/* Block editor — all workspace divs stacked, only selected one visible */}
+      <div style={s.editorPane}>
+        {sprites.map(sp => (
+          <div
+            key={sp.id}
+            ref={el => { if (el) blocksDivRefs.current[sp.id] = el }}
+            style={{
+              position: 'absolute', inset: 0,
+              visibility: sp.id === selectedSpriteId ? 'visible' : 'hidden',
+              pointerEvents: sp.id === selectedSpriteId ? 'auto' : 'none',
+            }}
+          />
+        ))}
+      </div>
+
+      {/* Stage + controls */}
+      <div style={s.stagePane}>
+        <div style={s.stageToolbar}>
+          <button
+            type="button"
+            className="btn-primary"
+            style={s.greenFlagBtn}
+            onClick={handleRun}
+            aria-label="Run"
+            title="Run green flag scripts"
+          >
+            <span style={s.flagPole} aria-hidden="true"><span style={s.flagBanner} /></span>
+          </button>
+          <button
+            type="button"
+            className="btn-secondary"
+            style={s.stopFlagBtn}
+            onClick={handleStop}
+            aria-label="Stop"
+            title="Stop all scripts"
+          >
+            <span style={s.stopIcon} aria-hidden="true" />
+          </button>
+          <button type="button" className="btn-secondary" style={s.resetBtn} onClick={handleResetStage} title="Reset stage">
+            Reset
+          </button>
+        </div>
+
+        <div style={{ ...s.stageFrame, width: STAGE_W * stageScale, height: STAGE_H * stageScale }}>
+          <canvas
+            ref={canvasRef}
+            width={STAGE_W}
+            height={STAGE_H}
+            style={{ ...s.canvas, width: STAGE_W * stageScale, height: STAGE_H * stageScale, cursor: readOnly ? 'default' : stageCursor }}
+            onPointerDown={readOnly ? undefined : handleCanvasPointerDown}
+            onPointerMove={readOnly ? undefined : handleCanvasPointerMove}
+            onPointerUp={readOnly ? undefined : handleCanvasPointerUp}
+            onPointerLeave={readOnly ? undefined : handleCanvasPointerLeave}
+          />
+          {askPrompt && (
+            <form style={s.askBox} onSubmit={handleAskSubmit}>
+              <label style={s.askLabel}>{askPrompt}</label>
+              <div style={s.askRow}>
+                <input style={s.askInput} value={askValue} onChange={e => setAskValue(e.target.value)} autoFocus />
+                <button className="btn-primary" style={s.askBtn} type="submit">OK</button>
+              </div>
+            </form>
+          )}
+        </div>
+
+        {/* Sprite selector strip */}
+        <div style={s.spriteStrip}>
+          {sprites.map(sp => (
+            <button
+              key={sp.id}
+              type="button"
+              style={{ ...s.spriteChip, ...(sp.id === selectedSpriteId ? s.spriteChipActive : {}) }}
+              onClick={() => setSelectedSpriteId(sp.id)}
+              title={sp.name}
+            >
+              <span style={{ ...s.spriteChipDot, background: SPRITE_TYPE_COLOR[sp.type ?? 'cat'] ?? '#aaa' }} />
+              <span style={s.spriteChipName}>{sp.name}</span>
+            </button>
+          ))}
+        </div>
+
+        <div style={s.controls}>
+          {!readOnly && showManualCheck && (
+            <button className="btn-secondary" style={s.checkBtn} onClick={handleCheck}>Check</button>
+          )}
+          {scratchChecks.length > 0 && checkPassed && <span style={s.checkPass}>✅ Check passed!</span>}
+          {scratchChecks.length > 0 && !checkPassed && showManualCheck && !running && (
+            <span style={s.checkNone}>Run your code, then click Check</span>
+          )}
+          {scratchChecks.length > 0 && !checkPassed && hasAfterRunCheck && !showManualCheck && !running && (
+            <span style={s.checkNone}>Run your code to check</span>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const s = {
+  root: { display: 'flex', flex: 1, minHeight: 0, gap: 8, height: '100%', position: 'relative' },
+  overlay: { position: 'absolute', inset: 0, zIndex: 10, background: '#f5f5f5', borderRadius: 8 },
+  editorPane: { flex: 1, minWidth: 0, position: 'relative', border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden', background: '#F9F9F9' },
+  stagePane: { display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 },
+  stageToolbar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  canvas: { display: 'block', width: STAGE_W, height: STAGE_H, border: '1px solid #e5e7eb', borderRadius: 8 },
+  stageFrame: { position: 'relative', width: STAGE_W, height: STAGE_H },
+  spriteStrip: { display: 'flex', gap: 6, flexWrap: 'wrap', padding: '4px 0' },
+  spriteChip: {
+    display: 'flex', alignItems: 'center', gap: 6,
+    padding: '6px 10px', border: '1px solid #e5e7eb', borderRadius: 20,
+    background: '#fff', cursor: 'pointer', fontFamily: 'var(--font-body)',
+    fontSize: '0.8rem', fontWeight: 600, color: 'var(--colour-text)',
+    transition: 'border-color 0.1s, background 0.1s',
+  },
+  spriteChipActive: { borderColor: 'var(--colour-primary)', background: '#f3eeff', color: 'var(--colour-primary)' },
+  spriteChipDot: { width: 10, height: 10, borderRadius: '50%', flexShrink: 0 },
+  spriteChipName: { maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  askBox: { position: 'absolute', left: 12, right: 12, bottom: 12, display: 'grid', gap: 8, padding: 10, background: '#fff', border: '1px solid #d1d5db', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.14)' },
+  askLabel: { fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, color: 'var(--colour-text)' },
+  askRow: { display: 'grid', gridTemplateColumns: '1fr auto', gap: 8 },
+  askInput: { minWidth: 0, padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontFamily: 'var(--font-body)', fontSize: 14 },
+  askBtn: { padding: '8px 12px', fontSize: 13, borderRadius: 6 },
+  controls: { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' },
+  greenFlagBtn: { width: 44, height: 36, padding: 0, minWidth: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#22c55e', borderColor: '#16a34a' },
+  stopFlagBtn:  { width: 44, height: 36, padding: 0, minWidth: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#ef4444', borderColor: '#dc2626', color: '#fff' },
+  flagPole:   { width: 20, height: 18, display: 'inline-block', position: 'relative', borderLeft: '3px solid #fff' },
+  flagBanner: { position: 'absolute', top: 1, left: 1, width: 15, height: 10, background: '#fff', borderRadius: '1px 5px 5px 1px' },
+  stopIcon:   { width: 14, height: 14, display: 'inline-block', background: '#fff', borderRadius: 2 },
+  resetBtn:   { padding: '8px 14px', fontSize: 14 },
+  checkBtn:   { padding: '10px 20px', fontSize: 15 },
+  centre:     { display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', padding: 32 },
+  loadingText: { fontFamily: 'var(--font-body)', color: 'var(--colour-text)', fontSize: '1rem' },
+  errorText:   { fontFamily: 'var(--font-body)', color: '#ef4444', fontSize: '1rem' },
+  checkPass:   { fontFamily: 'var(--font-body)', fontSize: '0.95rem', color: '#16a34a', fontWeight: 600 },
+  checkNone:   { fontFamily: 'var(--font-body)', fontSize: '0.85rem', color: '#9ca3af' },
+}

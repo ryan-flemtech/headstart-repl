@@ -58,7 +58,7 @@ export default function BuilderApp() {
       <div style={s.centreScreen}>
         <div style={s.card} className="card">
           <div style={s.cardHeader}>
-            <span style={s.logo}>Headstart Lesson Builder</span>
+            <span style={s.logo}>Headstart Coding - LaunchPad | Lesson Builder</span>
           </div>
           <div style={s.cardBody}>
             <p style={s.message}>
@@ -149,7 +149,7 @@ function LessonTypeChooser({ onChoose, onUpload }) {
     <div style={s.centreScreen}>
       <div style={{ ...s.card, ...s.choiceCard }} className="card">
         <div style={s.cardHeader}>
-          <span style={s.logo}>Headstart Lesson Builder</span>
+          <span style={s.logo}>Headstart Coding - LaunchPad | Lesson Builder</span>
         </div>
         <div style={s.cardBody}>
           <div>
@@ -164,6 +164,10 @@ function LessonTypeChooser({ onChoose, onUpload }) {
             <button style={s.choiceButton} onClick={() => onChoose('html')}>
               <span style={s.choiceName}>Web</span>
               <span style={s.choiceDescription}>HTML, CSS, and JavaScript tasks with files, assets, and iframe preview.</span>
+            </button>
+            <button style={s.choiceButton} onClick={() => onChoose('scratch')}>
+              <span style={s.choiceName}>Scratch</span>
+              <span style={s.choiceDescription}>Block-based tasks with a Scratch workspace, stage, toolbox limits, and block checks.</span>
             </button>
           </div>
           <button className="btn-ghost" style={s.uploadBtn} onClick={handleUpload}>
@@ -223,7 +227,7 @@ const s = {
   },
   choiceGrid: {
     display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
     gap: 12,
   },
   choiceButton: {

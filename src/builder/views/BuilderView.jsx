@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import LessonMetaPanel from '../components/LessonMetaPanel'
 import TaskList from '../components/TaskList'
 import TaskEditor from '../components/TaskEditor'
+import { normalizeChecks } from '../../shared/checks'
 
 function validateLesson(lesson) {
   const errors = []
@@ -28,17 +29,49 @@ function validateLesson(lesson) {
       }
     }
 
-    if (task.check?.type && !task.check.value) errors.push(`Task ${n} has a check enabled but no check value`)
+    if (type === 'scratch') {
+      if (task.toolbox) {
+        try {
+          const parsed = new DOMParser().parseFromString(task.toolbox, 'text/xml')
+          if (parsed.querySelector('parsererror')) errors.push(`Task ${n} has invalid toolbox XML`)
+        } catch {
+          errors.push(`Task ${n} has invalid toolbox XML`)
+        }
+      }
 
-    if (task.carryCodeFrom != null) {
-      const exists = tasks.some(t => t.id === task.carryCodeFrom)
-      if (!exists) errors.push(`Task ${n} references task ${task.carryCodeFrom} for carry-through but that task does not exist`)
+      if (task.check?.type === 'sprite_property') {
+        if (!task.check.property) errors.push(`Task ${n} sprite check is missing a property`)
+        if (!task.check.operator) errors.push(`Task ${n} sprite check is missing an operator`)
+        if (task.check.value == null || task.check.value === '') errors.push(`Task ${n} sprite check is missing a value`)
+      }
+
+      if (task.check?.type === 'block_used' && !task.check.opcode) {
+        errors.push(`Task ${n} block-used check is missing a block opcode`)
+      }
+    } else if (task.check) {
+      const checksArr = normalizeChecks(task.check)
+      if (checksArr.some(c => !c.value && c.value !== 0)) {
+        errors.push(`Task ${n} has a check enabled but no check value`)
+      }
+    }
+
+    const carryFrom = type === 'scratch' ? task.carryBlocksFrom : task.carryCodeFrom
+    if (carryFrom != null) {
+      const exists = tasks.some(t => t.id === carryFrom)
+      if (!exists) errors.push(`Task ${n} references task ${carryFrom} for carry-through but that task does not exist`)
     }
 
     // Warnings
-    const hasStarter = type === 'python' ? !!task.starterCode : task.starterFiles?.some(f => f.content.trim())
+    const hasStarter = type === 'python'
+      ? !!task.starterCode
+      : type === 'scratch'
+        ? !!task.starterBlocks
+        : task.starterFiles?.some(f => f.content.trim())
     if (!hasStarter) warnings.push(`Task ${n} has no starter code — students will start with an empty editor`)
-    if (task.check?.type && task.check.value && !task._checkTested)
+    const checkHasValue = type === 'scratch'
+      ? !!task.check
+      : normalizeChecks(task.check).some(c => c.value)
+    if (checkHasValue && !task._checkTested)
       warnings.push(`Task ${n} has a completion check that hasn't been tested — run the task to verify it`)
   })
 
@@ -105,10 +138,11 @@ export default function BuilderView({ lesson, dirty, onUpdate, onNew, onMarkSave
       id: newId,
       title: '',
       explainer: '',
-      carryCodeFrom: null,
       ...(lesson.type === 'python'
-        ? { starterCode: '' }
-        : { starterFiles: [{ name: 'index.html', type: 'html', content: '<!DOCTYPE html>\n<html>\n<body>\n\n</body>\n</html>\n' }], entryFile: 'index.html' }
+        ? { starterCode: '', carryCodeFrom: null }
+        : lesson.type === 'scratch'
+          ? { toolbox: '', starterBlocks: null, carryBlocksFrom: null }
+          : { starterFiles: [{ name: 'index.html', type: 'html', content: '<!DOCTYPE html>\n<html>\n<body>\n\n</body>\n</html>\n' }], entryFile: 'index.html', carryCodeFrom: null }
       ),
     }
     onUpdate(prev => ({ ...prev, tasks: [...prev.tasks, newTask] }))
@@ -122,7 +156,7 @@ export default function BuilderView({ lesson, dirty, onUpdate, onNew, onMarkSave
     <div style={s.page}>
       {/* Top bar */}
       <header style={s.topBar}>
-        <span style={s.logo}>Headstart Lesson Builder</span>
+        <span style={s.logo}>Headstart Coding - LaunchPad | Lesson Builder</span>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           {dirty && <span style={s.dirtyDot} title="Unsaved changes" />}
           <button className="btn-ghost" style={{ fontSize: 13, padding: '5px 12px' }} onClick={onNew}>New</button>

@@ -1,0 +1,1247 @@
+// Shared Scratch module: Blockly setup, block definitions, a small interpreter,
+// check evaluation, and serialization helpers used by the app and builder.
+
+let _Blockly = null
+let audioContext = null
+let activeOscillators = []
+let _currentSprites = []
+let _currentBackdrops = []
+let _currentCostumes = []
+
+export function setSpriteContext(sprites) {
+  _currentSprites = sprites ?? []
+}
+
+export function setBackdropContext(backdrops) {
+  _currentBackdrops = backdrops ?? []
+}
+
+export function setCostumeContext(costumes) {
+  _currentCostumes = costumes ?? []
+}
+
+export async function loadBlocklyModules() {
+  if (!_Blockly) {
+    _Blockly = await import('blockly')
+    registerScratchFieldExtensions(_Blockly)
+    _Blockly.common.defineBlocks(SCRATCH_BLOCK_DEFINITIONS)
+  }
+  return { Blockly: _Blockly }
+}
+
+function registerScratchFieldExtensions(Blockly) {
+  if (Blockly.Extensions.isRegistered('scratch_variable_field')) return
+  Blockly.Extensions.register('scratch_variable_field', function () {
+    const field = this.getField('VARIABLE')
+    if (field?.getVariable?.()) return
+    const variable = this.workspace?.createVariable?.('score')
+    if (variable) field?.setValue?.(variable.getId())
+  })
+}
+
+function numberInput(name, value = 0) {
+  return {
+    type: 'input_value',
+    name,
+    check: ['Number', 'String'],
+  }
+}
+
+function stringInput(name, text = '') {
+  return {
+    type: 'input_value',
+    name,
+    check: ['String', 'Number'],
+  }
+}
+
+function boolInput(name) {
+  return { type: 'input_value', name, check: 'Boolean' }
+}
+
+export const SCRATCH_BLOCK_DEFINITIONS = {
+  event_whenflagclicked: {
+    init() {
+      this.jsonInit({ type: 'event_whenflagclicked', message0: 'when green flag clicked', nextStatement: null, colour: '#FFAB19' })
+    },
+  },
+  event_whenkeypressed: {
+    init() {
+      this.jsonInit({
+        type: 'event_whenkeypressed',
+        message0: 'when %1 key pressed',
+        args0: [{ type: 'field_dropdown', name: 'KEY_OPTION', options: KEY_OPTIONS }],
+        nextStatement: null,
+        colour: '#FFAB19',
+      })
+    },
+  },
+  event_whenthisspriteclicked: {
+    init() {
+      this.jsonInit({ type: 'event_whenthisspriteclicked', message0: 'when this sprite clicked', nextStatement: null, colour: '#FFAB19' })
+    },
+  },
+  event_broadcast: {
+    init() {
+      this.jsonInit({
+        type: 'event_broadcast',
+        message0: 'broadcast %1',
+        args0: [stringInput('BROADCAST_INPUT', 'message1')],
+        previousStatement: null,
+        nextStatement: null,
+        colour: '#FFAB19',
+      })
+    },
+  },
+  event_broadcastandwait: {
+    init() {
+      this.jsonInit({
+        type: 'event_broadcastandwait',
+        message0: 'broadcast %1 and wait',
+        args0: [stringInput('BROADCAST_INPUT', 'message1')],
+        previousStatement: null,
+        nextStatement: null,
+        colour: '#FFAB19',
+      })
+    },
+  },
+  event_whenbroadcastreceived: {
+    init() {
+      this.jsonInit({
+        type: 'event_whenbroadcastreceived',
+        message0: 'when I receive %1',
+        args0: [{ type: 'field_input', name: 'BROADCAST_OPTION', text: 'message1' }],
+        nextStatement: null,
+        colour: '#FFAB19',
+      })
+    },
+  },
+
+  motion_movesteps: blockStatement('motion_movesteps', 'move %1 steps', [numberInput('STEPS', 10)], '#4C97FF'),
+  motion_turnright: blockStatement('motion_turnright', 'turn right %1 degrees', [numberInput('DEGREES', 15)], '#4C97FF'),
+  motion_turnleft: blockStatement('motion_turnleft', 'turn left %1 degrees', [numberInput('DEGREES', 15)], '#4C97FF'),
+  motion_gotoxy: blockStatement('motion_gotoxy', 'go to x: %1 y: %2', [numberInput('X', 0), numberInput('Y', 0)], '#4C97FF'),
+  motion_goto: {
+    init() {
+      this.jsonInit({
+        type: 'motion_goto',
+        message0: 'go to %1',
+        args0: [{ type: 'field_dropdown', name: 'TO', options: () => [
+          ['random position', '_random_'],
+          ['mouse pointer', '_mouse_'],
+          ..._currentSprites.map(sp => [sp.name, sp.id]),
+        ]}],
+        previousStatement: null,
+        nextStatement: null,
+        colour: '#4C97FF',
+      })
+    },
+  },
+  motion_glidesecstoxy: blockStatement('motion_glidesecstoxy', 'glide %1 secs to x: %2 y: %3', [numberInput('SECS', 1), numberInput('X', 0), numberInput('Y', 0)], '#4C97FF'),
+  motion_glideto: {
+    init() {
+      this.jsonInit({
+        type: 'motion_glideto',
+        message0: 'glide %1 secs to %2',
+        args0: [
+          numberInput('SECS', 1),
+          { type: 'field_dropdown', name: 'TO', options: () => [
+            ['random position', '_random_'],
+            ['mouse pointer', '_mouse_'],
+            ..._currentSprites.map(sp => [sp.name, sp.id]),
+          ]},
+        ],
+        previousStatement: null,
+        nextStatement: null,
+        colour: '#4C97FF',
+      })
+    },
+  },
+  motion_pointindirection: blockStatement('motion_pointindirection', 'point in direction %1', [numberInput('DIRECTION', 90)], '#4C97FF'),
+  motion_ifonedge_bounce: blockStatement('motion_ifonedge_bounce', 'if on edge, bounce', [], '#4C97FF'),
+  motion_setx: blockStatement('motion_setx', 'set x to %1', [numberInput('X', 0)], '#4C97FF'),
+  motion_sety: blockStatement('motion_sety', 'set y to %1', [numberInput('Y', 0)], '#4C97FF'),
+  motion_changexby: blockStatement('motion_changexby', 'change x by %1', [numberInput('DX', 10)], '#4C97FF'),
+  motion_changeyby: blockStatement('motion_changeyby', 'change y by %1', [numberInput('DY', 10)], '#4C97FF'),
+  motion_xposition: reporter('motion_xposition', 'x position', 'Number', '#4C97FF'),
+  motion_yposition: reporter('motion_yposition', 'y position', 'Number', '#4C97FF'),
+  motion_direction: reporter('motion_direction', 'direction', 'Number', '#4C97FF'),
+  motion_setrotationstyle: {
+    init() {
+      this.jsonInit({
+        type: 'motion_setrotationstyle',
+        message0: 'set rotation style %1',
+        args0: [{ type: 'field_dropdown', name: 'STYLE', options: [['left-right', 'left-right'], ["don't rotate", "don't rotate"], ['all around', 'all around']] }],
+        previousStatement: null,
+        nextStatement: null,
+        colour: '#4C97FF',
+      })
+    },
+  },
+
+  looks_sayforsecs: blockStatement('looks_sayforsecs', 'say %1 for %2 seconds', [stringInput('MESSAGE', 'Hello!'), numberInput('SECS', 2)], '#9966FF'),
+  looks_say: blockStatement('looks_say', 'say %1', [stringInput('MESSAGE', 'Hello!')], '#9966FF'),
+  looks_think: blockStatement('looks_think', 'think %1', [stringInput('MESSAGE', 'Hmm...')], '#9966FF'),
+  looks_thinkforsecs: blockStatement('looks_thinkforsecs', 'think %1 for %2 seconds', [stringInput('MESSAGE', 'Hmm...'), numberInput('SECS', 2)], '#9966FF'),
+  looks_show: blockStatement('looks_show', 'show', [], '#9966FF'),
+  looks_hide: blockStatement('looks_hide', 'hide', [], '#9966FF'),
+  looks_setsizeto: blockStatement('looks_setsizeto', 'set size to %1 %', [numberInput('SIZE', 100)], '#9966FF'),
+  looks_changesizeby: blockStatement('looks_changesizeby', 'change size by %1', [numberInput('CHANGE', 10)], '#9966FF'),
+  looks_switchcostumeto: {
+    init() {
+      this.jsonInit({
+        type: 'looks_switchcostumeto',
+        message0: 'switch costume to %1',
+        args0: [{ type: 'field_dropdown', name: 'COSTUME', options: () =>
+          _currentCostumes.length ? _currentCostumes.map(c => [c.name, c.name]) : [['costume1', 'costume1']]
+        }],
+        previousStatement: null,
+        nextStatement: null,
+        colour: '#9966FF',
+      })
+    },
+  },
+  looks_nextcostume: blockStatement('looks_nextcostume', 'next costume', [], '#9966FF'),
+  looks_costumenumber: reporter('looks_costumenumber', 'costume number', 'Number', '#9966FF'),
+  looks_switchbackdropto: {
+    init() {
+      this.jsonInit({
+        type: 'looks_switchbackdropto',
+        message0: 'switch backdrop to %1',
+        args0: [{ type: 'field_dropdown', name: 'BACKDROP', options: () =>
+          _currentBackdrops.length ? _currentBackdrops.map(b => [b.name, b.name]) : [['Backdrop 1', 'Backdrop 1']]
+        }],
+        previousStatement: null,
+        nextStatement: null,
+        colour: '#9966FF',
+      })
+    },
+  },
+  looks_nextbackdrop: blockStatement('looks_nextbackdrop', 'next backdrop', [], '#9966FF'),
+  event_whenbackdropswitchesto: {
+    init() {
+      this.jsonInit({
+        type: 'event_whenbackdropswitchesto',
+        message0: 'when backdrop switches to %1',
+        args0: [{ type: 'field_dropdown', name: 'BACKDROP', options: () =>
+          _currentBackdrops.length ? _currentBackdrops.map(b => [b.name, b.name]) : [['Backdrop 1', 'Backdrop 1']]
+        }],
+        nextStatement: null,
+        colour: '#FFAB19',
+      })
+    },
+  },
+
+  sound_play: soundBlock('sound_play', 'start sound %1'),
+  sound_playuntildone: soundBlock('sound_playuntildone', 'play sound %1 until done'),
+  sound_stopallsounds: blockStatement('sound_stopallsounds', 'stop all sounds', [], '#CF63CF'),
+
+  control_wait: blockStatement('control_wait', 'wait %1 seconds', [numberInput('DURATION', 1)], '#FFAB19'),
+  control_repeat: {
+    init() {
+      this.jsonInit({
+        type: 'control_repeat',
+        message0: 'repeat %1',
+        args0: [numberInput('TIMES', 10)],
+        message1: '%1',
+        args1: [{ type: 'input_statement', name: 'SUBSTACK' }],
+        previousStatement: null,
+        nextStatement: null,
+        colour: '#FFAB19',
+      })
+    },
+  },
+  control_forever: {
+    init() {
+      this.jsonInit({
+        type: 'control_forever',
+        message0: 'forever',
+        message1: '%1',
+        args1: [{ type: 'input_statement', name: 'SUBSTACK' }],
+        previousStatement: null,
+        colour: '#FFAB19',
+      })
+    },
+  },
+  control_if: {
+    init() {
+      this.jsonInit({
+        type: 'control_if',
+        message0: 'if %1 then',
+        args0: [boolInput('CONDITION')],
+        message1: '%1',
+        args1: [{ type: 'input_statement', name: 'SUBSTACK' }],
+        previousStatement: null,
+        nextStatement: null,
+        colour: '#FFAB19',
+      })
+    },
+  },
+  control_if_else: {
+    init() {
+      this.jsonInit({
+        type: 'control_if_else',
+        message0: 'if %1 then',
+        args0: [boolInput('CONDITION')],
+        message1: '%1',
+        args1: [{ type: 'input_statement', name: 'SUBSTACK' }],
+        message2: 'else %1',
+        args2: [{ type: 'input_statement', name: 'SUBSTACK2' }],
+        previousStatement: null,
+        nextStatement: null,
+        colour: '#FFAB19',
+      })
+    },
+  },
+  control_stop: blockStop(),
+
+  sensing_askandwait: blockStatement('sensing_askandwait', 'ask %1 and wait', [stringInput('QUESTION', "What's your name?")], '#5CB1D6'),
+  sensing_answer: reporter('sensing_answer', 'answer', 'String', '#5CB1D6'),
+  sensing_keypressed: {
+    init() {
+      this.jsonInit({
+        type: 'sensing_keypressed',
+        message0: 'key %1 pressed?',
+        args0: [{ type: 'field_dropdown', name: 'KEY_OPTION', options: KEY_OPTIONS }],
+        output: 'Boolean',
+        colour: '#5CB1D6',
+      })
+    },
+  },
+  sensing_mousedown: reporter('sensing_mousedown', 'mouse down?', 'Boolean', '#5CB1D6'),
+  sensing_touchingedge: reporter('sensing_touchingedge', 'touching edge?', 'Boolean', '#5CB1D6'),
+  sensing_touchingobject: {
+    init() {
+      this.jsonInit({
+        type: 'sensing_touchingobject',
+        message0: 'touching %1?',
+        args0: [{ type: 'field_dropdown', name: 'TOUCHINGOBJECTMENU', options: () => [
+          ['mouse-pointer', '_mouse_'],
+          ['edge', '_edge_'],
+          ..._currentSprites.map(sp => [sp.name, sp.id]),
+        ]}],
+        output: 'Boolean',
+        colour: '#5CB1D6',
+      })
+    },
+  },
+
+  operator_equals: operator('operator_equals', '%1 = %2', [stringInput('OPERAND1', ''), stringInput('OPERAND2', '')], 'Boolean'),
+  operator_gt: operator('operator_gt', '%1 > %2', [numberInput('OPERAND1', 50), numberInput('OPERAND2', 0)], 'Boolean'),
+  operator_lt: operator('operator_lt', '%1 < %2', [numberInput('OPERAND1', 0), numberInput('OPERAND2', 50)], 'Boolean'),
+  operator_and: operator('operator_and', '%1 and %2', [boolInput('OPERAND1'), boolInput('OPERAND2')], 'Boolean'),
+  operator_or: operator('operator_or', '%1 or %2', [boolInput('OPERAND1'), boolInput('OPERAND2')], 'Boolean'),
+  operator_not: operator('operator_not', 'not %1', [boolInput('OPERAND')], 'Boolean'),
+  operator_add: operator('operator_add', '%1 + %2', [numberInput('NUM1', 1), numberInput('NUM2', 1)], 'Number'),
+  operator_subtract: operator('operator_subtract', '%1 - %2', [numberInput('NUM1', 1), numberInput('NUM2', 1)], 'Number'),
+  operator_join: operator('operator_join', 'join %1 %2', [stringInput('STRING1', 'apple'), stringInput('STRING2', 'banana')], 'String'),
+
+  data_variable: variableReporter(),
+  data_setvariableto: variableStatement('data_setvariableto', 'set %1 to %2', stringInput('VALUE', 0)),
+  data_changevariableby: variableStatement('data_changevariableby', 'change %1 by %2', numberInput('VALUE', 1)),
+}
+
+const KEY_OPTIONS = [['space', 'space'], ['up arrow', 'up arrow'], ['down arrow', 'down arrow'], ['left arrow', 'left arrow'], ['right arrow', 'right arrow'], ['any', 'any']]
+
+function blockStatement(type, message0, args0, colour) {
+  return {
+    init() {
+      this.jsonInit({ type, message0, args0, previousStatement: null, nextStatement: null, colour })
+    },
+  }
+}
+
+function reporter(type, message0, output, colour) {
+  return {
+    init() {
+      this.jsonInit({ type, message0, output, colour })
+    },
+  }
+}
+
+function operator(type, message0, args0, output) {
+  return {
+    init() {
+      this.jsonInit({ type, message0, args0, output, colour: '#59C059', inputsInline: true })
+    },
+  }
+}
+
+function soundBlock(type, message0) {
+  return {
+    init() {
+      this.jsonInit({
+        type,
+        message0,
+        args0: [{ type: 'field_dropdown', name: 'SOUND_MENU', options: [['pop', 'pop'], ['meow', 'meow'], ['click', 'click'], ['chime', 'chime']] }],
+        previousStatement: null,
+        nextStatement: null,
+        colour: '#CF63CF',
+      })
+    },
+  }
+}
+
+function blockStop() {
+  return {
+    init() {
+      this.jsonInit({ type: 'control_stop', message0: 'stop all', previousStatement: null, colour: '#FFAB19' })
+    },
+  }
+}
+
+function variableReporter() {
+  return {
+    init() {
+      this.jsonInit({
+        type: 'data_variable',
+        message0: '%1',
+        args0: [{ type: 'field_variable', name: 'VARIABLE', variable: 'score' }],
+        output: ['Number', 'String'],
+        colour: '#FF8C1A',
+        extensions: ['scratch_variable_field'],
+      })
+    },
+  }
+}
+
+function variableStatement(type, message0, valueInput) {
+  return {
+    init() {
+      this.jsonInit({
+        type,
+        message0,
+        args0: [{ type: 'field_variable', name: 'VARIABLE', variable: 'score' }, valueInput],
+        previousStatement: null,
+        nextStatement: null,
+        colour: '#FF8C1A',
+        extensions: ['scratch_variable_field'],
+      })
+    },
+  }
+}
+
+export const DEFAULT_TOOLBOX = {
+  kind: 'categoryToolbox',
+  contents: [
+    {
+      kind: 'category', name: 'Events', colour: '#FFAB19',
+      contents: [
+        { kind: 'block', type: 'event_whenflagclicked' },
+        { kind: 'block', type: 'event_whenkeypressed' },
+        { kind: 'block', type: 'event_whenthisspriteclicked' },
+        { kind: 'block', type: 'event_whenbackdropswitchesto' },
+        { kind: 'block', type: 'event_broadcast' },
+        { kind: 'block', type: 'event_broadcastandwait' },
+        { kind: 'block', type: 'event_whenbroadcastreceived' },
+      ],
+    },
+    {
+      kind: 'category', name: 'Motion', colour: '#4C97FF',
+      contents: [
+        { kind: 'block', type: 'motion_movesteps' },
+        { kind: 'block', type: 'motion_turnright' },
+        { kind: 'block', type: 'motion_turnleft' },
+        { kind: 'block', type: 'motion_pointindirection' },
+        { kind: 'block', type: 'motion_gotoxy' },
+        { kind: 'block', type: 'motion_goto' },
+        { kind: 'block', type: 'motion_glidesecstoxy' },
+        { kind: 'block', type: 'motion_glideto' },
+        { kind: 'block', type: 'motion_ifonedge_bounce' },
+        { kind: 'block', type: 'motion_setx' },
+        { kind: 'block', type: 'motion_sety' },
+        { kind: 'block', type: 'motion_changexby' },
+        { kind: 'block', type: 'motion_changeyby' },
+        { kind: 'block', type: 'motion_xposition' },
+        { kind: 'block', type: 'motion_yposition' },
+        { kind: 'block', type: 'motion_direction' },
+      ],
+    },
+    {
+      kind: 'category', name: 'Looks', colour: '#9966FF',
+      contents: [
+        { kind: 'block', type: 'looks_sayforsecs' },
+        { kind: 'block', type: 'looks_say' },
+        { kind: 'block', type: 'looks_think' },
+        { kind: 'block', type: 'looks_thinkforsecs' },
+        { kind: 'block', type: 'looks_show' },
+        { kind: 'block', type: 'looks_hide' },
+        { kind: 'block', type: 'looks_setsizeto' },
+        { kind: 'block', type: 'looks_changesizeby' },
+        { kind: 'block', type: 'looks_switchcostumeto' },
+        { kind: 'block', type: 'looks_nextcostume' },
+        { kind: 'block', type: 'looks_costumenumber' },
+        { kind: 'block', type: 'looks_switchbackdropto' },
+        { kind: 'block', type: 'looks_nextbackdrop' },
+      ],
+    },
+    {
+      kind: 'category', name: 'Sound', colour: '#CF63CF',
+      contents: [
+        { kind: 'block', type: 'sound_play' },
+        { kind: 'block', type: 'sound_playuntildone' },
+        { kind: 'block', type: 'sound_stopallsounds' },
+      ],
+    },
+    {
+      kind: 'category', name: 'Control', colour: '#FFAB19',
+      contents: [
+        { kind: 'block', type: 'control_wait' },
+        { kind: 'block', type: 'control_repeat' },
+        { kind: 'block', type: 'control_forever' },
+        { kind: 'block', type: 'control_if' },
+        { kind: 'block', type: 'control_if_else' },
+        { kind: 'block', type: 'control_stop' },
+      ],
+    },
+    {
+      kind: 'category', name: 'Sensing', colour: '#5CB1D6',
+      contents: [
+        { kind: 'block', type: 'sensing_askandwait' },
+        { kind: 'block', type: 'sensing_answer' },
+        { kind: 'block', type: 'sensing_keypressed' },
+        { kind: 'block', type: 'sensing_mousedown' },
+        { kind: 'block', type: 'sensing_touchingobject' },
+      ],
+    },
+    {
+      kind: 'category', name: 'Operators', colour: '#59C059',
+      contents: [
+        { kind: 'block', type: 'operator_equals' },
+        { kind: 'block', type: 'operator_gt' },
+        { kind: 'block', type: 'operator_lt' },
+        { kind: 'block', type: 'operator_and' },
+        { kind: 'block', type: 'operator_or' },
+        { kind: 'block', type: 'operator_not' },
+        { kind: 'block', type: 'operator_add' },
+        { kind: 'block', type: 'operator_subtract' },
+        { kind: 'block', type: 'operator_join' },
+      ],
+    },
+    {
+      kind: 'category', name: 'Variables', colour: '#FF8C1A',
+      contents: [
+        { kind: 'block', type: 'data_variable' },
+        { kind: 'block', type: 'data_setvariableto' },
+        { kind: 'block', type: 'data_changevariableby' },
+      ],
+    },
+  ],
+}
+
+const VALUE_INPUT_DEFAULTS = {
+  event_broadcast: { BROADCAST_INPUT: textShadow('message1') },
+  event_broadcastandwait: { BROADCAST_INPUT: textShadow('message1') },
+  motion_movesteps: { STEPS: numberShadow(10) },
+  motion_turnright: { DEGREES: numberShadow(15) },
+  motion_turnleft: { DEGREES: numberShadow(15) },
+  motion_gotoxy: { X: numberShadow(0), Y: numberShadow(0) },
+  motion_glidesecstoxy: { SECS: numberShadow(1), X: numberShadow(0), Y: numberShadow(0) },
+  motion_glideto: { SECS: numberShadow(1) },
+  motion_pointindirection: { DIRECTION: numberShadow(90) },
+  motion_setx: { X: numberShadow(0) },
+  motion_sety: { Y: numberShadow(0) },
+  motion_changexby: { DX: numberShadow(10) },
+  motion_changeyby: { DY: numberShadow(10) },
+  looks_sayforsecs: { MESSAGE: textShadow('Hello!'), SECS: numberShadow(2) },
+  looks_say: { MESSAGE: textShadow('Hello!') },
+  looks_think: { MESSAGE: textShadow('Hmm...') },
+  looks_thinkforsecs: { MESSAGE: textShadow('Hmm...'), SECS: numberShadow(2) },
+  looks_setsizeto: { SIZE: numberShadow(100) },
+  looks_changesizeby: { CHANGE: numberShadow(10) },
+  control_wait: { DURATION: numberShadow(1) },
+  control_repeat: { TIMES: numberShadow(10) },
+  sensing_askandwait: { QUESTION: textShadow("What's your name?") },
+  operator_equals: { OPERAND1: textShadow(''), OPERAND2: textShadow('') },
+  operator_gt: { OPERAND1: numberShadow(50), OPERAND2: numberShadow(0) },
+  operator_lt: { OPERAND1: numberShadow(0), OPERAND2: numberShadow(50) },
+  operator_add: { NUM1: numberShadow(1), NUM2: numberShadow(1) },
+  operator_subtract: { NUM1: numberShadow(1), NUM2: numberShadow(1) },
+  operator_join: { STRING1: textShadow('apple'), STRING2: textShadow('banana') },
+  data_setvariableto: { VALUE: textShadow(0) },
+  data_changevariableby: { VALUE: numberShadow(1) },
+}
+
+function numberShadow(value) {
+  return { type: 'math_number', field: 'NUM', value }
+}
+
+function textShadow(value) {
+  return { type: 'text', field: 'TEXT', value }
+}
+
+export function buildAlwaysOpenToolbox(toolbox) {
+  if (!toolbox) return flattenJsonToolbox(DEFAULT_TOOLBOX)
+  if (typeof toolbox === 'string') return flattenXmlToolbox(toolbox)
+  if (toolbox.kind === 'categoryToolbox') return flattenJsonToolbox(toolbox)
+  return toolbox
+}
+
+function flattenJsonToolbox(toolbox) {
+  const contents = []
+  for (const item of toolbox.contents ?? []) {
+    if (item.kind === 'category') {
+      contents.push({ kind: 'label', text: item.name, 'web-class': 'scratch-toolbox-label' })
+      contents.push(...(item.contents ?? []).map(withJsonInputDefaults))
+      contents.push({ kind: 'sep', gap: '16' })
+    } else {
+      contents.push(withJsonInputDefaults(item))
+    }
+  }
+  return { kind: 'flyoutToolbox', contents }
+}
+
+function withJsonInputDefaults(item) {
+  if (item?.kind !== 'block' || !VALUE_INPUT_DEFAULTS[item.type]) return item
+  const inputs = {}
+  for (const [name, shadow] of Object.entries(VALUE_INPUT_DEFAULTS[item.type])) {
+    inputs[name] = {
+      shadow: {
+        type: shadow.type,
+        fields: { [shadow.field]: String(shadow.value) },
+      },
+    }
+  }
+  return { ...item, inputs: { ...(item.inputs ?? {}), ...inputs } }
+}
+
+function flattenXmlToolbox(toolbox) {
+  if (typeof DOMParser === 'undefined') return toolbox
+  const source = new DOMParser().parseFromString(toolbox, 'text/xml')
+  if (source.querySelector('parsererror')) return toolbox
+  const doc = document.implementation.createDocument('', '', null)
+  const root = doc.createElement('xml')
+  doc.appendChild(root)
+  const categories = Array.from(source.documentElement?.children ?? []).filter(el => el.tagName.toLowerCase() === 'category')
+  if (!categories.length) return toolbox
+  for (const category of categories) {
+    const label = doc.createElement('label')
+    label.setAttribute('text', category.getAttribute('name') ?? '')
+    label.setAttribute('web-class', 'scratch-toolbox-label')
+    root.appendChild(label)
+    for (const child of Array.from(category.children)) {
+      const imported = doc.importNode(child, true)
+      if (imported.tagName?.toLowerCase() === 'block') addXmlInputDefaults(doc, imported)
+      root.appendChild(imported)
+    }
+    const sep = doc.createElement('sep')
+    sep.setAttribute('gap', '16')
+    root.appendChild(sep)
+  }
+  return new XMLSerializer().serializeToString(root)
+}
+
+function addXmlInputDefaults(doc, blockEl) {
+  const type = blockEl.getAttribute('type')
+  const defaults = VALUE_INPUT_DEFAULTS[type]
+  if (!defaults) return
+
+  for (const [name, shadow] of Object.entries(defaults)) {
+    const existing = Array.from(blockEl.children).find(child =>
+      child.tagName?.toLowerCase() === 'value' && child.getAttribute('name') === name
+    )
+    if (existing) continue
+
+    const value = doc.createElement('value')
+    value.setAttribute('name', name)
+    const shadowEl = doc.createElement('shadow')
+    shadowEl.setAttribute('type', shadow.type)
+    const field = doc.createElement('field')
+    field.setAttribute('name', shadow.field)
+    field.textContent = String(shadow.value)
+    shadowEl.appendChild(field)
+    value.appendChild(shadowEl)
+    blockEl.appendChild(value)
+  }
+}
+
+export function createRunSignal() {
+  return { stopped: false, keysPressed: new Set(), mouseDown: false, mouseX: 0, mouseY: 0, answer: '', ask: null, backdrop: null, backdrops: [], onBackdropChange: null }
+}
+
+export async function runWorkspace(workspace, spriteState, onUpdate, signal) {
+  const context = createRunContext(workspace, spriteState, onUpdate, signal)
+  const hats = workspace.getBlocksByType('event_whenflagclicked', false)
+  await Promise.all(hats.map(hat => runChain(hat.getNextBlock(), context)))
+}
+
+export async function runSingleBlock(block, spriteState, onUpdate, signal) {
+  const context = createRunContext(block?.workspace, spriteState, onUpdate, signal)
+  await runChain(block, context)
+}
+
+export async function runEvent(workspace, eventType, spriteState, onUpdate, signal, option = null) {
+  const context = createRunContext(workspace, spriteState, onUpdate, signal)
+  let hats = workspace.getBlocksByType(eventType, false)
+  if (eventType === 'event_whenkeypressed') {
+    hats = hats.filter(hat => keyMatches(hat.getFieldValue('KEY_OPTION'), option))
+  } else if (eventType === 'event_whenbroadcastreceived') {
+    hats = hats.filter(hat => String(hat.getFieldValue('BROADCAST_OPTION') ?? '') === String(option ?? ''))
+  }
+  await Promise.all(hats.map(hat => runChain(hat.getNextBlock(), context)))
+}
+
+// Multi-sprite: run all green-flag hats across every sprite concurrently.
+// spriteWorkspaces: Array of { id, workspace, state, costumes, onUpdate }
+export async function runAllSprites(spriteWorkspaces, signal) {
+  signal.variables ??= {}
+  await Promise.all(spriteWorkspaces.map(sp => {
+    const context = createRunContext(sp.workspace, sp.state, sp.onUpdate, signal, spriteWorkspaces, sp.costumes ?? [])
+    const hats = sp.workspace.getBlocksByType('event_whenflagclicked', false)
+    return Promise.all(hats.map(hat => runChain(hat.getNextBlock(), context)))
+  }))
+}
+
+export async function runAllSpritesEvent(spriteWorkspaces, eventType, signal, option = null) {
+  signal.variables ??= {}
+  await Promise.all(spriteWorkspaces.map(sp => {
+    const context = createRunContext(sp.workspace, sp.state, sp.onUpdate, signal, spriteWorkspaces, sp.costumes ?? [])
+    let hats = sp.workspace.getBlocksByType(eventType, false)
+    if (eventType === 'event_whenkeypressed') {
+      hats = hats.filter(hat => keyMatches(hat.getFieldValue('KEY_OPTION'), option))
+    } else if (eventType === 'event_whenbroadcastreceived') {
+      hats = hats.filter(hat => String(hat.getFieldValue('BROADCAST_OPTION') ?? '') === String(option ?? ''))
+    }
+    return Promise.all(hats.map(hat => runChain(hat.getNextBlock(), context)))
+  }))
+}
+
+// Run a single clicked block within the full multi-sprite context so broadcasts propagate.
+export async function runBlockInContext(block, spriteWorkspaces, targetSpriteId, signal) {
+  if (!block) return
+  const sp = spriteWorkspaces.find(s => s.id === targetSpriteId)
+  if (!sp) return
+  signal.variables ??= {}
+  const context = createRunContext(sp.workspace, sp.state, sp.onUpdate, signal, spriteWorkspaces, sp.costumes ?? [])
+  await runChain(block, context)
+}
+
+function createRunContext(workspace, state, onUpdate, signal, allSprites = null, costumes = []) {
+  signal.variables ??= {}
+  return { workspace, state, onUpdate, signal, allSprites, costumes }
+}
+
+async function runChain(block, context) {
+  while (block && !context.signal.stopped) {
+    await runBlock(block, context)
+    block = block.getNextBlock()
+  }
+}
+
+async function runBlock(block, context) {
+  const { state, onUpdate, signal, workspace } = context
+  if (signal.stopped) return
+
+  switch (block.type) {
+    case 'motion_movesteps': {
+      const steps = numberValue(block, 'STEPS', context, 10)
+      const rad = (state.direction - 90) * (Math.PI / 180)
+      state.x += Math.cos(rad) * steps
+      state.y -= Math.sin(rad) * steps
+      clampSprite(state)
+      onUpdate({ ...state })
+      await tick()
+      break
+    }
+    case 'motion_turnright':
+      state.direction = (state.direction + numberValue(block, 'DEGREES', context, 15)) % 360
+      onUpdate({ ...state }); await tick(); break
+    case 'motion_turnleft':
+      state.direction = (state.direction - numberValue(block, 'DEGREES', context, 15) + 360) % 360
+      onUpdate({ ...state }); await tick(); break
+    case 'motion_gotoxy':
+      state.x = numberValue(block, 'X', context, 0)
+      state.y = numberValue(block, 'Y', context, 0)
+      onUpdate({ ...state }); await tick(); break
+    case 'motion_setx':
+      state.x = numberValue(block, 'X', context, 0)
+      onUpdate({ ...state }); await tick(); break
+    case 'motion_sety':
+      state.y = numberValue(block, 'Y', context, 0)
+      onUpdate({ ...state }); await tick(); break
+    case 'motion_changexby':
+      state.x += numberValue(block, 'DX', context, 10)
+      clampSprite(state); onUpdate({ ...state }); await tick(); break
+    case 'motion_changeyby':
+      state.y += numberValue(block, 'DY', context, 10)
+      clampSprite(state); onUpdate({ ...state }); await tick(); break
+    case 'motion_setrotationstyle':
+      state.rotationStyle = block.getFieldValue('STYLE') ?? 'all around'
+      onUpdate({ ...state }); await tick(); break
+    case 'motion_ifonedge_bounce':
+      bounceIfNeeded(state)
+      onUpdate({ ...state }); await tick(); break
+    case 'motion_goto': {
+      const to = block.getFieldValue('TO')
+      if (to === '_random_') {
+        state.x = Math.round(Math.random() * 480 - 240)
+        state.y = Math.round(Math.random() * 360 - 180)
+      } else if (to === '_mouse_') {
+        state.x = signal.mouseX ?? 0
+        state.y = signal.mouseY ?? 0
+      } else {
+        const target = context.allSprites?.find(sp => sp.id === to)
+        if (target) { state.x = target.state.x; state.y = target.state.y }
+      }
+      clampSprite(state)
+      onUpdate({ ...state }); await tick(); break
+    }
+    case 'motion_glidesecstoxy': {
+      const secs = numberValue(block, 'SECS', context, 1)
+      const targetX = numberValue(block, 'X', context, 0)
+      const targetY = numberValue(block, 'Y', context, 0)
+      await glide(state, targetX, targetY, secs, onUpdate, signal)
+      break
+    }
+    case 'motion_glideto': {
+      const secs = numberValue(block, 'SECS', context, 1)
+      const to = block.getFieldValue('TO')
+      let targetX, targetY
+      if (to === '_random_') {
+        targetX = Math.round(Math.random() * 480 - 240)
+        targetY = Math.round(Math.random() * 360 - 180)
+      } else if (to === '_mouse_') {
+        targetX = signal.mouseX ?? 0
+        targetY = signal.mouseY ?? 0
+      } else {
+        const target = context.allSprites?.find(sp => sp.id === to)
+        targetX = target ? target.state.x : state.x
+        targetY = target ? target.state.y : state.y
+      }
+      await glide(state, targetX, targetY, secs, onUpdate, signal)
+      break
+    }
+    case 'motion_pointindirection':
+      state.direction = numberValue(block, 'DIRECTION', context, 90)
+      onUpdate({ ...state }); await tick(); break
+
+    case 'looks_sayforsecs':
+      state.bubble = stringValue(block, 'MESSAGE', context)
+      state.bubbleType = 'say'
+      onUpdate({ ...state })
+      await sleep(numberValue(block, 'SECS', context, 2) * 1000, signal)
+      state.bubble = ''
+      onUpdate({ ...state })
+      break
+    case 'looks_say':
+      state.bubble = stringValue(block, 'MESSAGE', context)
+      state.bubbleType = 'say'
+      onUpdate({ ...state }); await tick(); break
+    case 'looks_think':
+      state.bubble = stringValue(block, 'MESSAGE', context)
+      state.bubbleType = 'think'
+      onUpdate({ ...state }); await tick(); break
+    case 'looks_thinkforsecs':
+      state.bubble = stringValue(block, 'MESSAGE', context)
+      state.bubbleType = 'think'
+      onUpdate({ ...state })
+      await sleep(numberValue(block, 'SECS', context, 2) * 1000, signal)
+      state.bubble = ''
+      onUpdate({ ...state })
+      break
+    case 'looks_show':
+      state.visible = true; onUpdate({ ...state }); await tick(); break
+    case 'looks_hide':
+      state.visible = false; onUpdate({ ...state }); await tick(); break
+    case 'looks_setsizeto':
+      state.size = Math.max(0, numberValue(block, 'SIZE', context, 100))
+      onUpdate({ ...state }); await tick(); break
+    case 'looks_changesizeby':
+      state.size = Math.max(0, state.size + numberValue(block, 'CHANGE', context, 10))
+      onUpdate({ ...state }); await tick(); break
+    case 'looks_switchcostumeto': {
+      const name = block.getFieldValue('COSTUME')
+      if (name) state.costume = name
+      onUpdate({ ...state })
+      await tick()
+      break
+    }
+    case 'looks_nextcostume': {
+      const costumes = context.costumes ?? []
+      if (costumes.length > 0) {
+        const idx = costumes.findIndex(c => c.name === state.costume)
+        const next = costumes[(idx + 1) % costumes.length]
+        if (next) state.costume = next.name
+      }
+      onUpdate({ ...state })
+      await tick()
+      break
+    }
+    case 'looks_switchbackdropto': {
+      const name = block.getFieldValue('BACKDROP')
+      switchBackdrop(name, context)
+      await tick()
+      break
+    }
+    case 'looks_nextbackdrop': {
+      const bds = context.signal.backdrops ?? []
+      if (bds.length) {
+        const idx = bds.findIndex(b => b.name === context.signal.backdrop)
+        const next = bds[(idx + 1) % bds.length]
+        if (next) switchBackdrop(next.name, context)
+      }
+      await tick()
+      break
+    }
+
+    case 'sound_play':
+      playSound(block.getFieldValue('SOUND_MENU') ?? 'pop')
+      await tick()
+      break
+    case 'sound_playuntildone':
+      await playSound(block.getFieldValue('SOUND_MENU') ?? 'pop')
+      break
+    case 'sound_stopallsounds':
+      stopAllSounds()
+      await tick()
+      break
+
+    case 'control_wait':
+      await sleep(numberValue(block, 'DURATION', context, 1) * 1000, signal)
+      break
+    case 'control_repeat': {
+      const times = Math.max(0, Math.floor(numberValue(block, 'TIMES', context, 10)))
+      const inner = block.getInputTargetBlock('SUBSTACK')
+      for (let i = 0; i < times && !signal.stopped; i++) await runChain(inner, context)
+      break
+    }
+    case 'control_forever': {
+      const inner = block.getInputTargetBlock('SUBSTACK')
+      while (!signal.stopped) {
+        await runChain(inner, context)
+        await tick()
+      }
+      break
+    }
+    case 'control_if':
+      if (booleanValue(block, 'CONDITION', context)) await runChain(block.getInputTargetBlock('SUBSTACK'), context)
+      break
+    case 'control_if_else':
+      await runChain(block.getInputTargetBlock(booleanValue(block, 'CONDITION', context) ? 'SUBSTACK' : 'SUBSTACK2'), context)
+      break
+    case 'control_stop':
+      signal.stopped = true
+      stopAllSounds()
+      break
+
+    case 'event_broadcast':
+    case 'event_broadcastandwait': {
+      const msg = stringValue(block, 'BROADCAST_INPUT', context)
+      const targets = context.allSprites ?? [{ workspace: context.workspace, state: context.state, onUpdate: context.onUpdate }]
+      await Promise.all(targets.map(sp => {
+        const ctx = createRunContext(sp.workspace, sp.state, sp.onUpdate, context.signal, context.allSprites, sp.costumes ?? [])
+        const hats = sp.workspace.getBlocksByType('event_whenbroadcastreceived', false)
+          .filter(hat => String(hat.getFieldValue('BROADCAST_OPTION') ?? '') === String(msg ?? ''))
+        return Promise.all(hats.map(hat => runChain(hat.getNextBlock(), ctx)))
+      }))
+      break
+    }
+
+    case 'sensing_askandwait':
+      state.bubble = stringValue(block, 'QUESTION', context)
+      onUpdate({ ...state })
+      signal.answer = await askQuestion(state.bubble, signal)
+      state.bubble = ''
+      onUpdate({ ...state })
+      break
+
+    case 'data_setvariableto':
+      setVariable(block, evaluateInput(block, 'VALUE', context), signal)
+      await tick()
+      break
+    case 'data_changevariableby': {
+      const name = variableName(block)
+      const current = Number(signal.variables[name] ?? 0)
+      signal.variables[name] = current + numberValue(block, 'VALUE', context, 1)
+      await tick()
+      break
+    }
+    default:
+      break
+  }
+}
+
+function evaluateInput(block, inputName, context) {
+  const child = block.getInputTargetBlock(inputName)
+  if (!child) return block.getFieldValue(inputName) ?? ''
+  return evaluateReporter(child, context)
+}
+
+function evaluateReporter(block, context) {
+  const { state, signal, allSprites } = context
+  switch (block.type) {
+    case 'math_number':
+      return Number(block.getFieldValue('NUM') ?? 0)
+    case 'text':
+      return block.getFieldValue('TEXT') ?? ''
+    case 'data_variable':
+      return signal.variables[variableName(block)] ?? 0
+    case 'motion_xposition':
+      return state.x
+    case 'motion_yposition':
+      return state.y
+    case 'motion_direction':
+      return state.direction
+    case 'looks_costumenumber': {
+      const costumes = context.costumes ?? []
+      const idx = costumes.findIndex(c => c.name === state.costume)
+      return idx >= 0 ? idx + 1 : 1
+    }
+    case 'sensing_answer':
+      return signal.answer ?? ''
+    case 'sensing_keypressed':
+      return keyMatches(block.getFieldValue('KEY_OPTION'), null, signal.keysPressed)
+    case 'sensing_mousedown':
+      return !!signal.mouseDown
+    case 'sensing_touchingedge':
+      return isTouchingEdge(state)
+    case 'sensing_touchingobject': {
+      const target = block.getFieldValue('TOUCHINGOBJECTMENU')
+      if (target === '_mouse_') return isTouchingMouse(state, signal.mouseX ?? 0, signal.mouseY ?? 0)
+      if (target === '_edge_') return isTouchingEdge(state)
+      const targetSprite = allSprites?.find(sp => sp.id === target)
+      return targetSprite ? isTouchingSprite(state, targetSprite.state) : false
+    }
+    case 'operator_equals':
+      return String(evaluateInput(block, 'OPERAND1', context)) === String(evaluateInput(block, 'OPERAND2', context))
+    case 'operator_gt':
+      return Number(evaluateInput(block, 'OPERAND1', context)) > Number(evaluateInput(block, 'OPERAND2', context))
+    case 'operator_lt':
+      return Number(evaluateInput(block, 'OPERAND1', context)) < Number(evaluateInput(block, 'OPERAND2', context))
+    case 'operator_and':
+      return Boolean(evaluateInput(block, 'OPERAND1', context)) && Boolean(evaluateInput(block, 'OPERAND2', context))
+    case 'operator_or':
+      return Boolean(evaluateInput(block, 'OPERAND1', context)) || Boolean(evaluateInput(block, 'OPERAND2', context))
+    case 'operator_not':
+      return !Boolean(evaluateInput(block, 'OPERAND', context))
+    case 'operator_add':
+      return Number(evaluateInput(block, 'NUM1', context)) + Number(evaluateInput(block, 'NUM2', context))
+    case 'operator_subtract':
+      return Number(evaluateInput(block, 'NUM1', context)) - Number(evaluateInput(block, 'NUM2', context))
+    case 'operator_join':
+      return `${evaluateInput(block, 'STRING1', context)}${evaluateInput(block, 'STRING2', context)}`
+    default:
+      return ''
+  }
+}
+
+function numberValue(block, inputName, context, fallback = 0) {
+  const value = Number(evaluateInput(block, inputName, context))
+  return Number.isFinite(value) ? value : fallback
+}
+
+function stringValue(block, inputName, context) {
+  return String(evaluateInput(block, inputName, context) ?? '')
+}
+
+function booleanValue(block, inputName, context) {
+  return Boolean(evaluateInput(block, inputName, context))
+}
+
+function variableName(block) {
+  const id = block.getFieldValue('VARIABLE')
+  return block.workspace?.getVariableById?.(id)?.name ?? id ?? 'score'
+}
+
+function setVariable(block, value, signal) {
+  signal.variables[variableName(block)] = value
+}
+
+function keyMatches(expected, pressedKey, keysPressed = null) {
+  if (expected === 'any') return keysPressed ? keysPressed.size > 0 : !!pressedKey
+  const normalized = normalizeKey(pressedKey)
+  if (keysPressed) return keysPressed.has(expected)
+  return normalized === expected
+}
+
+export function normalizeKey(key) {
+  if (!key) return ''
+  if (key === ' ') return 'space'
+  if (key === 'ArrowUp') return 'up arrow'
+  if (key === 'ArrowDown') return 'down arrow'
+  if (key === 'ArrowLeft') return 'left arrow'
+  if (key === 'ArrowRight') return 'right arrow'
+  return String(key).toLowerCase()
+}
+
+function askQuestion(question, signal) {
+  if (signal.ask) return signal.ask(question)
+  return Promise.resolve(window.prompt(question, '') ?? '')
+}
+
+function playSound(name) {
+  if (typeof window === 'undefined') return Promise.resolve()
+  audioContext ??= new (window.AudioContext || window.webkitAudioContext)()
+  const ctx = audioContext
+  const osc = ctx.createOscillator()
+  const gain = ctx.createGain()
+  const sound = {
+    pop: { frequency: 660, duration: 0.18, type: 'sine' },
+    meow: { frequency: 440, duration: 0.42, type: 'sawtooth' },
+    click: { frequency: 880, duration: 0.08, type: 'square' },
+    chime: { frequency: 1046, duration: 0.35, type: 'triangle' },
+  }[name] ?? { frequency: 660, duration: 0.18, type: 'sine' }
+
+  osc.type = sound.type
+  osc.frequency.setValueAtTime(sound.frequency, ctx.currentTime)
+  if (name === 'meow') osc.frequency.exponentialRampToValueAtTime(260, ctx.currentTime + sound.duration)
+  gain.gain.setValueAtTime(0.001, ctx.currentTime)
+  gain.gain.exponentialRampToValueAtTime(0.16, ctx.currentTime + 0.02)
+  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + sound.duration)
+  osc.connect(gain).connect(ctx.destination)
+  activeOscillators.push(osc)
+  osc.start()
+  osc.stop(ctx.currentTime + sound.duration + 0.03)
+  return new Promise(resolve => {
+    osc.onended = () => {
+      activeOscillators = activeOscillators.filter(item => item !== osc)
+      resolve()
+    }
+  })
+}
+
+function stopAllSounds() {
+  for (const osc of activeOscillators) {
+    try { osc.stop() } catch {}
+  }
+  activeOscillators = []
+}
+
+function switchBackdrop(name, context) {
+  context.signal.backdrop = name
+  context.signal.onBackdropChange?.(name)
+  const targets = context.allSprites ?? [{ workspace: context.workspace, state: context.state, onUpdate: context.onUpdate }]
+  for (const sp of targets) {
+    const ctx = createRunContext(sp.workspace, sp.state, sp.onUpdate, context.signal, context.allSprites, sp.costumes ?? [])
+    const hats = sp.workspace.getBlocksByType('event_whenbackdropswitchesto', false)
+      .filter(hat => hat.getFieldValue('BACKDROP') === name)
+    for (const hat of hats) {
+      runChain(hat.getNextBlock(), ctx).catch(() => {})
+    }
+  }
+}
+
+function tick() {
+  return new Promise(r => requestAnimationFrame(r))
+}
+
+function sleep(ms, signal) {
+  return new Promise(r => {
+    const start = Date.now()
+    function check() {
+      if (signal?.stopped || Date.now() - start >= ms) return r()
+      requestAnimationFrame(check)
+    }
+    check()
+  })
+}
+
+async function glide(state, targetX, targetY, secs, onUpdate, signal) {
+  const startX = state.x
+  const startY = state.y
+  const duration = Math.max(0, secs) * 1000
+  if (duration === 0) {
+    state.x = targetX
+    state.y = targetY
+    clampSprite(state)
+    onUpdate({ ...state })
+    await tick()
+    return
+  }
+  const start = Date.now()
+  while (!signal.stopped) {
+    const elapsed = Date.now() - start
+    if (elapsed >= duration) break
+    const t = elapsed / duration
+    state.x = startX + (targetX - startX) * t
+    state.y = startY + (targetY - startY) * t
+    onUpdate({ ...state })
+    await tick()
+  }
+  if (!signal.stopped) {
+    state.x = targetX
+    state.y = targetY
+    clampSprite(state)
+    onUpdate({ ...state })
+    await tick()
+  }
+}
+
+function clampSprite(state) {
+  state.x = Math.max(-240, Math.min(240, state.x))
+  state.y = Math.max(-180, Math.min(180, state.y))
+}
+
+function isTouchingEdge(state) {
+  const half = (state.size / 100) * 24
+  return state.x + half >= 240 || state.x - half <= -240 || state.y + half >= 180 || state.y - half <= -180
+}
+
+function isTouchingMouse(state, mouseX, mouseY) {
+  const r = (state.size / 100) * 24
+  return Math.hypot(state.x - mouseX, state.y - mouseY) <= r
+}
+
+function isTouchingSprite(stateA, stateB) {
+  if (!stateB?.visible) return false
+  const rA = (stateA.size / 100) * 24
+  const rB = (stateB.size / 100) * 24
+  return Math.hypot(stateA.x - stateB.x, stateA.y - stateB.y) < rA + rB
+}
+
+function bounceIfNeeded(state) {
+  const half = (state.size / 100) * 24
+  if (state.x + half > 240 || state.x - half < -240) {
+    state.direction = (360 - state.direction) % 360
+    state.x = Math.max(-240 + half, Math.min(240 - half, state.x))
+  }
+  if (state.y + half > 180 || state.y - half < -180) {
+    state.direction = (180 - state.direction + 360) % 360
+    state.y = Math.max(-180 + half, Math.min(180 - half, state.y))
+  }
+}
+
+export function createSpriteState() {
+  return { x: 0, y: 0, direction: 90, size: 100, visible: true, bubble: '', bubbleType: 'say', rotationStyle: 'all around', costume: null }
+}
+
+export const DEFAULT_SPRITES = [
+  { id: 'sprite1', name: 'Sprite 1', type: 'cat', x: 0, y: 0, size: 100, direction: 90 },
+]
+
+export function evaluateScratchCheck(check, workspace, spriteState, runState = null) {
+  if (!check?.type) return false
+  try {
+    switch (check.type) {
+      case 'sprite_property':
+        return spriteState ? compare(spriteState[check.property], check.operator, check.value) : false
+      case 'variable_equals':
+        return compare(runState?.variables?.[check.variableName ?? check.name ?? 'score'], 'equals', check.value)
+      case 'block_used':
+        return workspace ? workspace.getAllBlocks(false).some(b => b.type === check.opcode) : false
+      default:
+        return false
+    }
+  } catch {
+    return false
+  }
+}
+
+function compare(actual, operator, expected) {
+  const a = Number(actual)
+  const e = Number(expected)
+  if (!Number.isNaN(a) && !Number.isNaN(e)) {
+    if (operator === 'equals') return a === e
+    if (operator === 'greater_than') return a > e
+    if (operator === 'less_than') return a < e
+  }
+  return operator === 'equals' && String(actual) === String(expected)
+}
+
+export function saveWorkspace(Blockly, workspace) {
+  return Blockly.serialization.workspaces.save(workspace)
+}
+
+export function loadWorkspace(Blockly, workspace, state) {
+  Blockly.serialization.workspaces.load(state, workspace)
+}

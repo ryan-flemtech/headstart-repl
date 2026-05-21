@@ -12,7 +12,7 @@ export default function WaitingRoom({ lessonTitle, onGoSolo }) {
     <div style={s.page}>
       <div style={s.card} className="card">
         <div style={s.header}>
-          <span style={s.logo}>Headstart Coding</span>
+          <span style={s.logo}>Headstart Coding - LaunchPad</span>
           <h1 style={s.title}>{lessonTitle}</h1>
         </div>
         <div style={s.body}>

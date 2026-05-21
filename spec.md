@@ -1381,3 +1381,115 @@ v1 uses open read/write rules — security comes from obscurity of the teacher U
 ---
 
 *End of specification. Version 2.2. Ready for development.*
+
+---
+
+# Part 4 — Scratch Integration Extension
+
+---
+
+## 46. Scratch Architecture
+
+| Concern | Solution |
+|---|---|
+| Visual Blocks | scratch-blocks (fork of Google Blockly) |
+| Execution Engine | scratch-vm (runs block logic and maintains stage state) |
+| Asset Hosting | Curated bundle of standard Scratch assets hosted locally in `/public/scratch-assets/` to comply with CC BY-SA 2.0 attribution and avoid API rate limits |
+| Sync Payload | Serialised JSON representing the workspace state (via `vm.toJSON()` / `vm.loadProject()`) |
+
+---
+
+## 47. Extended Lesson Data Format
+
+### 47.1 Lesson Envelope
+
+The `type` field now accepts `"scratch"`.
+
+```json
+{
+  "id": "scratch-intro",
+  "type": "scratch",
+  "title": "Animation Basics",
+  "description": "Learn to move sprites and use loops.",
+  "tasks": []
+}
+```
+
+### 47.2 Scratch Task Object
+
+```json
+{
+  "id": 1,
+  "title": "Move the Cat",
+  "explainer": "Let's make the cat walk across the screen using a loop.",
+  "toolbox": "<xml>...[Restricted blocks defined here]...</xml>",
+  "starterBlocks": {
+    "targets": []
+  },
+  "carryBlocksFrom": null,
+  "check": {
+    "type": "sprite_property",
+    "evaluation": "continuous",
+    "spriteName": "Sprite1",
+    "property": "x",
+    "operator": "greater_than",
+    "value": 150
+  }
+}
+```
+
+### Scratch Task Field Reference
+
+| Field | Required | Type | Notes |
+|---|---|---|---|
+| `toolbox` | No | string (XML) | Defines the exact blocks available in the sidebar. If omitted, load full Scratch toolbox. |
+| `starterBlocks` | No | object (JSON) | Pre-built workspace injected into scratch-vm on load. |
+| `carryBlocksFrom` | No | integer | Functions exactly like `carryCodeFrom`, pulling saved project JSON from localStorage. |
+| `check` | No | object | Expanded check types supporting both static and live evaluation. |
+
+---
+
+## 48. Completion Checks
+
+Scratch tasks support two types of evaluation timing, defined by `check.evaluation`:
+
+- **`manual`** — Evaluated only when the student clicks a "Check" button. Best for static analysis (e.g. checking if they used a specific block).
+- **`continuous`** — Evaluated on every tick of the scratch-vm frame loop (roughly 30 times a second). Best for animation goals (e.g. reaching a coordinate).
+
+### 48.1 Check Types
+
+| Type | Behaviour |
+|---|---|
+| `sprite_property` | Queries the VM for a specific target (sprite). Evaluates properties like `x`, `y`, `size`, `direction`, or `visible` against a value using an operator (`equals`, `greater_than`, `less_than`). |
+| `variable_equals` | Queries the VM's global or local variables. Useful for checking score counters. |
+| `block_used` | Parses the workspace JSON to check if a specific opcode (e.g. `control_repeat`) is present in the workspace. Evaluated statically. |
+
+---
+
+## 49. Scratch Live Sync & Firebase
+
+Scratch syncing requires careful debouncing to protect the Firebase free tier, as JSON block states are heavier than text.
+
+### 49.1 Student Sync Behaviour (When Watched)
+
+Student drags, drops, or edits a block → scratch-blocks emits a workspace change event → App debounces event (1000 ms wait after last edit) → Workspace state serialised to JSON via `vm.toJSON()` → Written to Firebase `currentCode` node.
+
+### 49.2 Teacher Live View (Expanded View)
+
+Because Scratch is visual, the teacher needs to see both the blocks and the stage.
+
+Teacher clicks "Go Live" on a student → App fetches student's block JSON from Firebase → Injects JSON into teacher's read-only scratch-blocks mirror → Injects JSON into a hidden, local scratch-vm on the teacher's client → Teacher sees blocks update in near real-time → Teacher clicks "Run" on their own client to play out the student's code on the teacher's local Stage.
+
+**Note:** We do not stream the stage's canvas frame-by-frame over Firebase — this would instantly drain the quota. We only stream the code (blocks), and the teacher's local machine handles rendering.
+
+---
+
+## 50. Sandbox Mode (Scratch)
+
+**Entering Sandbox:** The toolbox restrictions are lifted. The student receives the full Scratch block library.
+
+**Pushing Code:** When the teacher clicks "Push to All", the teacher's current workspace JSON (from `vm.toJSON()`) is written to `sandboxCode` in Firebase, instantly replacing the students' block setups.
+
+---
+
+*End of specification. Version 2.3 — Scratch integration added.*

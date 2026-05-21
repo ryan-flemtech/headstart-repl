@@ -2,14 +2,39 @@ import React, { useEffect, useRef, useState } from 'react'
 import { CodeEditor } from '../../shared/CodeEditor'
 import OutputPanel from './OutputPanel'
 import IframePreview from './IframePreview'
+import ScratchWorkspace from './ScratchWorkspace'
 import { buildIframeSrc } from '../../shared/iframe'
 import { decodeFileKey } from '../hooks/useSession'
+
+function resolveAssetsPath(rawPath) {
+  if (!rawPath) return ''
+  const base = import.meta.env.BASE_URL.replace(/\/$/, '')
+  const encoded = rawPath.split('/').map(s => (s ? encodeURIComponent(s) : s)).join('/')
+  return window.location.origin + base + encoded
+}
+
+function parseScratchState(raw) {
+  if (!raw) return null
+  if (typeof raw === 'object') return raw
+  try { return JSON.parse(raw) } catch { return null }
+}
+
+function parseSpriteState(raw) {
+  if (!raw) return null
+  try {
+    const parsed = typeof raw === 'object' ? raw : JSON.parse(raw)
+    return parsed && typeof parsed === 'object' && 'x' in parsed && 'y' in parsed ? parsed : null
+  } catch {
+    return null
+  }
+}
 
 export default function StudentModal({ student, lesson, session, isLive, onGoLive, onStopLive, onClose }) {
   const overlayRef = useRef(null)
   const iframeRef  = useRef(null)
 
   const isPython  = lesson?.type === 'python'
+  const isScratch = lesson?.type === 'scratch'
   const files     = student.currentFiles
     ? Object.entries(student.currentFiles).map(([key, content]) => {
         const name = decodeFileKey(key)
@@ -17,7 +42,9 @@ export default function StudentModal({ student, lesson, session, isLive, onGoLiv
       })
     : []
   const task      = lesson?.tasks?.find(t => t.id === session?.currentTaskId)
-  const iframeSrc = !isPython && files.length
+  const scratchState = isScratch ? parseScratchState(student.currentCode) : null
+  const spriteState = isScratch ? parseSpriteState(student.currentOutput) : null
+  const iframeSrc = !isPython && !isScratch && files.length
     ? buildIframeSrc(files, task?.entryFile ?? 'index.html')
     : null
 
@@ -74,7 +101,7 @@ export default function StudentModal({ student, lesson, session, isLive, onGoLiv
         </div>
 
         {/* Content */}
-        <div style={isPython ? s.bodyPython : s.bodyHtml}>
+        <div style={isPython ? s.bodyPython : isScratch ? s.bodyScratch : s.bodyHtml}>
           {isPython ? (
             <>
               <div style={s.editorWrap}>
@@ -92,6 +119,16 @@ export default function StudentModal({ student, lesson, session, isLive, onGoLiv
                 checkPassed={student.checkPassed}
               />
             </>
+          ) : isScratch ? (
+            <ScratchWorkspace
+              key={`student-scratch-${student.anonymousId}-${session?.currentTaskId}`}
+              task={task}
+              readOnly
+              assetsPath={resolveAssetsPath(lesson?.assetsPath) || undefined}
+              initialState={scratchState}
+              externalState={scratchState}
+              initialSpriteState={spriteState}
+            />
           ) : (
             <>
               {/* Left: tabbed file editor */}
@@ -195,6 +232,12 @@ const s = {
     display: 'flex',
     flexDirection: 'row',
     gap: 0,
+  },
+  bodyScratch: {
+    flex: 1,
+    overflow: 'hidden',
+    padding: 16,
+    display: 'flex',
   },
   htmlEditorPane: {
     flex: 1,

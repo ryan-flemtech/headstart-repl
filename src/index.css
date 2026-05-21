@@ -234,3 +234,39 @@ button:disabled {
 .hljs-selector-id                   { color: #2563eb; }
 .hljs-selector-attr                 { color: #0284c7; }
 .hljs-meta                          { color: #9ca3af; }
+
+/* Scratch editor polish */
+.scratch-workspace .blocklyToolboxDiv {
+  background: #fff7ed;
+  border-right: 1px solid #fed7aa;
+  box-shadow: inset -1px 0 0 rgba(251, 165, 4, 0.16);
+}
+
+.scratch-workspace .blocklyFlyoutBackground {
+  fill: #fffaf0;
+  fill-opacity: 1;
+}
+
+.scratch-workspace .blocklyMainBackground {
+  stroke: none;
+}
+
+.scratch-workspace .scratch-toolbox-label {
+  font-family: var(--font-title);
+  font-size: 13px;
+  font-weight: 700;
+  fill: #7c2d12;
+}
+
+.scratch-workspace .blocklyText {
+  font-family: var(--font-body);
+  font-weight: 600;
+}
+
+.scratch-workspace .blocklyPath {
+  filter: drop-shadow(0 2px 0 rgba(58, 59, 60, 0.14));
+}
+
+.scratch-workspace .blocklySelected > .blocklyPath {
+  filter: drop-shadow(0 0 0 rgba(0, 0, 0, 0)) drop-shadow(0 0 8px rgba(251, 165, 4, 0.7));
+}

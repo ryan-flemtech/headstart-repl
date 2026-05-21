@@ -2,6 +2,8 @@ import React, { useState } from 'react'
 import SplitPane from '../../shared/SplitPane'
 import { CodeEditor } from '../../shared/CodeEditor'
 import FileManager from './FileManager'
+import ScratchWorkspace from '../../app/components/ScratchWorkspace'
+import { ScratchToolboxPicker } from './TaskEditor'
 
 export default function LessonMetaPanel({ lesson, onUpdate }) {
   const [sandboxOpen, setSandboxOpen] = useState(false)
@@ -11,6 +13,7 @@ export default function LessonMetaPanel({ lesson, onUpdate }) {
   }
 
   const isPython = lesson.type === 'python'
+  const isScratch = lesson.type === 'scratch'
   const sandboxLineCount = (lesson.sandboxStarter ?? '').trim()
     ? (lesson.sandboxStarter ?? '').split('\n').length
     : 0
@@ -21,7 +24,7 @@ export default function LessonMetaPanel({ lesson, onUpdate }) {
       <div style={s.header}>Lesson Details</div>
       <div style={s.fields}>
         <Field label="Lesson type">
-          <div style={s.typeBadge}>{isPython ? 'Python' : 'Web'}</div>
+          <div style={s.typeBadge}>{isPython ? 'Python' : isScratch ? 'Scratch' : 'Web'}</div>
         </Field>
 
         <Field label="Lesson ID" hint="e.g. python-intro">
@@ -63,9 +66,9 @@ export default function LessonMetaPanel({ lesson, onUpdate }) {
           />
         </Field>
 
-        {lesson.type === 'html' && (
+        {(lesson.type === 'html' || lesson.type === 'scratch') && (
           <>
-            <Field label="Assets path" hint="e.g. /assets/web-intro/">
+            <Field label="Assets path" hint="e.g. /assets/scratch-intro/">
               <input
                 style={s.input}
                 value={lesson.assetsPath ?? ''}
@@ -92,7 +95,9 @@ export default function LessonMetaPanel({ lesson, onUpdate }) {
             <p style={s.summaryText}>
               {isPython
                 ? (sandboxLineCount ? `${sandboxLineCount} lines configured` : 'No sandbox starter code set.')
-                : (sandboxFileCount ? `${sandboxFileCount} starter files configured` : 'No sandbox starter files set.')}
+                : isScratch
+                  ? (lesson.sandboxStarter ? 'Scratch sandbox starter configured.' : 'No Scratch sandbox starter set.')
+                  : (sandboxFileCount ? `${sandboxFileCount} starter files configured` : 'No sandbox starter files set.')}
             </p>
           </div>
           <button className="btn-ghost" style={s.secondaryBtn} onClick={() => setSandboxOpen(true)}>
@@ -111,6 +116,13 @@ export default function LessonMetaPanel({ lesson, onUpdate }) {
                   style={s.modalCodeEditor}
                 />
               </div>
+            ) : isScratch ? (
+              <ScratchSandboxStarter
+                value={lesson.sandboxStarter}
+                toolbox={lesson.sandboxToolbox ?? ''}
+                onChange={state => set('sandboxStarter', state ? JSON.stringify(state) : undefined)}
+                onToolboxChange={v => set('sandboxToolbox', v || undefined)}
+              />
             ) : (
               <SandboxStarterFiles
                 files={lesson.sandboxStarterFiles ?? []}
@@ -118,6 +130,49 @@ export default function LessonMetaPanel({ lesson, onUpdate }) {
               />
             )}
           </Modal>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function parseScratchStarter(value) {
+  if (!value) return null
+  try {
+    return typeof value === 'string' ? JSON.parse(value) : value
+  } catch {
+    return null
+  }
+}
+
+function ScratchSandboxStarter({ value, toolbox, onChange, onToolboxChange }) {
+  const [toolboxOpen, setToolboxOpen] = useState(false)
+
+  return (
+    <div style={s.scratchSandboxEditor}>
+      <div style={{ flex: 1, minHeight: 0, minWidth: 0, display: 'flex' }}>
+        <ScratchWorkspace
+          key="scratch-sandbox-starter"
+          task={{ toolbox, check: null }}
+          initialState={parseScratchStarter(value)}
+          onStateChange={onChange}
+        />
+      </div>
+      <div style={s.toolboxCollapsible}>
+        <button
+          type="button"
+          style={s.collapsibleHeader}
+          onClick={() => setToolboxOpen(o => !o)}
+          aria-expanded={toolboxOpen}
+        >
+          <span style={s.collapsibleLabel}>Toolbox blocks</span>
+          <span style={{ ...s.collapsibleChevron, transform: toolboxOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▾</span>
+        </button>
+        {toolboxOpen && (
+          <ScratchToolboxPicker
+            toolbox={toolbox}
+            onChange={onToolboxChange}
+          />
         )}
       </div>
     </div>
@@ -422,6 +477,46 @@ const s = {
     width: '100%',
     minWidth: 0,
     flex: '1 1 auto',
+  },
+  scratchSandboxEditor: {
+    flex: 1,
+    minHeight: 0,
+    minWidth: 0,
+    width: '100%',
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  toolboxCollapsible: {
+    flexShrink: 0,
+    borderTop: '1px solid #e5e7eb',
+    background: '#fafafa',
+    maxHeight: 260,
+    overflowY: 'auto',
+  },
+  collapsibleHeader: {
+    width: '100%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '10px 14px',
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    fontFamily: 'var(--font-body)',
+    fontWeight: 600,
+    fontSize: '0.82rem',
+    color: 'var(--colour-text)',
+  },
+  collapsibleLabel: {
+    fontFamily: 'var(--font-body)',
+    fontWeight: 600,
+    fontSize: '0.82rem',
+    color: 'var(--colour-text)',
+  },
+  collapsibleChevron: {
+    fontSize: '1rem',
+    transition: 'transform 0.15s ease',
+    lineHeight: 1,
   },
   noFile: {
     flex: 1,

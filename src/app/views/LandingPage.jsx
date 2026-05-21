@@ -19,7 +19,7 @@ export default function LandingPage() {
     <div style={s.page}>
       <div style={s.card} className="card">
         <div style={s.brand}>
-          <span style={s.logo}>Headstart Coding</span>
+          <span style={s.logo}>Headstart Coding - LaunchPad</span>
         </div>
 
         <h1 style={s.heading}>

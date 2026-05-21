@@ -9,6 +9,7 @@ import PythonEditor from '../components/PythonEditor'
 import HtmlEditor from '../components/HtmlEditor'
 import OutputPanel from '../components/OutputPanel'
 import IframePreview from '../components/IframePreview'
+import ScratchWorkspace from '../components/ScratchWorkspace'
 import SplitPane from '../../shared/SplitPane'
 import ExplainerPanel from '../components/ExplainerPanel'
 import StudentGrid from '../components/StudentGrid'
@@ -35,12 +36,18 @@ function decodeSessionFiles(sessionFiles) {
   })
 }
 
+function parseScratchState(raw) {
+  if (!raw) return null
+  if (typeof raw === 'object') return raw
+  try { return JSON.parse(raw) } catch { return null }
+}
+
 export default function TeacherView({ lessonId }) {
   const navigate = useNavigate()
   const {
     session, loading,
     createSession, restartSession, startSession, endSession,
-    setTaskId, enterSandbox, exitSandbox,
+    setTaskId, enterSandbox, exitSandbox, pushSandboxCode,
     setPaused, setActiveStudentView, renameStudent, removeStudent,
   } = useSession(lessonId)
 
@@ -60,6 +67,7 @@ export default function TeacherView({ lessonId }) {
   const [iframeSrc, setIframeSrc]       = useState(null)
   const [inputPrompt, setInputPrompt]   = useState(null)
   const [sandboxStaging, setSandboxStaging] = useState(false)
+  const [scratchState, setScratchState] = useState(null)
   const iframeRef = useRef(null)
   const appendOutputRef = useRef(null)
 
@@ -85,6 +93,8 @@ export default function TeacherView({ lessonId }) {
     if (!task) return
     if (lesson.type === 'python') {
       setCode(task.starterCode ?? '')
+    } else if (lesson.type === 'scratch') {
+      setScratchState(task.starterBlocks ?? null)
     } else {
       const taskFiles = task.starterFiles ?? []
       setFiles(taskFiles)
@@ -112,6 +122,15 @@ export default function TeacherView({ lessonId }) {
     return task?.starterFiles ?? []
   }
 
+  function getSandboxStarterScratch() {
+    const task = lesson?.tasks.find(t => t.id === currentTaskId)
+    if (session?.state === 'sandbox' && session.sandboxCode != null) {
+      return parseScratchState(session.sandboxCode)
+    }
+    if (scratchState) return scratchState
+    return task?.starterBlocks ?? null
+  }
+
   // Load task content when task changes
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -125,6 +144,8 @@ export default function TeacherView({ lessonId }) {
     if (!lesson || sandboxStaging || session?.state !== 'sandbox') return
     if (lesson.type === 'python') {
       setCode(getSandboxStarterCode())
+    } else if (lesson.type === 'scratch') {
+      setScratchState(getSandboxStarterScratch())
     } else {
       const starterFiles = getSandboxStarterFiles()
       setFiles(starterFiles)
@@ -161,13 +182,15 @@ export default function TeacherView({ lessonId }) {
       })
       setInputPrompt(null)
       setRunStatus(result.status)
-    } else {
+    } else if (lesson.type === 'html') {
       const task = lesson.tasks.find(t => t.id === currentTaskId)
       const src = buildIframeSrc(files, task?.entryFile ?? 'index.html', {
         assets: lesson.assets ?? [],
         assetsPath: resolveAssetsPath(lesson.assetsPath),
       })
       setIframeSrc(src)
+      setRunStatus('success')
+    } else if (lesson.type === 'scratch') {
       setRunStatus('success')
     }
     setRunning(false)
@@ -181,6 +204,8 @@ export default function TeacherView({ lessonId }) {
   function handleEnterSandbox() {
     if (lesson.type === 'python') {
       setCode(getSandboxStarterCode())
+    } else if (lesson.type === 'scratch') {
+      setScratchState(getSandboxStarterScratch())
     } else {
       const starterFiles = getSandboxStarterFiles()
       setFiles(starterFiles)
@@ -200,11 +225,19 @@ export default function TeacherView({ lessonId }) {
   async function handleGoLiveSandbox() {
     if (lesson.type === 'python') {
       await enterSandbox({ code })
+    } else if (lesson.type === 'scratch') {
+      await enterSandbox({ code: JSON.stringify(scratchState ?? {}) })
     } else {
       await enterSandbox({ files })
     }
     setSandboxStaging(false)
   }
+
+  async function handlePushScratchSandbox() {
+    await pushSandboxCode(JSON.stringify(scratchState ?? {}))
+  }
+
+
 
   async function handleDeactivateSandbox() {
     setSandboxStaging(false)
@@ -316,7 +349,7 @@ export default function TeacherView({ lessonId }) {
         </aside>
 
         {/* Centre — Teacher Editor */}
-        <main style={{ ...s.centre, ...(lesson.type === 'html' ? { overflow: 'hidden' } : {}) }}>
+        <main style={{ ...s.centre, ...(lesson.type === 'html' || lesson.type === 'scratch' ? { overflow: 'hidden' } : {}) }}>
           {task?.explainer && !isInSandbox && (
             <ExplainerPanel content={task.explainer} />
           )}
@@ -339,9 +372,16 @@ export default function TeacherView({ lessonId }) {
                     </button>
                   </>
                 ) : (
-                  <button className="btn-danger" style={s.sandboxBannerBtn} onClick={handleDeactivateSandbox}>
-                    Deactivate Sandbox
-                  </button>
+                  <>
+                    {lesson.type === 'scratch' && (
+                      <button className="btn-primary" style={s.sandboxBannerBtn} onClick={handlePushScratchSandbox}>
+                        Push to All
+                      </button>
+                    )}
+                    <button className="btn-danger" style={s.sandboxBannerBtn} onClick={handleDeactivateSandbox}>
+                      Deactivate Sandbox
+                    </button>
+                  </>
                 )}
               </div>
             </div>
@@ -370,6 +410,18 @@ export default function TeacherView({ lessonId }) {
                 onInputSubmit={v => { appendOutputRef.current?.(v + '\n'); setInputPrompt(null); provideInput(v) }}
               />
             </>
+          ) : lesson.type === 'scratch' ? (
+            <div style={s.scratchWrap}>
+              <ScratchWorkspace
+                key={`teacher-scratch-${currentTaskId}-${isInSandbox ? 'sandbox' : 'task'}`}
+                task={task}
+                unrestricted={isInSandbox}
+                assetsPath={resolveAssetsPath(lesson.assetsPath) || undefined}
+                initialState={scratchState}
+                externalState={scratchState}
+                onStateChange={setScratchState}
+              />
+            </div>
           ) : (
             <SplitPane
               style={{ flex: 1, minHeight: 0 }}
@@ -489,6 +541,11 @@ const s = {
     height: '100%',
     overflow: 'hidden',
     gap: 0,
+  },
+  scratchWrap: {
+    flex: 1,
+    minHeight: 0,
+    display: 'flex',
   },
   sandboxBanner: {
     display: 'flex',

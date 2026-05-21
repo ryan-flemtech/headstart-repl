@@ -9,8 +9,7 @@ export default function BuilderOutputPanel({
   runStatus = null,
   inputPrompt = null,
   onInputSubmit,
-  checkResult = null, // null | 'pass' | 'fail'
-  checkValue = '',
+  checkResults = null, // null | [{type, value, passed}]
 }) {
   const [inputValue, setInputValue] = useState('')
   const bottomRef  = useRef(null)
@@ -27,6 +26,8 @@ export default function BuilderOutputPanel({
 
   const statusColour = runStatus === 'success' ? '#22c55e' : runStatus === 'error' ? '#ef4444' : '#9ca3af'
   const statusLabel  = runStatus === 'success' ? 'Ran OK' : runStatus === 'error' ? 'Error' : 'Not run'
+
+  const allPassed = checkResults !== null && checkResults.every(r => r.passed)
 
   return (
     <div style={s.wrap}>
@@ -54,11 +55,28 @@ export default function BuilderOutputPanel({
       </div>
 
       {/* Check verification */}
-      {checkResult !== null && (
-        <div style={{ ...s.checkResult, background: checkResult === 'pass' ? '#f0fdf4' : '#fffbeb', borderColor: checkResult === 'pass' ? '#bbf7d0' : '#fde68a' }}>
-          {checkResult === 'pass'
-            ? <span>✅ <strong>Check passes</strong> — students will see the completion banner.</span>
-            : <span>⚠️ <strong>Check does not pass</strong> with this output — review your check value (<code style={s.code}>{checkValue}</code>).</span>}
+      {checkResults !== null && (
+        <div style={{ ...s.checkResult, background: allPassed ? '#f0fdf4' : '#fffbeb', borderColor: allPassed ? '#bbf7d0' : '#fde68a' }}>
+          {checkResults.length === 1 ? (
+            checkResults[0].passed
+              ? <span>✅ <strong>Check passes</strong> — students will see the completion banner.</span>
+              : <span>⚠️ <strong>Check does not pass</strong> with this output — review your check value (<code style={s.code}>{checkResults[0].value}</code>).</span>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {checkResults.map((r, i) => (
+                <div key={i}>
+                  {r.passed
+                    ? <span>✅ <strong>Check {i + 1}</strong> passes.</span>
+                    : <span>⚠️ <strong>Check {i + 1}</strong> does not pass — review value (<code style={s.code}>{r.value}</code>).</span>}
+                </div>
+              ))}
+              <div style={{ marginTop: 4, borderTop: '1px solid', borderColor: allPassed ? '#bbf7d0' : '#fde68a', paddingTop: 6, fontWeight: 700 }}>
+                {allPassed
+                  ? '✅ All checks pass — students will see the completion banner.'
+                  : '⚠️ Not all checks pass — students will not see the completion banner.'}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

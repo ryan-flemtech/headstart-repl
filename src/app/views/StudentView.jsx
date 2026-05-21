@@ -14,6 +14,7 @@ import PythonEditor from '../components/PythonEditor'
 import HtmlEditor from '../components/HtmlEditor'
 import OutputPanel from '../components/OutputPanel'
 import IframePreview from '../components/IframePreview'
+import ScratchWorkspace from '../components/ScratchWorkspace'
 import SplitPane from '../../shared/SplitPane'
 import JoinSessionPrompt from '../components/JoinSessionPrompt'
 import JoinChoiceScreen from '../components/JoinChoiceScreen'
@@ -63,9 +64,10 @@ export default function StudentView({ lessonId }) {
   const [runStatus, setRunStatus]       = useState(null)
   const [running, setRunning]           = useState(false)
   const [pyodideStatus, setPyodideStatus] = useState('idle') // idle | loading | ready
-  const [iframeSrc, setIframeSrc]       = useState(null)
-  const [inputPrompt, setInputPrompt]   = useState(null)
-  const [checkPassed, setCheckPassed]   = useState(false)
+  const [iframeSrc, setIframeSrc]         = useState(null)
+  const [inputPrompt, setInputPrompt]     = useState(null)
+  const [checkPassed, setCheckPassed]     = useState(false)
+  const [scratchSandboxProject, setScratchSandboxProject] = useState(null)
   const [showJoinPrompt, setShowJoinPrompt] = useState(false)
   const isMobile = useIsMobile()
   const iframeRef = useRef(null)
@@ -88,6 +90,8 @@ export default function StudentView({ lessonId }) {
   currentTaskIdRef.current = currentTaskId
   const lessonRef = useRef(lesson)
   lessonRef.current = lesson
+  const activeStudentViewRef = useRef(session?.activeStudentView)
+  activeStudentViewRef.current = session?.activeStudentView
 
   function saveCurrentWorkSnapshot() {
     const id = identityRef.current
@@ -101,9 +105,10 @@ export default function StudentView({ lessonId }) {
         output: outputRef.current,
         runStatus: runStatusRef.current,
       })
-    } else {
+    } else if (currentLesson.type === 'html') {
       filesRef.current.forEach(f => saveFile(lessonId, taskId, f.name, id.anonymousId, f.content))
     }
+    // Scratch: blocks are saved immediately in handleScratchChange — no snapshot needed
   }
 
   // Load lesson JSON
@@ -252,6 +257,16 @@ export default function StudentView({ lessonId }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, session?.sandboxCodePushedAt])
 
+  // React to sandbox block pushes (Scratch)
+  useEffect(() => {
+    if (phase !== 'sandbox' || lesson?.type !== 'scratch' || !session?.sandboxCode) return
+    try {
+      // sandboxCode is a JSON string of the Blockly workspace state
+      setScratchSandboxProject(JSON.parse(session.sandboxCode))
+    } catch {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, session?.sandboxCodePushedAt])
+
   // React to sandbox files pushes (HTML)
   useEffect(() => {
     if (phase !== 'sandbox' || lesson?.type !== 'html') return
@@ -297,6 +312,9 @@ export default function StudentView({ lessonId }) {
         if (saved?.code) initial = saved.code
       }
       setCode(initial)
+    } else if (lesson.type === 'scratch') {
+      setFiles([])
+      setActiveFile('')
     } else {
       const taskFiles = (task.starterFiles ?? []).map(f => {
         // In solo mode, prefer own saved file for this task
@@ -357,9 +375,10 @@ export default function StudentView({ lessonId }) {
     // Persist current editing state before leaving the task
     if (lesson?.type === 'python') {
       saveCode(lessonId, currentTaskId, identity.anonymousId, { code, output, runStatus })
-    } else {
+    } else if (lesson?.type === 'html') {
       files.forEach(f => saveFile(lessonId, currentTaskId, f.name, identity.anonymousId, f.content))
     }
+    // scratch: blocks are saved incrementally via handleScratchChange
     setViewingTaskId(null)
     setOutput('')
     setRunStatus(null)
@@ -465,6 +484,28 @@ export default function StudentView({ lessonId }) {
     }
   }
 
+  function handleScratchChange(workspaceStates) {
+    if (!identity) return
+    saveCode(lessonId, currentTaskId, identity.anonymousId, { state: workspaceStates })
+    if (activeStudentViewRef.current === identity.anonymousId) {
+      writeStudentCode(identity.anonymousId, JSON.stringify(workspaceStates))
+    }
+  }
+
+  function handleScratchCheck(passed, snapshot) {
+    setCheckPassed(passed)
+    if (!identity || lesson?.type !== 'scratch') return
+    if (phase === 'lesson' || phase === 'sandbox' || activeStudentViewRef.current === identity.anonymousId) {
+      const states = snapshot?.workspaceStates ?? loadSavedCode(lessonId, currentTaskId, identity.anonymousId)?.state ?? null
+      writeStudentRun(identity.anonymousId, {
+        code: states ? JSON.stringify(states) : undefined,
+        output: snapshot?.spriteStates ? JSON.stringify(snapshot.spriteStates) : undefined,
+        status: 'success',
+        checkPassed: passed,
+      })
+    }
+  }
+
   // ─── Render helpers ────────────────────────────────────────────────────────
 
   if (phase === 'loading' || sessionLoading || lessonLoading || !identityLoaded) {
@@ -485,9 +526,10 @@ export default function StudentView({ lessonId }) {
     // Persist current solo work before transitioning
     if (lesson?.type === 'python') {
       saveCode(lessonId, currentTaskId, identity.anonymousId, { code, output, runStatus })
-    } else {
+    } else if (lesson?.type === 'html') {
       files.forEach(f => saveFile(lessonId, currentTaskId, f.name, identity.anonymousId, f.content))
     }
+    // scratch: saved incrementally
     setPhase('name-entry')
   }
 
@@ -613,8 +655,31 @@ export default function StudentView({ lessonId }) {
           <ExplainerPanel content={task.explainer} />
         )}
 
-        <div style={styles.editorArea}>
-          {lesson.type === 'python' ? (
+        <div style={lesson.type === 'scratch' ? styles.editorAreaScratch : styles.editorArea}>
+          {lesson.type === 'scratch' ? (() => {
+            const saved = loadSavedCode(lessonId, viewingTaskId ?? currentTaskId, identity?.anonymousId)
+            let initialProject = saved?.state ?? null
+            if (!initialProject && task?.carryBlocksFrom) {
+              const carried = loadSavedCode(lessonId, task.carryBlocksFrom, identity?.anonymousId)
+              initialProject = carried?.state ?? null
+            }
+            if (!initialProject) initialProject = task?.starterBlocks ?? null
+            return (
+              <ScratchWorkspace
+                key={`scratch-${viewingTaskId ?? currentTaskId}-${isSandbox ? 'sandbox' : 'task'}`}
+                task={task}
+                readOnly={isViewingPrev}
+                unrestricted={isSandbox}
+                assetsPath={resolveAssetsPath(lesson.assetsPath) || undefined}
+                initialState={initialProject}
+                onStateChange={isViewingPrev ? undefined : handleScratchChange}
+                onCheckResult={isViewingPrev ? undefined : handleScratchCheck}
+                externalState={isSandbox ? scratchSandboxProject : null}
+                syncNowKey={session?.activeStudentView === identity?.anonymousId ? session?.activeStudentView : null}
+              />
+            )
+          })()
+          : lesson.type === 'python' ? (
             <>
               <PythonEditor
                 code={isViewingPrev ? (loadSavedCode(lessonId, viewingTaskId, identity?.anonymousId)?.code ?? '') : code}
@@ -773,6 +838,13 @@ const styles = {
     flexDirection: 'column',
     gap: '8px',
   },
+  editorAreaScratch: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+    minHeight: 520,
+  },
   htmlLeft: {
     display: 'flex',
     flexDirection: 'column',
@@ -823,21 +895,23 @@ const styles = {
   soloNav: {
     display: 'flex',
     alignItems: 'center',
-    gap: 8,
-    paddingTop: 8,
-    borderTop: '1px solid #e5e7eb',
+    gap: 12,
+    paddingTop: 12,
+    borderTop: '2px solid #e5e7eb',
     marginTop: 4,
   },
   soloNavBtn: {
-    fontSize: 13,
-    padding: '6px 16px',
+    fontSize: 16,
+    padding: '12px 28px',
+    fontWeight: 600,
   },
   soloNavLabel: {
     flex: 1,
     textAlign: 'center',
     fontFamily: 'var(--font-body)',
-    fontSize: '0.85rem',
-    color: '#6b7280',
+    fontSize: '1rem',
+    fontWeight: 600,
+    color: 'var(--colour-text)',
   },
   pauseOverlay: {
     position: 'fixed',

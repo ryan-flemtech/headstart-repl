@@ -9,6 +9,12 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 export default defineConfig({
   plugins: [react()],
   base: '/headstart-repl/',
+  resolve: {
+    dedupe: ['react', 'react-dom'],
+  },
+  optimizeDeps: {
+    include: ['blockly'],
+  },
   build: {
     outDir: 'dist',
     rollupOptions: {

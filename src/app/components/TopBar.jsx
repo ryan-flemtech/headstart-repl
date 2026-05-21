@@ -14,7 +14,7 @@ export default function TopBar({ lessonTitle, lessonLevel, displayName, isSandbo
   return (
     <header style={s.bar}>
       <div style={s.left}>
-        {!isMobile && <span style={s.logo}>Headstart Coding</span>}
+        {!isMobile && <span style={s.logo}>Headstart Coding - LaunchPad</span>}
         {!isMobile && <span style={s.divider}>·</span>}
         {lessonLevel && <span style={s.level}>{lessonLevel}</span>}
         <span style={{ ...s.title, fontSize: isMobile ? '0.8rem' : '0.95rem' }}>{lessonTitle}</span>

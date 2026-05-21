@@ -28,6 +28,8 @@ Both are static React apps deployed to GitHub Pages. No backend server exists or
 | Real-time sync | Firebase Realtime Database (free tier) — classroom app only |
 | Python execution | Pyodide (WASM) — classroom app AND lesson builder |
 | Web output | Sandboxed iframe with Blob URL virtual filesystem — classroom app AND lesson builder |
+| Scratch blocks | scratch-blocks (fork of Google Blockly) — classroom app only |
+| Scratch execution | scratch-vm + scratch-render — classroom app only |
 | Code editor | CodeMirror 6 |
 | Markdown | react-markdown + rehype-highlight |
 | Styling | CSS modules or Tailwind — confirm before starting |
@@ -78,6 +80,7 @@ Both apps share execution and rendering logic via `src/shared/`. Never duplicate
 | `markdown.jsx` | react-markdown renderer with rehype-highlight |
 | `iframe.js` | Blob URL generation, file reference rewriting, iframe injection |
 | `pyodide.js` | Pyodide loader, stdin intercept, stdout hook, run function |
+| `scratch.js` | scratch-vm factory, scratch-render attachment, storage setup, check evaluation, DEFAULT_PROJECT, DEFAULT_TOOLBOX |
 
 Both the classroom app and lesson builder import from these modules. Build the shared modules first.
 
