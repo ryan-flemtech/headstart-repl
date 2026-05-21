@@ -7,7 +7,7 @@ function applySuffix(name, existing) {
   return `${name}-${n}`
 }
 
-export default function NameEntry({ lessonTitle, existingNames = [], onSubmit, onGoSolo }) {
+export default function NameEntry({ lessonTitle, existingNames = [], onSubmit, onGoSolo, waitingForSession = false }) {
   const [value, setValue]       = useState('')
   const [confirmed, setConfirmed] = useState(null)
 
@@ -49,6 +49,9 @@ export default function NameEntry({ lessonTitle, existingNames = [], onSubmit, o
             </>
           ) : (
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {waitingForSession && (
+                <p style={s.waitNote}>Enter your name and we&apos;ll put you in the waiting room until your teacher starts.</p>
+              )}
               <label style={s.label}>
                 What&apos;s your name?
                 <input
@@ -62,7 +65,7 @@ export default function NameEntry({ lessonTitle, existingNames = [], onSubmit, o
                 />
               </label>
               <button className="btn-primary" type="submit" disabled={!value.trim()}>
-                Join
+                {waitingForSession ? 'Join Waiting Room' : 'Join'}
               </button>
               {onGoSolo && (
                 <button type="button" onClick={onGoSolo} style={s.soloLink}>
@@ -88,7 +91,7 @@ const s = {
   card: {
     width: 400,
     overflow: 'hidden',
-    borderRadius: 12,
+    borderRadius: 18,
   },
   header: {
     background: 'var(--colour-primary)',
@@ -106,7 +109,7 @@ const s = {
   title: {
     fontFamily: 'var(--font-title)',
     fontWeight: 700,
-    fontSize: '1.4rem',
+    fontSize: '1.6rem',
     color: '#fff',
   },
   body: {
@@ -122,15 +125,15 @@ const s = {
     gap: 8,
     fontFamily: 'var(--font-body)',
     fontWeight: 600,
-    fontSize: '0.95rem',
+    fontSize: '1.05rem',
     color: 'var(--colour-text)',
   },
   input: {
-    padding: '10px 12px',
+    padding: '12px 14px',
     border: '2px solid #e5e7eb',
-    borderRadius: 8,
+    borderRadius: 12,
     fontFamily: 'var(--font-body)',
-    fontSize: '1rem',
+    fontSize: '1.05rem',
     outline: 'none',
   },
   note: {
@@ -139,6 +142,14 @@ const s = {
     color: 'var(--colour-text)',
     lineHeight: 1.6,
     marginBottom: 4,
+  },
+  waitNote: {
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.88rem',
+    color: '#6b7280',
+    lineHeight: 1.5,
+    margin: 0,
+    textAlign: 'center',
   },
   soloLink: {
     background: 'none',

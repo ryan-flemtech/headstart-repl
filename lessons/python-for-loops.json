@@ -3,6 +3,7 @@
   "type": "python",
   "title": "For Loops",
   "description": "Learn to use for loops and the range() function to repeat code a set number of times.",
+  "sandboxStarter": "# Sandbox — try anything here!\n",
   "tasks": [
     {
       "id": 1,

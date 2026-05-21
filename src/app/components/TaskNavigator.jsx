@@ -8,6 +8,7 @@ export default function TaskNavigator({
   onTaskSelect,
   onSandbox,
   isSandbox,
+  sandboxStaging,
   collapsed,
   onToggle,
 }) {
@@ -44,8 +45,8 @@ export default function TaskNavigator({
           return (
             <button
               key={task.id}
-              style={{ ...s.item, ...(isCurrent ? s.itemActive : {}) }}
-              onClick={() => onTaskSelect?.(task.id)}
+              style={{ ...s.item, ...(isCurrent ? s.itemActive : {}), ...((isSandbox || sandboxStaging) ? { opacity: 0.45, cursor: 'default' } : {}) }}
+              onClick={() => (!isSandbox && !sandboxStaging) && onTaskSelect?.(task.id)}
             >
               <span style={s.num}>{task.id}</span>
               <div style={s.detail}>
@@ -85,13 +86,31 @@ export default function TaskNavigator({
 
       {/* Sandbox toggle */}
       <div style={s.sandboxArea}>
-        <button
-          className={isSandbox ? 'btn-primary' : 'btn-ghost'}
-          style={{ width: '100%', color: isSandbox ? undefined : 'var(--colour-primary)', border: isSandbox ? undefined : '1px solid var(--colour-primary)' }}
-          onClick={onSandbox}
-        >
-          {isSandbox ? 'Return to Lesson' : 'Sandbox'}
-        </button>
+        {isSandbox ? (
+          <button
+            className="btn-danger"
+            style={{ width: '100%' }}
+            onClick={onSandbox}
+          >
+            Deactivate Sandbox
+          </button>
+        ) : sandboxStaging ? (
+          <button
+            className="btn-ghost"
+            style={{ width: '100%', color: 'var(--colour-primary)', border: '1px solid var(--colour-primary)' }}
+            onClick={onSandbox}
+          >
+            Cancel Sandbox
+          </button>
+        ) : (
+          <button
+            className="btn-ghost"
+            style={{ width: '100%', color: 'var(--colour-primary)', border: '1px solid var(--colour-primary)' }}
+            onClick={onSandbox}
+          >
+            Sandbox
+          </button>
+        )}
       </div>
     </div>
   )

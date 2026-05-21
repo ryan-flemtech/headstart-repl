@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useSession } from '../hooks/useSession'
 import { initPyodide, runPython, provideInput, isPyodideReady } from '../../shared/pyodide'
 import { buildIframeSrc } from '../../shared/iframe'
@@ -20,16 +21,18 @@ function resolveAssetsPath(rawPath) {
 }
 
 export default function TeacherView({ lessonId }) {
+  const navigate = useNavigate()
   const {
     session, loading,
     createSession, restartSession, startSession, endSession,
-    setTaskId, enterSandbox, exitSandbox, pushSandboxCode,
-    setActiveStudentView, renameStudent, removeStudent,
+    setTaskId, enterSandbox, exitSandbox,
+    setPaused, setActiveStudentView, renameStudent, removeStudent,
   } = useSession(lessonId)
 
   const [lesson, setLesson]             = useState(null)
   const [lessonLoading, setLessonLoading] = useState(true)
   const [currentTaskId, setCurrentTaskId] = useState(1)
+  const [showEndModal, setShowEndModal]     = useState(false)
   const [leftCollapsed, setLeftCollapsed]   = useState(false)
   const [rightCollapsed, setRightCollapsed] = useState(false)
   const [code, setCode]                 = useState('')
@@ -41,6 +44,7 @@ export default function TeacherView({ lessonId }) {
   const [pyodideStatus, setPyodideStatus] = useState('idle')
   const [iframeSrc, setIframeSrc]       = useState(null)
   const [inputPrompt, setInputPrompt]   = useState(null)
+  const [sandboxStaging, setSandboxStaging] = useState(false)
   const iframeRef = useRef(null)
   const appendOutputRef = useRef(null)
 
@@ -60,10 +64,9 @@ export default function TeacherView({ lessonId }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, lesson])
 
-  // Load task content when task changes
-  useEffect(() => {
+  function loadCurrentTaskContent(taskId) {
     if (!lesson) return
-    const task = lesson.tasks.find(t => t.id === currentTaskId)
+    const task = lesson.tasks.find(t => t.id === taskId)
     if (!task) return
     if (lesson.type === 'python') {
       setCode(task.starterCode ?? '')
@@ -75,7 +78,11 @@ export default function TeacherView({ lessonId }) {
     setOutput('')
     setRunStatus(null)
     setIframeSrc(null)
-  }, [currentTaskId, lesson])
+  }
+
+  // Load task content when task changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { loadCurrentTaskContent(currentTaskId) }, [currentTaskId, lesson])
 
   // Warm up Pyodide
   useEffect(() => {
@@ -119,8 +126,44 @@ export default function TeacherView({ lessonId }) {
     await setTaskId(taskId)
   }
 
-  async function handlePushToAll() {
-    if (lesson.type === 'python') await pushSandboxCode(code)
+  function handleEnterSandbox() {
+    if (lesson.type === 'python') {
+      setCode(lesson.sandboxStarter ?? '')
+    } else {
+      const starterFiles = lesson.sandboxStarterFiles ?? []
+      setFiles(starterFiles)
+      setActiveFile(starterFiles[0]?.name ?? '')
+    }
+    setOutput('')
+    setRunStatus(null)
+    setIframeSrc(null)
+    setSandboxStaging(true)
+  }
+
+  function handleCancelSandbox() {
+    setSandboxStaging(false)
+    loadCurrentTaskContent(currentTaskId)
+  }
+
+  async function handleGoLiveSandbox() {
+    if (lesson.type === 'python') {
+      await enterSandbox({ code })
+    } else {
+      await enterSandbox({ files })
+    }
+    setSandboxStaging(false)
+  }
+
+  async function handleDeactivateSandbox() {
+    setSandboxStaging(false)
+    await exitSandbox()
+    loadCurrentTaskContent(currentTaskId)
+  }
+
+  async function handleEndSession(goHome) {
+    await endSession()
+    setShowEndModal(false)
+    if (goHome) navigate('/')
   }
 
   async function handleShareLink() {
@@ -130,6 +173,7 @@ export default function TeacherView({ lessonId }) {
   }
 
   const isSandbox = session?.state === 'sandbox'
+  const isInSandbox = isSandbox || sandboxStaging
   const task = lesson?.tasks.find(t => t.id === currentTaskId)
   const students = session ? Object.entries(session.students ?? {}).map(([id, s]) => ({ ...s, anonymousId: id })) : []
 
@@ -145,7 +189,7 @@ export default function TeacherView({ lessonId }) {
         isSandbox={isSandbox}
         right={
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            {!isSandbox && (
+            {!isInSandbox && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 <button
                   className="btn-ghost"
@@ -180,7 +224,16 @@ export default function TeacherView({ lessonId }) {
               </button>
             )}
             {(session?.state === 'active' || session?.state === 'sandbox') && (
-              <button className="btn-danger" style={{ fontSize: 13, padding: '5px 12px' }} onClick={endSession}>
+              <button
+                className={session?.isPaused ? 'btn-paused' : 'btn-ghost'}
+                style={{ fontSize: 13, padding: '5px 12px' }}
+                onClick={() => setPaused(!session?.isPaused)}
+              >
+                {session?.isPaused ? 'Resume Coding' : 'Pause Coding'}
+              </button>
+            )}
+            {(session?.state === 'active' || session?.state === 'sandbox') && (
+              <button className="btn-danger" style={{ fontSize: 13, padding: '5px 12px' }} onClick={() => setShowEndModal(true)}>
                 End Session
               </button>
             )}
@@ -202,8 +255,9 @@ export default function TeacherView({ lessonId }) {
             session={session}
             students={students}
             onTaskSelect={handleTaskChange}
-            onSandbox={isSandbox ? exitSandbox : enterSandbox}
+            onSandbox={isSandbox ? handleDeactivateSandbox : sandboxStaging ? handleCancelSandbox : handleEnterSandbox}
             isSandbox={isSandbox}
+            sandboxStaging={sandboxStaging}
             collapsed={leftCollapsed}
             onToggle={() => setLeftCollapsed(v => !v)}
           />
@@ -211,8 +265,34 @@ export default function TeacherView({ lessonId }) {
 
         {/* Centre — Teacher Editor */}
         <main style={{ ...s.centre, ...(lesson.type === 'html' ? { overflow: 'hidden' } : {}) }}>
-          {task?.explainer && !isSandbox && (
+          {task?.explainer && !isInSandbox && (
             <ExplainerPanel content={task.explainer} />
+          )}
+
+          {isInSandbox && (
+            <div style={s.sandboxBanner}>
+              <span style={s.sandboxBannerText}>
+                {sandboxStaging
+                  ? 'Sandbox preview — students are still on the lesson'
+                  : 'Sandbox is LIVE — students can see this'}
+              </span>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {sandboxStaging ? (
+                  <>
+                    <button className="btn-ghost" style={{ ...s.sandboxBannerBtn, color: '#92400e', borderColor: '#92400e', background: 'transparent' }} onClick={handleCancelSandbox}>
+                      Cancel
+                    </button>
+                    <button className="btn-primary" style={s.sandboxBannerBtn} onClick={handleGoLiveSandbox}>
+                      Go Live &amp; Send to Students
+                    </button>
+                  </>
+                ) : (
+                  <button className="btn-danger" style={s.sandboxBannerBtn} onClick={handleDeactivateSandbox}>
+                    Deactivate Sandbox
+                  </button>
+                )}
+              </div>
+            </div>
           )}
 
           {lesson.type === 'python' ? (
@@ -230,11 +310,6 @@ export default function TeacherView({ lessonId }) {
                 >
                   {running ? 'Running…' : 'Run'}
                 </button>
-                {isSandbox && (
-                  <button className="btn-secondary" onClick={handlePushToAll}>
-                    Push to All
-                  </button>
-                )}
               </div>
               <OutputPanel
                 output={output}
@@ -266,11 +341,6 @@ export default function TeacherView({ lessonId }) {
                     >
                       {running ? 'Running…' : 'Run'}
                     </button>
-                    {isSandbox && (
-                      <button className="btn-secondary" onClick={handlePushToAll}>
-                        Push to All
-                      </button>
-                    )}
                   </div>
                 </div>
               }
@@ -295,6 +365,40 @@ export default function TeacherView({ lessonId }) {
           />
         </aside>
       </div>
+
+      {showEndModal && (
+        <div style={s.overlay} onClick={() => setShowEndModal(false)}>
+          <div style={s.modal} onClick={e => e.stopPropagation()}>
+            <h2 style={s.modalTitle}>End Session?</h2>
+            <p style={s.modalBody}>
+              This will end the session for all students. They will see a session-ended screen.
+            </p>
+            <div style={s.modalActions}>
+              <button
+                className="btn-ghost"
+                style={{ fontSize: 14 }}
+                onClick={() => setShowEndModal(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn-danger"
+                style={{ fontSize: 14 }}
+                onClick={() => handleEndSession(false)}
+              >
+                End Session
+              </button>
+              <button
+                className="btn-primary"
+                style={{ fontSize: 14 }}
+                onClick={() => handleEndSession(true)}
+              >
+                End &amp; Go to Home
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -334,9 +438,68 @@ const s = {
     overflow: 'hidden',
     gap: 0,
   },
+  sandboxBanner: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    background: '#fef3c7',
+    border: '1px solid #fcd34d',
+    borderRadius: 8,
+    padding: '10px 14px',
+    flexShrink: 0,
+    flexWrap: 'wrap',
+  },
+  sandboxBannerText: {
+    fontFamily: 'var(--font-body)',
+    fontWeight: 600,
+    fontSize: '0.88rem',
+    color: '#92400e',
+  },
+  sandboxBannerBtn: {
+    fontSize: 13,
+    padding: '5px 12px',
+  },
   right: {
     background: '#fff',
     borderLeft: '1px solid #e5e7eb',
     overflow: 'auto',
+  },
+  overlay: {
+    position: 'fixed',
+    inset: 0,
+    background: 'rgba(0,0,0,0.45)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+  },
+  modal: {
+    background: '#fff',
+    borderRadius: 12,
+    padding: '28px 32px',
+    maxWidth: 420,
+    width: '90%',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+  },
+  modalTitle: {
+    fontFamily: 'var(--font-title)',
+    fontWeight: 700,
+    fontSize: '1.2rem',
+    color: 'var(--colour-text)',
+    margin: '0 0 12px',
+  },
+  modalBody: {
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.95rem',
+    color: 'var(--colour-text)',
+    margin: '0 0 24px',
+    lineHeight: 1.5,
+  },
+  modalActions: {
+    display: 'flex',
+    gap: 10,
+    justifyContent: 'flex-end',
+    flexWrap: 'wrap',
   },
 }

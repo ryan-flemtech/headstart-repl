@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import SplitPane from '../../shared/SplitPane'
 import { CodeEditor } from '../../shared/CodeEditor'
-import { initPyodide, runPython, provideInput, isPyodideReady } from '../../shared/pyodide'
+import { initPyodide, runPython, stopPython, provideInput, isPyodideReady } from '../../shared/pyodide'
 import { buildIframeSrc, waitForIframeText } from '../../shared/iframe'
 import AssetBrowser from '../../shared/AssetBrowser'
 import ExplainerEditor from './ExplainerEditor'
@@ -34,6 +34,10 @@ export default function TaskEditor({ task, lesson, onUpdate }) {
     onUpdate({ ...task, [field]: value })
   }
 
+  function handleStop() {
+    stopPython()
+  }
+
   async function handleRun() {
     if (running) return
     setRunning(true)
@@ -57,6 +61,12 @@ export default function TaskEditor({ task, lesson, onUpdate }) {
         onInputRequired: p => setInputPrompt(p),
       })
       setInputPrompt(null)
+
+      if (result.status === 'stopped') {
+        setRunning(false)
+        return
+      }
+
       setRunStatus(result.status)
 
       if (task.check?.value) {
@@ -163,11 +173,15 @@ export default function TaskEditor({ task, lesson, onUpdate }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <button
               className="btn-primary"
-              onClick={handleRun}
-              disabled={running || pyodideStatus === 'loading'}
-              style={{ padding: '10px 28px', fontSize: 15 }}
+              onClick={running ? handleStop : handleRun}
+              disabled={!running && pyodideStatus === 'loading'}
+              style={{
+                padding: '10px 28px',
+                fontSize: 15,
+                ...(running ? { backgroundColor: '#ef4444', borderColor: '#ef4444' } : {}),
+              }}
             >
-              {running ? 'Running…' : pyodideStatus === 'loading' ? 'Getting Python ready…' : 'Run'}
+              {running ? 'Stop' : pyodideStatus === 'loading' ? 'Getting Python ready…' : 'Run'}
             </button>
             {pyodideStatus === 'loading' && (
               <span style={{ fontFamily: 'var(--font-body)', fontSize: '0.85rem', color: 'var(--colour-primary)' }}>

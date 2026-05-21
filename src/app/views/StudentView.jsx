@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react'
-import { useSession } from '../hooks/useSession'
+import { useIsMobile } from '../../shared/useIsMobile'
+import { useSession, decodeFileKey } from '../hooks/useSession'
 import { useIdentity } from '../hooks/useIdentity'
-import { initPyodide, runPython, provideInput, isPyodideReady } from '../../shared/pyodide'
+import { initPyodide, runPython, stopPython, provideInput, isPyodideReady } from '../../shared/pyodide'
 import { buildIframeSrc, waitForIframeText } from '../../shared/iframe'
 import TopBar from '../components/TopBar'
 import NameEntry from '../components/NameEntry'
@@ -14,6 +15,7 @@ import OutputPanel from '../components/OutputPanel'
 import IframePreview from '../components/IframePreview'
 import SplitPane from '../../shared/SplitPane'
 import JoinSessionPrompt from '../components/JoinSessionPrompt'
+import JoinChoiceScreen from '../components/JoinChoiceScreen'
 
 // Returns a full absolute URL for the assets base so blob-URL iframes can load
 // resources without ambiguity (root-relative paths don't resolve in blob docs).
@@ -50,7 +52,7 @@ export default function StudentView({ lessonId }) {
 
   const [lesson, setLesson]             = useState(null)
   const [lessonLoading, setLessonLoading] = useState(true)
-  const [phase, setPhase]               = useState('loading') // loading | waiting | name-entry | lesson | sandbox | solo | ended
+  const [phase, setPhase]               = useState('loading') // loading | join-choice | waiting | name-entry | lesson | sandbox | solo | ended
   const [currentTaskId, setCurrentTaskId] = useState(1)
   const [viewingTaskId, setViewingTaskId] = useState(null) // null = current task
   const [code, setCode]                 = useState('')
@@ -64,6 +66,7 @@ export default function StudentView({ lessonId }) {
   const [inputPrompt, setInputPrompt]   = useState(null)
   const [checkPassed, setCheckPassed]   = useState(false)
   const [showJoinPrompt, setShowJoinPrompt] = useState(false)
+  const isMobile = useIsMobile()
   const iframeRef = useRef(null)
   const appendOutputRef = useRef(null)
   const identityRef = useRef(identity)
@@ -124,15 +127,42 @@ export default function StudentView({ lessonId }) {
   useEffect(() => {
     if (sessionLoading || !identityLoaded || lessonLoading) return
 
-    if (!session || session.state === 'ended') {
-      // Was the student actively coding? Save their work and show the ended screen.
+    // No session at all — show join-choice on first load; keep it if already there
+    if (!session) {
       if (phaseRef.current === 'lesson' || phaseRef.current === 'sandbox') {
         saveCurrentWorkSnapshot()
         setShowJoinPrompt(false)
         setPhase('ended')
         return
       }
-      // Not mid-lesson — go straight to solo
+      if (phaseRef.current === 'join-choice' || phaseRef.current === 'name-entry' || phaseRef.current === 'waiting') {
+        setPhase('join-choice')
+        return
+      }
+      if (phaseRef.current === 'loading') {
+        setPhase('join-choice')
+        return
+      }
+      // Already solo — stay solo
+      if (!identity) createIdentity('Solo', Date.now())
+      setShowJoinPrompt(false)
+      setPhase('solo')
+      return
+    }
+
+    // Session ended — exit any join flow gracefully
+    if (session.state === 'ended') {
+      if (phaseRef.current === 'lesson' || phaseRef.current === 'sandbox') {
+        saveCurrentWorkSnapshot()
+        setShowJoinPrompt(false)
+        setPhase('ended')
+        return
+      }
+      // Fresh load with ended session — show choice screen rather than jumping to solo
+      if (phaseRef.current === 'loading' || phaseRef.current === 'join-choice') {
+        setPhase('join-choice')
+        return
+      }
       if (!identity) createIdentity('Solo', Date.now())
       setShowJoinPrompt(false)
       setPhase('solo')
@@ -149,22 +179,41 @@ export default function StudentView({ lessonId }) {
 
     // Student is working solo (or on the ended screen) and a new session appeared — prompt rather than auto-transition
     if (phaseRef.current === 'solo' || phaseRef.current === 'ended') {
-      if (declinedSessionRef.current === session.createdAt) {
-        return
-      }
+      if (declinedSessionRef.current === session.createdAt) return
       setShowJoinPrompt(true)
       return
     }
 
+    // Don't interrupt the student while they're choosing or entering their name
+    if (phaseRef.current === 'join-choice' || phaseRef.current === 'name-entry') return
+
     if (session.state === 'waiting') {
-      // Teacher hasn't started yet — hold in waiting room, name not required yet
-      setPhase('waiting')
+      // Already in waiting room — check if they need to be prompted for name now
+      if (phaseRef.current === 'waiting') {
+        const alreadyRegistered = identity && identity.lastSessionTimestamp === session.createdAt
+        if (!alreadyRegistered) setPhase('name-entry')
+        return
+      }
+      // Fresh arrival → show join-choice
+      setPhase('join-choice')
       return
     }
 
     // Session is active or sandbox
     const sessionTs = session.createdAt
     const isReturning = identity && identity.lastSessionTimestamp === sessionTs
+
+    // Student was in the waiting room and the session just became active
+    if (phaseRef.current === 'waiting') {
+      if (isReturning) {
+        if (session.state === 'sandbox') { setPhase('sandbox'); return }
+        setCurrentTaskId(session.currentTaskId ?? 1)
+        setPhase('lesson')
+      } else {
+        setPhase('name-entry')
+      }
+      return
+    }
 
     if (!identity || !isReturning) {
       setPhase('name-entry')
@@ -195,12 +244,30 @@ export default function StudentView({ lessonId }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.currentTaskId])
 
-  // React to sandbox code pushes
+  // React to sandbox code pushes (Python)
   useEffect(() => {
-    if (phase !== 'sandbox' || !session?.sandboxCode) return
-    if (lesson?.type === 'python') setCode(session.sandboxCode)
+    if (phase !== 'sandbox' || lesson?.type !== 'python' || !session?.sandboxCode) return
+    setCode(session.sandboxCode)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.sandboxCodePushedAt])
+  }, [phase, session?.sandboxCodePushedAt])
+
+  // React to sandbox files pushes (HTML)
+  useEffect(() => {
+    if (phase !== 'sandbox' || lesson?.type !== 'html') return
+    if (session?.sandboxFiles) {
+      const decoded = Object.entries(session.sandboxFiles).map(([k, v]) => {
+        const name = decodeFileKey(k)
+        const type = name.endsWith('.html') ? 'html' : name.endsWith('.css') ? 'css' : 'js'
+        return { name, content: v, type }
+      })
+      setFiles(decoded)
+      if (decoded.length > 0) setActiveFile(decoded[0].name)
+    } else if (lesson?.sandboxStarterFiles?.length > 0) {
+      setFiles(lesson.sandboxStarterFiles)
+      setActiveFile(lesson.sandboxStarterFiles[0].name)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, session?.sandboxFilesUpdatedAt])
 
   // Sync teacher rename back to local identity so TopBar updates immediately
   useEffect(() => {
@@ -269,9 +336,19 @@ export default function StudentView({ lessonId }) {
     const sessionTs = session.createdAt
     const id = createIdentity(displayName, sessionTs)
     await joinSession(id.anonymousId, displayName)
+    if (session.state === 'waiting') { setPhase('waiting'); return }
     if (session.state === 'sandbox') { setPhase('sandbox'); return }
     setCurrentTaskId(session.currentTaskId ?? 1)
     setPhase('lesson')
+  }
+
+  function handleWaitForTeacher() {
+    if (session && session.state === 'waiting') {
+      setPhase('name-entry')
+    } else {
+      // No session yet — go to waiting room; when session appears we'll prompt for name
+      setPhase('waiting')
+    }
   }
 
   function handleSoloNavigate(taskId) {
@@ -310,11 +387,15 @@ export default function StudentView({ lessonId }) {
       appendOutputRef.current = echoOutput
       const result = await runPython(code, {
         onOutput: (text, _kind) => echoOutput(text),
-        onInputRequired: (prompt) => {
-          setInputPrompt(prompt)
-        },
+        onInputRequired: (prompt) => setInputPrompt(prompt),
       })
       setInputPrompt(null)
+
+      if (result.status === 'stopped') {
+        setRunning(false)
+        return
+      }
+
       const status = result.status
       setRunStatus(status)
 
@@ -327,30 +408,35 @@ export default function StudentView({ lessonId }) {
       if (phase === 'lesson' || phase === 'sandbox' || isWatched) {
         await writeStudentRun(identity.anonymousId, { code, output: accumulated, status, checkPassed: passed })
       }
-    } else {
-      // HTML — build iframe
-      const src = buildIframeSrc(files, task?.entryFile ?? 'index.html', {
-        assets: lesson.assets ?? [],
-        assetsPath: resolveAssetsPath(lesson.assetsPath),
-      })
-      setIframeSrc(src)
-      setRunStatus('success')
-
-      // Wait for the iframe to report its body text via postMessage, then run checks
-      waitForIframeText().then(text => {
-        const passed = task?.check
-          ? text.toLowerCase().includes(task.check.value.toLowerCase())
-          : false
-        setCheckPassed(passed)
-        if (phase === 'lesson' || phase === 'sandbox' || isWatched) {
-          const filesMap = Object.fromEntries(files.map(f => [f.name, f.content]))
-          writeStudentRun(identity.anonymousId, { files: filesMap, status: 'success', checkPassed: passed })
-        }
-        files.forEach(f => saveFile(lessonId, currentTaskId, f.name, identity.anonymousId, f.content))
-      })
+      setRunning(false)
+      return
     }
 
+    // HTML — build iframe
+    const src = buildIframeSrc(files, task?.entryFile ?? 'index.html', {
+      assets: lesson.assets ?? [],
+      assetsPath: resolveAssetsPath(lesson.assetsPath),
+    })
+    setIframeSrc(src)
+    setRunStatus('success')
+
+    // Wait for the iframe to report its body text via postMessage, then run checks
+    waitForIframeText().then(text => {
+      const passed = task?.check
+        ? text.toLowerCase().includes(task.check.value.toLowerCase())
+        : false
+      setCheckPassed(passed)
+      if (phase === 'lesson' || phase === 'sandbox' || isWatched) {
+        const filesMap = Object.fromEntries(files.map(f => [f.name, f.content]))
+        writeStudentRun(identity.anonymousId, { files: filesMap, status: 'success', checkPassed: passed })
+      }
+      files.forEach(f => saveFile(lessonId, currentTaskId, f.name, identity.anonymousId, f.content))
+    })
     setRunning(false)
+  }
+
+  function handleStop() {
+    stopPython()
   }
 
   function handleInputSubmit(value) {
@@ -405,16 +491,24 @@ export default function StudentView({ lessonId }) {
     } else {
       files.forEach(f => saveFile(lessonId, currentTaskId, f.name, identity.anonymousId, f.content))
     }
-    if (session?.state === 'waiting') {
-      setPhase('waiting')
-    } else {
-      setPhase('name-entry')
-    }
+    setPhase('name-entry')
   }
 
   function handleDeclineSolo() {
     declinedSessionRef.current = session?.createdAt
     setShowJoinPrompt(false)
+  }
+
+  if (phase === 'join-choice') {
+    return (
+      <JoinChoiceScreen
+        lessonTitle={lesson.title}
+        sessionExists={!!session}
+        sessionEnded={session?.state === 'ended'}
+        onWait={handleWaitForTeacher}
+        onSolo={handleGoSolo}
+      />
+    )
   }
 
   if (phase === 'name-entry') {
@@ -424,6 +518,7 @@ export default function StudentView({ lessonId }) {
         existingNames={session ? Object.values(session.students ?? {}).map(s => s.displayName) : []}
         onSubmit={handleNameSubmit}
         onGoSolo={handleGoSolo}
+        waitingForSession={session?.state === 'waiting'}
       />
     )
   }
@@ -458,8 +553,17 @@ export default function StudentView({ lessonId }) {
   const isSandbox = phase === 'sandbox'
   const isSolo = phase === 'solo'
 
+  const isPaused = (phase === 'lesson' || phase === 'sandbox') && session?.isPaused
+
   return (
     <div style={styles.page}>
+      {isPaused && (
+        <div style={styles.pauseOverlay}>
+          <span style={styles.pauseIcon}>⏸</span>
+          <h2 style={styles.pauseTitle}>Coding Paused</h2>
+          <p style={styles.pauseSubtitle}>Your teacher will resume the session shortly</p>
+        </div>
+      )}
       {showJoinPrompt && lesson && (
         <JoinSessionPrompt
           lessonTitle={lesson.title}
@@ -507,6 +611,7 @@ export default function StudentView({ lessonId }) {
       )}
 
       <div style={styles.body}>
+        <div key={`task-${currentTaskId}`} className="task-enter" style={styles.taskContent}>
         {task?.explainer && !isSandbox && (
           <ExplainerPanel content={task.explainer} />
         )}
@@ -523,11 +628,17 @@ export default function StudentView({ lessonId }) {
               {!isViewingPrev && (
                 <button
                   className="btn-primary"
-                  style={{ margin: '8px 0', alignSelf: 'flex-start', padding: '10px 28px', fontSize: 15 }}
-                  onClick={handleRun}
-                  disabled={running || pyodideStatus === 'loading'}
+                  style={{
+                    margin: '8px 0',
+                    alignSelf: 'flex-start',
+                    padding: '10px 28px',
+                    fontSize: 15,
+                    ...(running ? { backgroundColor: '#ef4444', borderColor: '#ef4444' } : {}),
+                  }}
+                  onClick={running ? handleStop : handleRun}
+                  disabled={!running && pyodideStatus === 'loading'}
                 >
-                  {running ? 'Running…' : pyodideStatus === 'loading' ? 'Getting Python ready…' : 'Run'}
+                  {running ? 'Stop' : pyodideStatus === 'loading' ? 'Getting Python ready…' : 'Run'}
                 </button>
               )}
               <OutputPanel
@@ -543,6 +654,33 @@ export default function StudentView({ lessonId }) {
                 hasCheck={!!task?.check}
               />
             </>
+          ) : isMobile ? (
+            <div style={styles.htmlMobile}>
+              <div style={styles.htmlLeft}>
+                <HtmlEditor
+                  files={files}
+                  activeFile={activeFile}
+                  onTabChange={setActiveFile}
+                  onFileChange={isViewingPrev ? undefined : handleFileChange}
+                  readOnly={isViewingPrev}
+                  assetsPath={resolveAssetsPath(lesson.assetsPath) || undefined}
+                  assets={lesson.assets}
+                />
+                {!isViewingPrev && (
+                  <button
+                    className="btn-primary"
+                    style={{ margin: '8px 0', alignSelf: 'flex-start', padding: '10px 28px', fontSize: 15, flexShrink: 0 }}
+                    onClick={handleRun}
+                    disabled={running}
+                  >
+                    {running ? 'Running…' : 'Run'}
+                  </button>
+                )}
+              </div>
+              <div style={styles.htmlMobilePreview}>
+                <IframePreview src={iframeSrc} iframeRef={iframeRef} fill />
+              </div>
+            </div>
           ) : (
             <SplitPane
               style={{ flex: 1, minHeight: 320 }}
@@ -597,6 +735,7 @@ export default function StudentView({ lessonId }) {
             </div>
           )}
         </div>
+        </div>
       </div>
     </div>
   )
@@ -623,7 +762,13 @@ const styles = {
     flexDirection: 'column',
     overflow: 'auto',
     padding: '16px',
+  },
+  taskContent: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
     gap: '12px',
+    minHeight: 0,
   },
   editorArea: {
     flex: 1,
@@ -638,6 +783,19 @@ const styles = {
     overflow: 'auto',
     gap: 8,
     paddingBottom: 4,
+  },
+  htmlMobile: {
+    display: 'flex',
+    flexDirection: 'column',
+    flex: 1,
+    gap: 8,
+    minHeight: 0,
+  },
+  htmlMobilePreview: {
+    flex: 1,
+    minHeight: 280,
+    display: 'flex',
+    flexDirection: 'column',
   },
   centreScreen: {
     display: 'flex',
@@ -683,5 +841,35 @@ const styles = {
     fontFamily: 'var(--font-body)',
     fontSize: '0.85rem',
     color: '#6b7280',
+  },
+  pauseOverlay: {
+    position: 'fixed',
+    inset: 0,
+    background: 'var(--colour-primary)',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    zIndex: 999,
+  },
+  pauseIcon: {
+    fontSize: '3rem',
+    lineHeight: 1,
+    color: '#fff',
+    opacity: 0.8,
+  },
+  pauseTitle: {
+    fontFamily: 'var(--font-title)',
+    fontWeight: 700,
+    fontSize: '2rem',
+    color: '#fff',
+    margin: 0,
+  },
+  pauseSubtitle: {
+    fontFamily: 'var(--font-body)',
+    fontSize: '1rem',
+    color: 'rgba(255,255,255,0.75)',
+    margin: 0,
   },
 }

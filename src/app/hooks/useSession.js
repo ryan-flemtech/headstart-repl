@@ -47,13 +47,16 @@ export function useSession(lessonId) {
   async function createSession() {
     await set(ref(db, `sessions/${lessonId}`), {
       lessonId,
-      state:              'waiting',
-      currentTaskId:      1,
-      createdAt:          Date.now(),
-      activeStudentView:  null,
-      sandboxCode:        null,
-      sandboxCodePushedAt: null,
-      students:           {},
+      state:                 'waiting',
+      currentTaskId:         1,
+      createdAt:             Date.now(),
+      activeStudentView:     null,
+      isPaused:              false,
+      sandboxCode:           null,
+      sandboxCodePushedAt:   null,
+      sandboxFiles:          null,
+      sandboxFilesUpdatedAt: null,
+      students:              {},
     })
   }
 
@@ -67,11 +70,13 @@ export function useSession(lessonId) {
 
   async function endSession() {
     await update(ref(db, `sessions/${lessonId}`), {
-      state:              'ended',
-      activeStudentView:  null,
-      sandboxCode:        null,
-      sandboxCodePushedAt: null,
-      students:           null,
+      state:                 'ended',
+      activeStudentView:     null,
+      sandboxCode:           null,
+      sandboxCodePushedAt:   null,
+      sandboxFiles:          null,
+      sandboxFilesUpdatedAt: null,
+      students:              null,
     })
     // When the teacher closes the tab, remove the session entirely so the
     // lesson becomes available for solo study without a stale "ended" record.
@@ -90,15 +95,27 @@ export function useSession(lessonId) {
     await update(ref(db, `sessions/${lessonId}`), updates)
   }
 
-  async function enterSandbox() {
-    await update(ref(db, `sessions/${lessonId}`), { state: 'sandbox' })
+  async function enterSandbox({ code = null, files = null } = {}) {
+    const updates = { state: 'sandbox' }
+    if (code != null) {
+      updates.sandboxCode        = code
+      updates.sandboxCodePushedAt = Date.now()
+    }
+    if (files != null) {
+      const filesMap             = Object.fromEntries(files.map(f => [f.name, f.content]))
+      updates.sandboxFiles        = encodeFileKeys(filesMap)
+      updates.sandboxFilesUpdatedAt = Date.now()
+    }
+    await update(ref(db, `sessions/${lessonId}`), updates)
   }
 
   async function exitSandbox() {
     await update(ref(db, `sessions/${lessonId}`), {
-      state:              'active',
-      sandboxCode:        null,
-      sandboxCodePushedAt: null,
+      state:                 'active',
+      sandboxCode:           null,
+      sandboxCodePushedAt:   null,
+      sandboxFiles:          null,
+      sandboxFilesUpdatedAt: null,
     })
   }
 
@@ -107,6 +124,18 @@ export function useSession(lessonId) {
       sandboxCode:        code,
       sandboxCodePushedAt: Date.now(),
     })
+  }
+
+  async function pushSandboxFiles(files) {
+    const filesMap = Object.fromEntries(files.map(f => [f.name, f.content]))
+    await update(ref(db, `sessions/${lessonId}`), {
+      sandboxFiles:          encodeFileKeys(filesMap),
+      sandboxFilesUpdatedAt: Date.now(),
+    })
+  }
+
+  async function setPaused(isPaused) {
+    await update(ref(db, `sessions/${lessonId}`), { isPaused })
   }
 
   async function setActiveStudentView(anonymousId) {
@@ -179,8 +208,8 @@ export function useSession(lessonId) {
     connected,
     // teacher
     createSession, restartSession, startSession, endSession,
-    setTaskId, enterSandbox, exitSandbox, pushSandboxCode,
-    setActiveStudentView, renameStudent, removeStudent,
+    setTaskId, enterSandbox, exitSandbox, pushSandboxCode, pushSandboxFiles,
+    setPaused, setActiveStudentView, renameStudent, removeStudent,
     // student
     registerPresence, joinSession, writeStudentRun, writeStudentCode, writeStudentFiles, writeStudentOutput,
   }

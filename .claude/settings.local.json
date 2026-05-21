@@ -28,7 +28,12 @@
       "Bash(python -m markitdown \"C:\\\\Users\\\\rflem\\\\Downloads\\\\4 - for loops.pptx\")",
       "Bash(pip install *)",
       "PowerShell(pip install \"markitdown[pptx]\" -q)",
-      "PowerShell(python -m markitdown \"C:\\\\Users\\\\rflem\\\\Downloads\\\\4 - for loops.pptx\")"
+      "PowerShell(python -m markitdown \"C:\\\\Users\\\\rflem\\\\Downloads\\\\4 - for loops.pptx\")",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\rflem\\\\Documents\\\\HSC Repl\" -Recurse -Force)",
+      "Bash(Select-Object -Property FullName)",
+      "Bash(Sort-Object FullName)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(node -e \"const p = require\\('./package.json'\\); console.log\\('rehype-highlight:', p.dependencies['rehype-highlight']\\); console.log\\('react-markdown:', p.dependencies['react-markdown']\\)\")"
     ]
   }
 }

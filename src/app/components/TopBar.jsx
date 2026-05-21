@@ -1,23 +1,36 @@
 import React from 'react'
+import { useIsMobile } from '../../shared/useIsMobile'
 
 // isSolo: true = solo, false = live teacher session, undefined = don't show badge (teacher view)
 export default function TopBar({ lessonTitle, lessonLevel, displayName, isSandbox, isSolo, right }) {
+  const isMobile = useIsMobile()
+
+  const statusDot = isSolo === true
+    ? <span style={{ ...s.statusDot, background: '#6b7280' }} title="Solo mode" />
+    : isSolo === false
+      ? <span style={{ ...s.statusDot, background: '#22c55e' }} title="Live session" />
+      : null
+
   return (
     <header style={s.bar}>
       <div style={s.left}>
-        <span style={s.logo}>Headstart Coding</span>
-        <span style={s.divider}>·</span>
+        {!isMobile && <span style={s.logo}>Headstart Coding</span>}
+        {!isMobile && <span style={s.divider}>·</span>}
         {lessonLevel && <span style={s.level}>{lessonLevel}</span>}
-        <span style={s.title}>{lessonTitle}</span>
+        <span style={{ ...s.title, fontSize: isMobile ? '0.8rem' : '0.95rem' }}>{lessonTitle}</span>
         {isSandbox && <span style={s.sandboxBadge}>SANDBOX</span>}
-        {!isSandbox && isSolo === true  && <span style={{ ...s.modeBadge, background: '#6b7280' }}>SOLO</span>}
-        {!isSandbox && isSolo === false && <span style={{ ...s.modeBadge, background: '#22c55e' }}>LIVE</span>}
+        {!isSandbox && (isMobile ? statusDot : (
+          <>
+            {isSolo === true  && <span style={{ ...s.modeBadge, background: '#6b7280' }}>SOLO</span>}
+            {isSolo === false && <span style={{ ...s.modeBadge, background: '#22c55e' }}>LIVE</span>}
+          </>
+        ))}
       </div>
       <div style={s.centre}>{/* progress dots injected here by parent */}</div>
       <div style={s.rightSlot}>
         {right}
         {displayName && !isSolo && (
-          <span style={s.name}>{displayName}</span>
+          <span style={{ ...s.name, fontSize: isMobile ? '0.75rem' : '0.9rem' }}>{displayName}</span>
         )}
       </div>
     </header>
@@ -107,5 +120,11 @@ const s = {
     fontWeight: 600,
     fontSize: '0.9rem',
     opacity: 0.9,
+  },
+  statusDot: {
+    width: 10,
+    height: 10,
+    borderRadius: '50%',
+    flexShrink: 0,
   },
 }

@@ -37,10 +37,14 @@ button {
   font-family: var(--font-body);
   font-weight: var(--font-weight-body-medium);
   border: none;
-  border-radius: 6px;
-  padding: 8px 16px;
-  font-size: 14px;
-  transition: background 0.15s ease, opacity 0.15s ease;
+  border-radius: 12px;
+  padding: 8px 18px;
+  font-size: 15px;
+  transition: background 0.15s ease, opacity 0.15s ease, transform 0.1s ease;
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.96);
 }
 
 button:disabled {
@@ -79,6 +83,22 @@ button:disabled {
 }
 .btn-danger:hover:not(:disabled) {
   background: #dc2626;
+}
+
+@keyframes flash-yellow {
+  0%, 100% { background: #FBA504; box-shadow: 0 0 0 0 rgba(251,165,4,0); }
+  50%       { background: #ffd04d; box-shadow: 0 0 10px 4px rgba(251,165,4,0.55); }
+}
+
+.btn-paused {
+  background: #FBA504;
+  color: #fff;
+  border: none;
+  animation: flash-yellow 1.2s ease-in-out infinite;
+}
+.btn-paused:hover:not(:disabled) {
+  background: #e09400;
+  animation: none;
 }
 
 /* Status dot colours */
@@ -158,10 +178,36 @@ button:disabled {
   background: currentColor;
 }
 
+.presence-badge--waiting {
+  background: #fef9c3;
+  border-color: #fde047;
+  color: #854d0e;
+}
+
+.presence-badge--waiting .presence-badge__dot {
+  background: #eab308;
+}
+
+/* Task transition animation */
+@keyframes taskSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.task-enter {
+  animation: taskSlideIn 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
 /* Shared card style */
 .card {
   background: #fff;
-  border-radius: 10px;
+  border-radius: 14px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
 

@@ -1,169 +1,153 @@
 /**
- * Shared Pyodide loader and execution module.
+ * Shared Pyodide loader and execution module — main-thread side.
  *
- * input() handling: user code is run inside an async Python function.
- * The AST transformer converts every input() call to an awaited async version,
- * and every `def` to `async def`, so input() works at any depth.
+ * Python runs inside a Web Worker (pyodide.worker.js) so the UI never freezes,
+ * even on infinite loops. Stopping execution terminates the worker instantly;
+ * a new worker is pre-warmed in the background immediately so the next run
+ * reloads Pyodide as quickly as possible.
  *
- * Remaining limitation: calls to user-defined functions are NOT auto-awaited,
- * so a user function that calls input() must itself be called with `await` in
- * the student's code. Lessons should avoid this pattern; top-level input()
- * calls (the vast majority of classroom code) work correctly.
+ * Public API (unchanged from previous version):
+ *   initPyodide(onProgress?)  — load Pyodide; resolves when ready
+ *   runPython(code, callbacks) — run code; resolves { status: 'success'|'error'|'stopped' }
+ *   stopPython()               — terminate worker and pre-warm a replacement
+ *   provideInput(text)         — supply a value for a pending input() call
+ *   isPyodideReady()           — true when worker is alive and Pyodide is loaded
  */
 
-const PYODIDE_CDN = 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/'
+// ─── Module state ─────────────────────────────────────────────────────────────
 
-let pyodide = null
-let loadingPromise = null
+let _worker = null
+let _loadingPromise = null  // resolves when Pyodide is ready inside the worker
+let _loadResolve = null
+let _loadReject = null
+let _runResolve = null      // resolves when the current run finishes
+let _onOutput = null
+let _onInputRequired = null
+let _stopped = false
+let _progressCallback = null
 
-// Queue of resolvers for pending input() calls
-let _inputResolvers = []
+// ─── Worker management ────────────────────────────────────────────────────────
 
-// ─── Loader ──────────────────────────────────────────────────────────────────
+function createAndInitWorker() {
+  // Reject any in-flight load promise so callers awaiting it unblock immediately.
+  if (_loadReject) {
+    _loadReject(new Error('__hs_stopped__'))
+    _loadReject = null
+    _loadResolve = null
+  }
 
-export async function initPyodide(onProgress) {
-  if (pyodide) return pyodide
-  if (loadingPromise) return loadingPromise
+  const w = new Worker(new URL('./pyodide.worker.js', import.meta.url), { type: 'module' })
+  w.onmessage = handleWorkerMessage
+  _loadingPromise = new Promise((res, rej) => {
+    _loadResolve = res
+    _loadReject = rej
+  })
+  w.postMessage({ type: 'init' })
+  return w
+}
 
-  loadingPromise = (async () => {
-    onProgress?.('Loading Python…')
-    if (!window.loadPyodide) {
-      await loadScript(PYODIDE_CDN + 'pyodide.js')
-    }
-    onProgress?.('Starting Python runtime…')
-    pyodide = await window.loadPyodide({ indexURL: PYODIDE_CDN })
-    onProgress?.('Python ready')
-    return pyodide
-  })()
+function handleWorkerMessage({ data }) {
+  switch (data.type) {
+    case 'progress':
+      _progressCallback?.(data.msg)
+      break
 
-  try {
-    return await loadingPromise
-  } catch (err) {
-    loadingPromise = null
-    throw err
+    case 'ready':
+      _loadResolve?.()
+      _loadResolve = null
+      _loadReject = null
+      _loadingPromise = null
+      break
+
+    case 'load_error':
+      _loadReject?.(new Error(data.msg))
+      _loadResolve = null
+      _loadReject = null
+      _loadingPromise = null
+      _worker = null  // worker is unusable; force re-creation on next initPyodide
+      break
+
+    case 'output':
+      if (!_stopped) _onOutput?.(data.text, data.kind)
+      break
+
+    case 'input_required':
+      if (!_stopped) _onInputRequired?.(data.prompt)
+      break
+
+    case 'done':
+      _runResolve?.({ status: _stopped ? 'stopped' : data.status })
+      _runResolve = null
+      break
   }
 }
+
+// ─── Public API ───────────────────────────────────────────────────────────────
 
 export function isPyodideReady() {
-  return !!pyodide
+  return _worker !== null && _loadingPromise === null
 }
-
-// ─── Input bridge ─────────────────────────────────────────────────────────────
-
-/** Called from the OutputPanel UI when the student submits their input. */
-export function provideInput(text) {
-  const resolve = _inputResolvers.shift()
-  if (resolve) resolve(text)
-}
-
-// ─── Runner ──────────────────────────────────────────────────────────────────
 
 /**
- * Run a Python code string.
- * @param {string} code
- * @param {{ onOutput, onInputRequired }} callbacks
- *   onOutput(text, kind)  — kind is 'stdout' | 'stderr'
- *   onInputRequired(prompt) — called when input() is waiting; resolve with provideInput()
+ * Ensure Pyodide is loaded. Safe to call multiple times — returns immediately
+ * if already ready, or waits for the in-progress load (e.g. pre-warm after stop).
+ */
+export async function initPyodide(onProgress) {
+  _progressCallback = onProgress
+  if (!_worker) {
+    _worker = createAndInitWorker()
+  }
+  if (_loadingPromise) {
+    try {
+      await _loadingPromise
+    } catch (err) {
+      if (!String(err).includes('__hs_stopped__')) throw err
+      // Stopped mid-load — not a real error, caller's .catch() should not fire
+    }
+  }
+}
+
+/**
+ * Run a Python code string in the worker.
+ * Waits for Pyodide to finish loading if a pre-warm is in progress.
  */
 export async function runPython(code, { onOutput, onInputRequired } = {}) {
-  if (!pyodide) throw new Error('Pyodide not initialised — call initPyodide first')
+  if (!_worker) throw new Error('Pyodide not initialised — call initPyodide first')
 
-  _inputResolvers = []
+  _stopped = false
+  _onOutput = onOutput
+  _onInputRequired = onInputRequired
 
-  pyodide.setStdout({ batched: line => onOutput?.(line + '\n', 'stdout') })
-  pyodide.setStderr({ batched: line => onOutput?.(line + '\n', 'stderr') })
-
-  // JS-side async input handler called from Python
-  window.__hsInput = async (prompt) => {
-    return new Promise(resolve => {
-      // Display the prompt string immediately before the input field appears.
-      // Cannot rely on sys.stdout.write here — Pyodide's batched stdout only
-      // flushes on newline, so a prompt without '\n' would never appear.
-      if (prompt) onOutput?.(String(prompt), 'stdout')
-      _inputResolvers.push(resolve)
-      onInputRequired?.(String(prompt))
-    })
+  if (_loadingPromise) {
+    try {
+      await _loadingPromise
+    } catch {
+      // Worker was terminated while we were waiting for the pre-warm to finish
+      return { status: 'stopped' }
+    }
   }
 
-  // Pass code to Python without string-escaping worries
-  pyodide.globals.set('_hs_user_code', code)
+  // Guard: stopPython() may have been called between the await above and here
+  if (_stopped) return { status: 'stopped' }
 
-  // Python wrapper: AST-transforms user code, wraps in async, runs it
-  const wrapper = `
-import js as _js
-import sys, builtins, ast
-
-async def _hs_input(prompt=''):
-    val = await _js.__hsInput(str(prompt) if prompt else '')
-    return str(val).rstrip('\\n')
-
-builtins.input = _hs_input  # fallback for any non-transformed call sites
-
-class _Tx(ast.NodeTransformer):
-    """Wrap input() in await; convert def → async def."""
-    def visit_Call(self, node):
-        self.generic_visit(node)
-        if isinstance(node.func, ast.Name) and node.func.id == 'input':
-            return ast.Await(value=node)
-        return node
-    def visit_FunctionDef(self, node):
-        self.generic_visit(node)
-        new = ast.AsyncFunctionDef(
-            name=node.name, args=node.args, body=node.body,
-            decorator_list=node.decorator_list, returns=node.returns,
-            lineno=node.lineno, col_offset=node.col_offset,
-            type_comment=getattr(node, 'type_comment', None),
-        )
-        ast.copy_location(new, node)
-        return new
-
-_tree = ast.parse(_hs_user_code)
-_Tx().visit(_tree)
-ast.fix_missing_locations(_tree)
-
-_fn = ast.AsyncFunctionDef(
-    name='__hs_run__',
-    args=ast.arguments(
-        posonlyargs=[], args=[], vararg=None,
-        kwonlyargs=[], kw_defaults=[], kwarg=None, defaults=[],
-    ),
-    body=_tree.body,
-    decorator_list=[],
-    returns=None,
-    lineno=1, col_offset=0,
-    type_comment=None,
-)
-ast.fix_missing_locations(_fn)
-_mod = ast.Module(body=[_fn], type_ignores=[])
-ast.fix_missing_locations(_mod)
-
-_g = {
-    '_hs_input': _hs_input,
-    '__builtins__': builtins,
-    '__name__': '__main__',
-}
-exec(compile(_mod, '<student>', 'exec'), _g)
-await _g['__hs_run__']()
-`
-
-  try {
-    await pyodide.runPythonAsync(wrapper)
-    return { status: 'success' }
-  } catch (err) {
-    const msg = String(err).replace(/^PythonError:\s*/, '')
-    onOutput?.(msg + '\n', 'stderr')
-    return { status: 'error', error: msg }
-  }
-}
-
-// ─── Internal ─────────────────────────────────────────────────────────────────
-
-function loadScript(src) {
-  return new Promise((resolve, reject) => {
-    const s = document.createElement('script')
-    s.src = src
-    s.onload = resolve
-    s.onerror = reject
-    document.head.appendChild(s)
+  return new Promise((resolve) => {
+    _runResolve = resolve
+    _worker.postMessage({ type: 'run', code })
   })
+}
+
+/** Terminate the running worker immediately and pre-warm a replacement. */
+export function stopPython() {
+  if (!_worker) return
+  _stopped = true
+  _worker.terminate()
+  _runResolve?.({ status: 'stopped' })
+  _runResolve = null
+  // createAndInitWorker rejects the old _loadingPromise and creates a fresh one
+  _worker = createAndInitWorker()
+}
+
+/** Supply the value for a pending input() call. */
+export function provideInput(value) {
+  _worker?.postMessage({ type: 'input', value })
 }

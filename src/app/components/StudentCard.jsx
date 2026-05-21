@@ -15,8 +15,11 @@ export default function StudentCard({ student, lesson, lessonId, session, onRena
     student.lastRunStatus === 'error'   ? '#ef4444' : '#9ca3af'
 
   const hasCheck = lesson?.tasks?.find(t => t.id === session?.currentTaskId)?.check != null
-  const presenceClass = student.online ? 'presence-badge presence-badge--online' : 'presence-badge presence-badge--offline'
-  const presenceLabel = student.online ? 'Online' : 'Offline'
+  const isWaiting = session?.state === 'waiting'
+  const presenceClass = isWaiting
+    ? 'presence-badge presence-badge--waiting'
+    : student.online ? 'presence-badge presence-badge--online' : 'presence-badge presence-badge--offline'
+  const presenceLabel = isWaiting ? 'Waiting' : student.online ? 'Online' : 'Offline'
 
   return (
     <div style={s.card} className="card">

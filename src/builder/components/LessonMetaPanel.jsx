@@ -1,4 +1,6 @@
 import React, { useState } from 'react'
+import { CodeEditor } from '../../shared/CodeEditor'
+import FileManager from './FileManager'
 
 export default function LessonMetaPanel({ lesson, onUpdate }) {
   function set(field, value) {
@@ -84,6 +86,58 @@ export default function LessonMetaPanel({ lesson, onUpdate }) {
               onChange={assets => set('assets', assets.length ? assets : undefined)}
             />
           </>
+        )}
+
+        <div style={s.divider} />
+
+        {/* Sandbox starter */}
+        {lesson.type === 'python' ? (
+          <Field label="Sandbox starter code" hint="shown to teacher when entering sandbox">
+            <div style={{ height: 140 }}>
+              <CodeEditor
+                value={lesson.sandboxStarter ?? ''}
+                language="python"
+                onChange={v => set('sandboxStarter', v || undefined)}
+              />
+            </div>
+          </Field>
+        ) : (
+          <SandboxStarterFiles
+            files={lesson.sandboxStarterFiles ?? []}
+            onChange={files => set('sandboxStarterFiles', files.length ? files : undefined)}
+          />
+        )}
+      </div>
+    </div>
+  )
+}
+
+function SandboxStarterFiles({ files, onChange }) {
+  const [selectedFile, setSelectedFile] = useState(files[0]?.name ?? '')
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <span style={s.fieldLabel}>Sandbox starter files <span style={s.fieldHint}>(shown to teacher when entering sandbox)</span></span>
+      <div style={{ height: 260, display: 'flex', flexDirection: 'column', gap: 0, border: '1px solid #e5e7eb', borderRadius: 6, overflow: 'hidden' }}>
+        <FileManager
+          files={files}
+          entryFile={files.find(f => f.type === 'html')?.name ?? files[0]?.name ?? ''}
+          selectedFile={selectedFile}
+          onSelectFile={setSelectedFile}
+          onAddFile={f => { onChange([...files, f]); setSelectedFile(f.name) }}
+          onDeleteFile={name => { onChange(files.filter(f => f.name !== name)); setSelectedFile(files.find(f => f.name !== name)?.name ?? '') }}
+          onChangeType={(name, type) => onChange(files.map(f => f.name === name ? { ...f, type } : f))}
+          onChangeEntryFile={() => {}}
+        />
+        {selectedFile && (
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <CodeEditor
+              key={selectedFile}
+              value={files.find(f => f.name === selectedFile)?.content ?? ''}
+              language={files.find(f => f.name === selectedFile)?.type ?? 'html'}
+              onChange={v => onChange(files.map(f => f.name === selectedFile ? { ...f, content: v } : f))}
+            />
+          </div>
         )}
       </div>
     </div>
@@ -233,6 +287,11 @@ const s = {
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
+  },
+  divider: {
+    height: 1,
+    background: '#e5e7eb',
+    margin: '4px 0',
   },
   removeBtn: {
     flexShrink: 0,
