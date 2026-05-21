@@ -408,6 +408,7 @@ export default function TeacherView({ lessonId }) {
                 runStatus={runStatus}
                 inputPrompt={inputPrompt}
                 onInputSubmit={v => { appendOutputRef.current?.(v + '\n'); setInputPrompt(null); provideInput(v) }}
+                running={running}
               />
             </>
           ) : lesson.type === 'scratch' ? (

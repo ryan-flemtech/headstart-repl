@@ -714,6 +714,7 @@ export default function StudentView({ lessonId }) {
                 onInputSubmit={handleInputSubmit}
                 checkPassed={checkPassed}
                 hasCheck={!!task?.check}
+                running={running}
               />
             </>
           ) : isMobile ? (

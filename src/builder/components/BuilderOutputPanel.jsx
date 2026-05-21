@@ -10,13 +10,77 @@ export default function BuilderOutputPanel({
   inputPrompt = null,
   onInputSubmit,
   checkResults = null, // null | [{type, value, passed}]
+  running = false,
 }) {
   const [inputValue, setInputValue] = useState('')
+  const [isCollapsed, setIsCollapsed] = useState(true)
+  const [displayedOutput, setDisplayedOutput] = useState('')
+  
   const bottomRef  = useRef(null)
   const inputRef   = useRef(null)
+  const prevRunningRef = useRef(running)
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [output, inputPrompt])
-  useEffect(() => { if (inputPrompt !== null) inputRef.current?.focus() }, [inputPrompt])
+  // Auto-expand when code starts running
+  useEffect(() => {
+    if (running && !prevRunningRef.current) {
+      setIsCollapsed(false)
+    }
+    prevRunningRef.current = running
+  }, [running])
+
+  // Retro typing animation effect
+  useEffect(() => {
+    if (!output) {
+      setDisplayedOutput('')
+      return
+    }
+
+    if (displayedOutput === output) return
+
+    const timer = setTimeout(() => {
+      setDisplayedOutput(prev => {
+        if (prev === output) return prev
+        
+        let current = prev
+        if (!output.startsWith(prev)) {
+          current = ''
+        }
+
+        const remaining = output.slice(current.length)
+        if (remaining.length === 0) return current
+
+        // Speed adjustment so long outputs don't take forever
+        let chunkSize = 1
+        if (remaining.length > 500) {
+          chunkSize = 25
+        } else if (remaining.length > 200) {
+          chunkSize = 12
+        } else if (remaining.length > 100) {
+          chunkSize = 6
+        } else if (remaining.length > 50) {
+          chunkSize = 3
+        } else if (remaining.length > 20) {
+          chunkSize = 2
+        }
+
+        return current + remaining.slice(0, chunkSize)
+      })
+    }, 12)
+
+    return () => clearTimeout(timer)
+  }, [output, displayedOutput])
+
+  // Scroll to bottom when output grows
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [displayedOutput, inputPrompt])
+
+  // Focus input field when prompt appears or panel is expanded
+  useEffect(() => {
+    if (inputPrompt !== null && !isCollapsed) {
+      inputRef.current?.focus()
+    }
+  }, [inputPrompt, isCollapsed])
 
   function handleInputSubmit(e) {
     e.preventDefault()
@@ -26,37 +90,50 @@ export default function BuilderOutputPanel({
 
   const statusColour = runStatus === 'success' ? '#22c55e' : runStatus === 'error' ? '#ef4444' : '#9ca3af'
   const statusLabel  = runStatus === 'success' ? 'Ran OK' : runStatus === 'error' ? 'Error' : 'Not run'
+  const showCursor   = running || (output && displayedOutput !== output)
 
   const allPassed = checkResults !== null && checkResults.every(r => r.passed)
 
   return (
     <div style={s.wrap}>
       {/* Output */}
-      <div style={s.panel} className="card">
-        <div style={s.header}>
-          <span style={s.headerLabel}>Output</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ ...s.panel, minHeight: isCollapsed ? 'auto' : 100, maxHeight: isCollapsed ? 'auto' : 240 }} className="card">
+        <div 
+          style={{ ...s.header, borderRadius: isCollapsed ? '10px' : '10px 10px 0 0', cursor: 'pointer', userSelect: 'none' }}
+          onClick={() => setIsCollapsed(prev => !prev)}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={s.headerLabel}>Output</span>
+            <span style={{ fontSize: '0.8rem', opacity: 0.8 }}>
+              {isCollapsed ? '▶' : '▼'}
+            </span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }} onClick={e => e.stopPropagation()}>
             <span style={{ ...s.statusDot, background: statusColour }} />
             <span style={s.statusLabel}>{statusLabel}</span>
           </div>
         </div>
-        <pre style={s.pre}>
-          {output || <span style={{ color: '#9ca3af' }}>Run to see output.</span>}
-          {inputPrompt !== null && (
-            <form onSubmit={handleInputSubmit} style={s.inputRow}>
-              <span style={s.prompt}>&gt;</span>
-              <input ref={inputRef} style={s.input} value={inputValue}
-                onChange={e => setInputValue(e.target.value)}
-                placeholder="Type input and press Enter" />
-            </form>
-          )}
-          <span ref={bottomRef} />
-        </pre>
+        {!isCollapsed && (
+          <pre style={s.pre}>
+            {displayedOutput || <span style={{ color: '#9ca3af' }}>Run to see output.</span>}
+            {showCursor && <span className="terminal-cursor" />}
+            {inputPrompt !== null && (
+              <form onSubmit={handleInputSubmit} style={s.inputRow}>
+                <span style={s.prompt}>&gt;</span>
+                <input ref={inputRef} style={s.input} value={inputValue}
+                  onChange={e => setInputValue(e.target.value)}
+                  placeholder="Type input and press Enter" />
+              </form>
+            )}
+            <span ref={bottomRef} />
+          </pre>
+        )}
       </div>
 
       {/* Check verification */}
-      {checkResults !== null && (
+      {!isCollapsed && checkResults !== null && (
         <div style={{ ...s.checkResult, background: allPassed ? '#f0fdf4' : '#fffbeb', borderColor: allPassed ? '#bbf7d0' : '#fde68a' }}>
+
           {checkResults.length === 1 ? (
             checkResults[0].passed
               ? <span>✅ <strong>Check passes</strong> — students will see the completion banner.</span>

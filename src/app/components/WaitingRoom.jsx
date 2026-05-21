@@ -38,12 +38,13 @@ const s = {
     alignItems: 'center',
     justifyContent: 'center',
     height: '100%',
-    background: 'var(--colour-primary)',
+    background: 'linear-gradient(135deg, #d3c0f9 0%, #b89df5 100%)',
   },
   card: {
     width: 400,
     overflow: 'hidden',
     borderRadius: 12,
+    boxShadow: '0 8px 30px rgba(98, 34, 204, 0.18), 0 4px 10px rgba(0, 0, 0, 0.06)',
   },
   header: {
     background: 'var(--colour-primary)',

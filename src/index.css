@@ -270,3 +270,20 @@ button:disabled {
 .scratch-workspace .blocklySelected > .blocklyPath {
   filter: drop-shadow(0 0 0 rgba(0, 0, 0, 0)) drop-shadow(0 0 8px rgba(251, 165, 4, 0.7));
 }
+
+/* Retro terminal cursor and animations */
+@keyframes terminal-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.terminal-cursor {
+  display: inline-block;
+  width: 8px;
+  height: 15px;
+  background-color: currentColor;
+  margin-left: 3px;
+  vertical-align: middle;
+  animation: terminal-blink 1s step-end infinite;
+}
+
