@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { MarkdownRenderer } from '../../shared/markdown'
 
-export default function ExplainerPanel({ content }) {
+export default function ExplainerPanel({ title, content }) {
   const [collapsed, setCollapsed] = useState(false)
 
   return (
@@ -17,7 +17,7 @@ export default function ExplainerPanel({ content }) {
 
       {!collapsed && (
         <div style={s.content}>
-          <MarkdownRenderer content={content} />
+          <MarkdownRenderer title={title} content={content} />
         </div>
       )}
     </div>

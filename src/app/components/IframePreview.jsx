@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 
-export default function IframePreview({ src, iframeRef, height = 300, fill = false }) {
+export default function IframePreview({ src, iframeRef, height = 300, fill = false, rightActions = null }) {
   const [tab, setTab] = useState('preview')
   const [logs, setLogs] = useState([])
   const logEndRef = useRef(null)
@@ -50,6 +50,7 @@ export default function IframePreview({ src, iframeRef, height = 300, fill = fal
           Console
           {errCount > 0 && <span style={s.badge}>{errCount}</span>}
         </button>
+        {rightActions && <div style={s.actions}>{rightActions}</div>}
       </div>
 
       {/* Always rendered so the iframe doesn't reload on tab switch */}
@@ -114,6 +115,12 @@ const s = {
     display: 'flex',
     alignItems: 'stretch',
     flexShrink: 0,
+  },
+  actions: {
+    marginLeft: 'auto',
+    display: 'flex',
+    alignItems: 'center',
+    paddingLeft: 8,
   },
   tab: {
     background: 'none',

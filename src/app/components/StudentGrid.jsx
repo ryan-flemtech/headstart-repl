@@ -2,18 +2,50 @@ import React, { useState } from 'react'
 import StudentCard from './StudentCard'
 import StudentModal from './StudentModal'
 
+function formatCheck(check) {
+  if (!check) return null
+  const checks = Array.isArray(check) ? check : [check]
+  return checks.map(c => {
+    if (c.type === 'output_contains') return `Contains: "${c.value}"`
+    if (c.type === 'output_equals') return `Equals: "${c.value}"`
+    if (c.type === 'output_line_count') return `${c.value} line${c.value === 1 ? '' : 's'}`
+    if (c.type === 'output_not_empty') return 'Output is not empty'
+    return `${c.type}: ${c.value}`
+  }).join(' · ')
+}
+
 export default function StudentGrid({ students = [], lesson, lessonId, session, onRename, onRemove, onGoLive, onStopLive, collapsed, onToggle }) {
-  const [expandedStudent, setExpandedStudent] = useState(null)
+  const [expandedStudentId, setExpandedStudentId] = useState(null)
+  const [checkSectionOpen, setCheckSectionOpen] = useState(false)
+
+  const expandedIndex = students.findIndex(s => s.anonymousId === expandedStudentId)
+  const expandedStudent = expandedIndex >= 0 ? students[expandedIndex] : null
 
   function handleExpand(student) {
-    setExpandedStudent(student)
+    setExpandedStudentId(student.anonymousId)
   }
 
   function handleClose() {
-    // Always clear live view on close
     onStopLive?.()
-    setExpandedStudent(null)
+    setExpandedStudentId(null)
   }
+
+  function handlePrev() {
+    if (expandedIndex > 0) {
+      onStopLive?.()
+      setExpandedStudentId(students[expandedIndex - 1].anonymousId)
+    }
+  }
+
+  function handleNext() {
+    if (expandedIndex < students.length - 1) {
+      onStopLive?.()
+      setExpandedStudentId(students[expandedIndex + 1].anonymousId)
+    }
+  }
+
+  const currentTask = lesson?.tasks?.find(t => t.id === session?.currentTaskId)
+  const tasksWithChecks = currentTask?.check != null ? [currentTask] : []
 
   if (collapsed) {
     const currentTask = lesson?.tasks?.find(t => t.id === session?.currentTaskId)
@@ -81,15 +113,41 @@ export default function StudentGrid({ students = [], lesson, lessonId, session, 
         </div>
       )}
 
+      {tasksWithChecks.length > 0 && (
+        <div style={s.checkSection}>
+          <button style={s.checkSectionHeader} onClick={() => setCheckSectionOpen(v => !v)}>
+            <span style={s.checkSectionTitle}>Check Conditions</span>
+            <span style={s.checkChevron}>{checkSectionOpen ? '▲' : '▼'}</span>
+          </button>
+          {checkSectionOpen && (
+            <div style={s.checkSectionBody}>
+              {tasksWithChecks.map(task => (
+                <div key={task.id} style={s.checkRow}>
+                  <div style={s.checkTaskLabel}>
+                    <span style={s.checkTaskNum}>T{task.id}</span>
+                    <span style={s.checkTaskTitle}>{task.title}</span>
+                  </div>
+                  <span style={s.checkValue}>{formatCheck(task.check)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {expandedStudent && (
         <StudentModal
-          student={students.find(s => s.anonymousId === expandedStudent.anonymousId) ?? expandedStudent}
+          student={expandedStudent}
           lesson={lesson}
           session={session}
           isLive={session?.activeStudentView === expandedStudent.anonymousId}
           onGoLive={() => onGoLive?.(expandedStudent.anonymousId)}
           onStopLive={() => onStopLive?.()}
           onClose={handleClose}
+          hasPrev={expandedIndex > 0}
+          hasNext={expandedIndex < students.length - 1}
+          onPrev={handlePrev}
+          onNext={handleNext}
         />
       )}
     </div>
@@ -155,6 +213,81 @@ const s = {
     padding: '0 4px',
     lineHeight: 1,
     borderRadius: 3,
+  },
+  checkSection: {
+    flexShrink: 0,
+    borderTop: '1px solid #e5e7eb',
+  },
+  checkSectionHeader: {
+    width: '100%',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '8px 14px',
+    background: '#f9fafb',
+    border: 'none',
+    borderBottom: '1px solid transparent',
+    cursor: 'pointer',
+    textAlign: 'left',
+  },
+  checkSectionTitle: {
+    fontFamily: 'var(--font-title)',
+    fontWeight: 700,
+    fontSize: '0.78rem',
+    letterSpacing: '0.03em',
+    color: 'var(--colour-primary)',
+  },
+  checkChevron: {
+    fontSize: '0.65rem',
+    color: '#9ca3af',
+  },
+  checkSectionBody: {
+    padding: '8px 14px 12px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 10,
+    background: '#fff',
+    maxHeight: 240,
+    overflowY: 'auto',
+  },
+  checkRow: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 4,
+  },
+  checkTaskLabel: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+  },
+  checkTaskNum: {
+    fontFamily: 'var(--font-body)',
+    fontWeight: 700,
+    fontSize: '0.7rem',
+    color: '#fff',
+    background: 'var(--colour-primary)',
+    borderRadius: 4,
+    padding: '1px 5px',
+    flexShrink: 0,
+  },
+  checkTaskTitle: {
+    fontFamily: 'var(--font-body)',
+    fontWeight: 600,
+    fontSize: '0.82rem',
+    color: 'var(--colour-text)',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  checkValue: {
+    fontFamily: 'var(--font-code)',
+    fontSize: '0.75rem',
+    color: '#374151',
+    background: '#f3f4f6',
+    borderRadius: 4,
+    padding: '3px 8px',
+    wordBreak: 'break-all',
+    lineHeight: 1.4,
   },
   collapsedWrap: {
     display: 'flex',

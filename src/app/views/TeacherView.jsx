@@ -8,7 +8,7 @@ import TaskNavigator from '../components/TaskNavigator'
 import PythonEditor from '../components/PythonEditor'
 import HtmlEditor from '../components/HtmlEditor'
 import OutputPanel from '../components/OutputPanel'
-import IframePreview from '../components/IframePreview'
+import CollapsibleIframePreview from '../components/CollapsibleIframePreview'
 import ScratchWorkspace from '../components/ScratchWorkspace'
 import SplitPane from '../../shared/SplitPane'
 import ExplainerPanel from '../components/ExplainerPanel'
@@ -65,9 +65,12 @@ export default function TeacherView({ lessonId }) {
   const [running, setRunning]           = useState(false)
   const [pyodideStatus, setPyodideStatus] = useState('idle')
   const [iframeSrc, setIframeSrc]       = useState(null)
+  const [htmlPreviewCollapsed, setHtmlPreviewCollapsed] = useState(true)
   const [inputPrompt, setInputPrompt]   = useState(null)
   const [sandboxStaging, setSandboxStaging] = useState(false)
   const [scratchState, setScratchState] = useState(null)
+  const [teacherCodeTab, setTeacherCodeTab] = useState('starter')
+  const [activeCompleteFile, setActiveCompleteFile] = useState('')
   const iframeRef = useRef(null)
   const appendOutputRef = useRef(null)
 
@@ -79,6 +82,10 @@ export default function TeacherView({ lessonId }) {
       .then(data => { setLesson(data); setLessonLoading(false) })
       .catch(() => setLessonLoading(false))
   }, [lessonId])
+
+  useEffect(() => {
+    if (lesson?.type === 'html') setHtmlPreviewCollapsed(true)
+  }, [lesson?.type, currentTaskId])
 
   // Create session only if none exists — don't auto-restart an ended session
   useEffect(() => {
@@ -157,6 +164,11 @@ export default function TeacherView({ lessonId }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lesson, sandboxStaging, session?.state, session?.sandboxCodePushedAt, session?.sandboxFilesUpdatedAt])
 
+  // Reset complete code tab when task changes
+  useEffect(() => {
+    setTeacherCodeTab('starter')
+  }, [currentTaskId])
+
   // Warm up Pyodide
   useEffect(() => {
     if (!lesson || lesson.type !== 'python' || isPyodideReady()) return
@@ -173,18 +185,20 @@ export default function TeacherView({ lessonId }) {
     setRunStatus(null)
 
     if (lesson.type === 'python') {
+      const codeToRun = showingComplete ? (task?.completeCode ?? '') : code
       let accumulated = ''
       const echoOutput = (text) => { accumulated += text; setOutput(accumulated) }
       appendOutputRef.current = echoOutput
-      const result = await runPython(code, {
+      const result = await runPython(codeToRun, {
         onOutput: echoOutput,
         onInputRequired: (p) => setInputPrompt(p),
       })
       setInputPrompt(null)
       setRunStatus(result.status)
     } else if (lesson.type === 'html') {
-      const task = lesson.tasks.find(t => t.id === currentTaskId)
-      const src = buildIframeSrc(files, task?.entryFile ?? 'index.html', {
+      setHtmlPreviewCollapsed(false)
+      const filesToRun = showingComplete ? (task?.completeFiles ?? []) : files
+      const src = buildIframeSrc(filesToRun, task?.entryFile ?? 'index.html', {
         assets: lesson.assets ?? [],
         assetsPath: resolveAssetsPath(lesson.assetsPath),
       })
@@ -260,6 +274,7 @@ export default function TeacherView({ lessonId }) {
   const isSandbox = session?.state === 'sandbox'
   const isInSandbox = isSandbox || sandboxStaging
   const task = lesson?.tasks.find(t => t.id === currentTaskId)
+  const showingComplete = teacherCodeTab === 'complete' && !isInSandbox
   const students = session ? Object.entries(session.students ?? {}).map(([id, s]) => ({ ...s, anonymousId: id })) : []
 
   if (lessonLoading || !lesson) {
@@ -351,7 +366,7 @@ export default function TeacherView({ lessonId }) {
         {/* Centre — Teacher Editor */}
         <main style={{ ...s.centre, ...(lesson.type === 'html' || lesson.type === 'scratch' ? { overflow: 'hidden' } : {}) }}>
           {task?.explainer && !isInSandbox && (
-            <ExplainerPanel content={task.explainer} />
+            <ExplainerPanel title={task.title} content={task.explainer} />
           )}
 
           {isInSandbox && (
@@ -387,11 +402,29 @@ export default function TeacherView({ lessonId }) {
             </div>
           )}
 
+          {!isInSandbox && (lesson.type === 'python' || lesson.type === 'html') && (
+            <div style={s.codeTabStrip}>
+              <button
+                style={{ ...s.codeTabBtn, ...(teacherCodeTab === 'starter' ? s.codeTabBtnActive : {}) }}
+                onClick={() => setTeacherCodeTab('starter')}
+              >
+                Starter Code
+              </button>
+              <button
+                style={{ ...s.codeTabBtn, ...(teacherCodeTab === 'complete' ? s.codeTabBtnActive : {}) }}
+                onClick={() => { setTeacherCodeTab('complete'); setActiveCompleteFile(task?.completeFiles?.[0]?.name ?? '') }}
+              >
+                Complete Code
+              </button>
+            </div>
+          )}
+
           {lesson.type === 'python' ? (
             <>
               <PythonEditor
-                code={code}
-                onChange={setCode}
+                code={showingComplete ? (task?.completeCode ?? '') : code}
+                onChange={showingComplete ? undefined : setCode}
+                readOnly={showingComplete}
                 pyodideStatus={pyodideStatus}
               />
               <div style={{ display: 'flex', gap: 8 }}>
@@ -426,15 +459,25 @@ export default function TeacherView({ lessonId }) {
           ) : (
             <SplitPane
               style={{ flex: 1, minHeight: 0 }}
+              rightCollapsed={htmlPreviewCollapsed}
+              collapsedRight={
+                <CollapsibleIframePreview
+                  src={iframeSrc}
+                  iframeRef={iframeRef}
+                  collapsed
+                  onToggle={() => setHtmlPreviewCollapsed(false)}
+                />
+              }
               left={
                 <div style={s.htmlLeft}>
                   <HtmlEditor
-                    files={files}
-                    activeFile={activeFile}
-                    onTabChange={setActiveFile}
-                    onFileChange={(name, content) =>
+                    files={showingComplete ? (task?.completeFiles ?? []) : files}
+                    activeFile={showingComplete ? activeCompleteFile : activeFile}
+                    onTabChange={showingComplete ? setActiveCompleteFile : setActiveFile}
+                    onFileChange={showingComplete ? undefined : (name, content) =>
                       setFiles(prev => prev.map(f => f.name === name ? { ...f, content } : f))
                     }
+                    readOnly={showingComplete}
                     assetsPath={resolveAssetsPath(lesson.assetsPath) || undefined}
                     assets={lesson.assets}
                   />
@@ -449,7 +492,15 @@ export default function TeacherView({ lessonId }) {
                   </div>
                 </div>
               }
-              right={<IframePreview src={iframeSrc} iframeRef={iframeRef} fill />}
+              right={
+                <CollapsibleIframePreview
+                  src={iframeSrc}
+                  iframeRef={iframeRef}
+                  fill
+                  collapsed={false}
+                  onToggle={() => setHtmlPreviewCollapsed(true)}
+                />
+              }
             />
           )}
         </main>
@@ -547,6 +598,31 @@ const s = {
     flex: 1,
     minHeight: 0,
     display: 'flex',
+  },
+  codeTabStrip: {
+    display: 'inline-flex',
+    gap: 4,
+    border: '1px solid #e5e7eb',
+    borderRadius: 8,
+    padding: 4,
+    background: '#fff',
+    flexShrink: 0,
+    alignSelf: 'flex-start',
+  },
+  codeTabBtn: {
+    border: 0,
+    borderRadius: 6,
+    background: 'transparent',
+    color: '#4b5563',
+    padding: '7px 14px',
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.86rem',
+    fontWeight: 700,
+    cursor: 'pointer',
+  },
+  codeTabBtnActive: {
+    background: 'var(--colour-primary)',
+    color: '#fff',
   },
   sandboxBanner: {
     display: 'flex',

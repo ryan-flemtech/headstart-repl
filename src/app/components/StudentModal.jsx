@@ -29,7 +29,7 @@ function parseSpriteState(raw) {
   }
 }
 
-export default function StudentModal({ student, lesson, session, isLive, onGoLive, onStopLive, onClose }) {
+export default function StudentModal({ student, lesson, session, isLive, onGoLive, onStopLive, onClose, hasPrev, hasNext, onPrev, onNext }) {
   const overlayRef = useRef(null)
   const iframeRef  = useRef(null)
 
@@ -82,6 +82,24 @@ export default function StudentModal({ student, lesson, session, isLive, onGoLiv
             {student.checkPassed && <span style={s.checkBadge}>✅</span>}
           </div>
           <div style={s.headerRight}>
+            <div style={s.navButtons}>
+              <button
+                style={{ ...s.navBtn, opacity: hasPrev ? 1 : 0.35 }}
+                disabled={!hasPrev}
+                onClick={onPrev}
+                title="Previous student"
+              >
+                ←
+              </button>
+              <button
+                style={{ ...s.navBtn, opacity: hasNext ? 1 : 0.35 }}
+                disabled={!hasNext}
+                onClick={onNext}
+                title="Next student"
+              >
+                →
+              </button>
+            </div>
             <button
               className={isLive ? 'btn-danger' : 'btn-primary'}
               style={{ fontSize: 13, padding: '5px 14px' }}
@@ -205,6 +223,26 @@ const s = {
   },
   headerLeft: { display: 'flex', alignItems: 'center', gap: 10 },
   headerRight: { display: 'flex', alignItems: 'center', gap: 8 },
+  navButtons: {
+    display: 'flex',
+    gap: 2,
+    marginRight: 4,
+  },
+  navBtn: {
+    background: 'rgba(255,255,255,0.15)',
+    border: '1px solid rgba(255,255,255,0.3)',
+    color: '#fff',
+    borderRadius: 5,
+    width: 30,
+    height: 28,
+    fontSize: '0.95rem',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 0,
+    transition: 'background 0.15s',
+  },
   name: {
     fontFamily: 'var(--font-title)',
     fontWeight: 700,

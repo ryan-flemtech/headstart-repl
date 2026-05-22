@@ -570,31 +570,31 @@ function textShadow(value) {
   return { type: 'text', field: 'TEXT', value }
 }
 
-export function buildAlwaysOpenToolbox(toolbox) {
-  if (!toolbox) return flattenJsonToolbox(DEFAULT_TOOLBOX)
-  if (typeof toolbox === 'string') return flattenXmlToolbox(toolbox)
-  if (toolbox.kind === 'categoryToolbox') return flattenJsonToolbox(toolbox)
+export function buildAlwaysOpenToolbox(toolbox, options = {}) {
+  if (!toolbox) return flattenJsonToolbox(DEFAULT_TOOLBOX, options)
+  if (typeof toolbox === 'string') return flattenXmlToolbox(toolbox, options)
+  if (toolbox.kind === 'categoryToolbox') return flattenJsonToolbox(toolbox, options)
   return toolbox
 }
 
-function flattenJsonToolbox(toolbox) {
+function flattenJsonToolbox(toolbox, options = {}) {
   const contents = []
   for (const item of toolbox.contents ?? []) {
     if (item.kind === 'category') {
       contents.push({ kind: 'label', text: item.name, 'web-class': 'scratch-toolbox-label' })
-      contents.push(...(item.contents ?? []).map(withJsonInputDefaults))
+      contents.push(...(item.contents ?? []).map(item => withJsonInputDefaults(item, options)))
       contents.push({ kind: 'sep', gap: '16' })
     } else {
-      contents.push(withJsonInputDefaults(item))
+      contents.push(withJsonInputDefaults(item, options))
     }
   }
   return { kind: 'flyoutToolbox', contents }
 }
 
-function withJsonInputDefaults(item) {
+function withJsonInputDefaults(item, options = {}) {
   if (item?.kind !== 'block' || !VALUE_INPUT_DEFAULTS[item.type]) return item
   const inputs = {}
-  for (const [name, shadow] of Object.entries(VALUE_INPUT_DEFAULTS[item.type])) {
+  for (const [name, shadow] of Object.entries(inputDefaultsForBlock(item.type, options))) {
     inputs[name] = {
       shadow: {
         type: shadow.type,
@@ -605,7 +605,7 @@ function withJsonInputDefaults(item) {
   return { ...item, inputs: { ...(item.inputs ?? {}), ...inputs } }
 }
 
-function flattenXmlToolbox(toolbox) {
+function flattenXmlToolbox(toolbox, options = {}) {
   if (typeof DOMParser === 'undefined') return toolbox
   const source = new DOMParser().parseFromString(toolbox, 'text/xml')
   if (source.querySelector('parsererror')) return toolbox
@@ -621,7 +621,7 @@ function flattenXmlToolbox(toolbox) {
     root.appendChild(label)
     for (const child of Array.from(category.children)) {
       const imported = doc.importNode(child, true)
-      if (imported.tagName?.toLowerCase() === 'block') addXmlInputDefaults(doc, imported)
+      if (imported.tagName?.toLowerCase() === 'block') addXmlInputDefaults(doc, imported, options)
       root.appendChild(imported)
     }
     const sep = doc.createElement('sep')
@@ -631,9 +631,9 @@ function flattenXmlToolbox(toolbox) {
   return new XMLSerializer().serializeToString(root)
 }
 
-function addXmlInputDefaults(doc, blockEl) {
+function addXmlInputDefaults(doc, blockEl, options = {}) {
   const type = blockEl.getAttribute('type')
-  const defaults = VALUE_INPUT_DEFAULTS[type]
+  const defaults = inputDefaultsForBlock(type, options)
   if (!defaults) return
 
   for (const [name, shadow] of Object.entries(defaults)) {
@@ -653,6 +653,20 @@ function addXmlInputDefaults(doc, blockEl) {
     value.appendChild(shadowEl)
     blockEl.appendChild(value)
   }
+}
+
+function inputDefaultsForBlock(type, options = {}) {
+  const defaults = VALUE_INPUT_DEFAULTS[type]
+  const position = options.position
+  if (!defaults || !position) return defaults
+
+  const x = Math.round(Number(position.x ?? 0))
+  const y = Math.round(Number(position.y ?? 0))
+  if (type === 'motion_gotoxy') return { X: numberShadow(x), Y: numberShadow(y) }
+  if (type === 'motion_glidesecstoxy') return { ...defaults, X: numberShadow(x), Y: numberShadow(y) }
+  if (type === 'motion_setx') return { X: numberShadow(x) }
+  if (type === 'motion_sety') return { Y: numberShadow(y) }
+  return defaults
 }
 
 export function createRunSignal() {

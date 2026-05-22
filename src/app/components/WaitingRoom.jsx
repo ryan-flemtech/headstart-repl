@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 
-export default function WaitingRoom({ lessonTitle, onGoSolo }) {
+export default function WaitingRoom({ lessonTitle, lessonDescription, onGoSolo }) {
   const [dots, setDots] = useState('.')
 
   useEffect(() => {
@@ -14,6 +14,9 @@ export default function WaitingRoom({ lessonTitle, onGoSolo }) {
         <div style={s.header}>
           <span style={s.logo}>Headstart Coding - LaunchPad</span>
           <h1 style={s.title}>{lessonTitle}</h1>
+          {lessonDescription && (
+            <p style={s.description}>{lessonDescription}</p>
+          )}
         </div>
         <div style={s.body}>
           <p style={s.waiting}>Your teacher is getting ready{dots}</p>
@@ -64,6 +67,13 @@ const s = {
     fontWeight: 700,
     fontSize: '1.4rem',
     color: '#fff',
+  },
+  description: {
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.95rem',
+    lineHeight: 1.5,
+    color: 'rgba(255, 255, 255, 0.86)',
+    marginTop: 2,
   },
   body: {
     padding: '28px',

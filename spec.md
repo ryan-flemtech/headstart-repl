@@ -230,9 +230,13 @@ The `explainer` field supports a subset of Markdown, rendered above the editor.
 | ```` ```css ... ``` ```` | Fenced CSS code block — syntax highlighted |
 | ```` ```javascript ... ``` ```` | Fenced JS code block — syntax highlighted |
 | `**bold**` | Bold text |
+| `# Heading`, `## Heading`, `### Heading` | Styled section headings |
+| `- item` / `1. item` | Bulleted and numbered lists |
+| `> tip` | Highlighted callout |
+| Pipe tables | Responsive table with styled header row |
 | Plain text / line breaks | Rendered as paragraphs |
 
-Not supported: images, headings, tables, lists, links.
+Not supported: images, links.
 
 Renderer: `react-markdown` with `rehype-highlight` or `react-syntax-highlighter`. All code blocks match the CodeMirror editor font and colour scheme for visual consistency throughout.
 
@@ -857,9 +861,13 @@ Solo mode is designed to complement a recorded lesson. Students can work at thei
 | ```` ```css ... ``` ```` | CSS code block — syntax highlighted |
 | ```` ```javascript ... ``` ```` | JavaScript code block — syntax highlighted |
 | `**bold**` | Bold text |
+| `# Heading`, `## Heading`, `### Heading` | Styled section headings |
+| `- item` / `1. item` | Bulleted and numbered lists |
+| `> tip` | Highlighted callout |
+| Pipe tables | Responsive table with styled header row |
 | Plain text / line breaks | Paragraphs |
 
-Not supported: images, headings, tables, lists, links.
+Not supported: images, links.
 
 Renderer: `react-markdown` with `rehype-highlight` or `react-syntax-highlighter`.
 
@@ -1426,6 +1434,9 @@ The `type` field now accepts `"scratch"`.
   "starterBlocks": {
     "targets": []
   },
+  "completeBlocks": {
+    "targets": []
+  },
   "carryBlocksFrom": null,
   "check": {
     "type": "sprite_property",
@@ -1444,6 +1455,7 @@ The `type` field now accepts `"scratch"`.
 |---|---|---|---|
 | `toolbox` | No | string (XML) | Defines the exact blocks available in the sidebar. If omitted, load full Scratch toolbox. |
 | `starterBlocks` | No | object (JSON) | Pre-built workspace injected into scratch-vm on load. |
+| `completeBlocks` | No | object (JSON) | Reference solution workspace saved by the lesson builder, equivalent to `completeCode` / `completeFiles`. |
 | `carryBlocksFrom` | No | integer | Functions exactly like `carryCodeFrom`, pulling saved project JSON from localStorage. |
 | `check` | No | object | Expanded check types supporting both static and live evaluation. |
 

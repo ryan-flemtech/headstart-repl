@@ -1,5 +1,11 @@
 import React, { useRef, useEffect, useState } from 'react'
 
+const CODE_FONT_STYLE = {
+  fontFamily: "'JetBrains Mono', monospace",
+  fontVariantLigatures: 'none',
+  fontFeatureSettings: '"liga" 0, "calt" 0',
+}
+
 /**
  * Output panel for the lesson builder.
  * Like the classroom OutputPanel but also shows check verification results.
@@ -9,7 +15,7 @@ export default function BuilderOutputPanel({
   runStatus = null,
   inputPrompt = null,
   onInputSubmit,
-  checkResults = null, // null | [{type, value, passed}]
+  checkResults = null, // null | [{type, value?, passed}]
   running = false,
 }) {
   const [inputValue, setInputValue] = useState('')
@@ -137,14 +143,14 @@ export default function BuilderOutputPanel({
           {checkResults.length === 1 ? (
             checkResults[0].passed
               ? <span>✅ <strong>Check passes</strong> — students will see the completion banner.</span>
-              : <span>⚠️ <strong>Check does not pass</strong> with this output — review your check value (<code style={s.code}>{checkResults[0].value}</code>).</span>
+              : <span>⚠️ <strong>Check does not pass</strong> {checkHint(checkResults[0])}</span>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               {checkResults.map((r, i) => (
                 <div key={i}>
                   {r.passed
                     ? <span>✅ <strong>Check {i + 1}</strong> passes.</span>
-                    : <span>⚠️ <strong>Check {i + 1}</strong> does not pass — review value (<code style={s.code}>{r.value}</code>).</span>}
+                    : <span>⚠️ <strong>Check {i + 1}</strong> does not pass {checkHint(r)}</span>}
                 </div>
               ))}
               <div style={{ marginTop: 4, borderTop: '1px solid', borderColor: allPassed ? '#bbf7d0' : '#fde68a', paddingTop: 6, fontWeight: 700 }}>
@@ -158,6 +164,12 @@ export default function BuilderOutputPanel({
       )}
     </div>
   )
+}
+
+function checkHint(result) {
+  if (result.type === 'code_no_error') return 'because the code errored.'
+  if (result.type === 'output_not_empty') return 'because the output is empty.'
+  return <>with this output — review your check value (<code style={s.code}>{result.value}</code>).</>
 }
 
 const s = {
@@ -178,7 +190,7 @@ const s = {
   pre: {
     margin: 0,
     padding: '10px 14px',
-    fontFamily: "'JetBrains Mono', monospace",
+    ...CODE_FONT_STYLE,
     fontSize: '14px',
     lineHeight: 1.6,
     overflowY: 'auto',
@@ -193,7 +205,7 @@ const s = {
   prompt: { color: 'var(--colour-primary)', fontWeight: 700 },
   input: {
     flex: 1,
-    fontFamily: "'JetBrains Mono', monospace",
+    ...CODE_FONT_STYLE,
     fontSize: '14px',
     border: 'none',
     borderBottom: '2px solid var(--colour-primary)',
@@ -211,7 +223,7 @@ const s = {
     color: 'var(--colour-text)',
   },
   code: {
-    fontFamily: "'JetBrains Mono', monospace",
+    ...CODE_FONT_STYLE,
     fontSize: '0.85em',
     background: 'rgba(0,0,0,0.06)',
     padding: '1px 5px',
