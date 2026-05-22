@@ -10,10 +10,11 @@ export default function HtmlEditor({ files = [], activeFile, onTabChange, onFile
   return (
     <div style={s.wrap}>
       {/* File tabs + Assets toggle */}
-      <div style={s.tabs}>
+      <div style={s.tabs} className="ui-tabs">
         {files.map(f => (
           <button
             key={f.name}
+            className={`ui-tab ui-tab--code${f.name === activeFile ? ' is-active' : ''}`}
             style={{
               ...s.tab,
               ...(f.name === activeFile ? s.tabActive : {}),
@@ -25,6 +26,7 @@ export default function HtmlEditor({ files = [], activeFile, onTabChange, onFile
         ))}
         {hasAssets && (
           <button
+            className={`ui-tab${showAssets ? ' is-active' : ''}`}
             style={{
               ...s.tab,
               ...s.assetsTab,

@@ -6,6 +6,7 @@ import ScratchWorkspace from './ScratchWorkspace'
 import { buildIframeSrc } from '../../shared/iframe'
 import { decodeFileKey } from '../hooks/useSession'
 import QuizTask from './QuizTask'
+import ExplainerPanel from './ExplainerPanel'
 
 function resolveAssetsPath(rawPath) {
   if (!rawPath) return ''
@@ -44,6 +45,7 @@ export default function StudentModal({ student, lesson, session, isLive, onGoLiv
     : []
   const task      = lesson?.tasks?.find(t => t.id === session?.currentTaskId)
   const isQuiz    = task?.taskType === 'quiz'
+  const isInformation = task?.taskType === 'information'
   const scratchState = isScratch ? parseScratchState(student.currentCode) : null
   const spriteState = isScratch ? parseSpriteState(student.currentOutput) : null
   const iframeSrc = !isPython && !isScratch && !isQuiz && files.length
@@ -120,7 +122,7 @@ export default function StudentModal({ student, lesson, session, isLive, onGoLiv
                 →
               </button>
             </div>
-            {onRemoteReset && (
+            {onRemoteReset && !isInformation && (
               <>
                 <button
                   style={s.teacherActionBtn}
@@ -139,13 +141,15 @@ export default function StudentModal({ student, lesson, session, isLive, onGoLiv
                 </button>
               </>
             )}
-            <button
-              className={isLive ? 'btn-danger' : 'btn-primary'}
-              style={{ fontSize: 13, padding: '5px 14px' }}
-              onClick={isLive ? onStopLive : onGoLive}
-            >
-              {isLive ? 'Stop Live' : 'Go Live'}
-            </button>
+            {!isInformation && (
+              <button
+                className={isLive ? 'btn-danger' : 'btn-primary'}
+                style={{ fontSize: 13, padding: '5px 14px' }}
+                onClick={isLive ? onStopLive : onGoLive}
+              >
+                {isLive ? 'Stop Live' : 'Go Live'}
+              </button>
+            )}
             <button
               className="btn-ghost"
               style={{ fontSize: 13, padding: '5px 10px' }}
@@ -158,8 +162,10 @@ export default function StudentModal({ student, lesson, session, isLive, onGoLiv
         </div>
 
         {/* Content */}
-        <div style={isQuiz ? s.bodyQuiz : isPython ? s.bodyPython : isScratch ? s.bodyScratch : s.bodyHtml}>
-          {isQuiz ? (
+        <div style={isInformation ? s.bodyInformation : isQuiz ? s.bodyQuiz : isPython ? s.bodyPython : isScratch ? s.bodyScratch : s.bodyHtml}>
+          {isInformation ? (
+            <ExplainerPanel title={task?.title} content={task?.explainer ?? ''} collapsible={false} fill />
+          ) : isQuiz ? (
             <QuizTask
               task={task}
               showQuestion
@@ -206,10 +212,11 @@ export default function StudentModal({ student, lesson, session, isLive, onGoLiv
               {/* Left: tabbed file editor */}
               <div style={s.htmlEditorPane}>
                 {files.length > 1 && (
-                  <div style={s.tabBar}>
+                  <div style={s.tabBar} className="ui-tabs">
                     {files.map(f => (
                       <button
                         key={f.name}
+                        className={`ui-tab ui-tab--code${f.name === activeFile ? ' is-active' : ''}`}
                         style={{ ...s.tab, ...(f.name === activeFile ? s.tabActive : {}) }}
                         onClick={() => setActiveFile(f.name)}
                       >
@@ -337,6 +344,13 @@ const s = {
     padding: 16,
     display: 'flex',
     alignItems: 'flex-start',
+  },
+  bodyInformation: {
+    flex: 1,
+    overflow: 'hidden',
+    padding: 16,
+    display: 'flex',
+    flexDirection: 'column',
   },
   htmlEditorPane: {
     flex: 1,

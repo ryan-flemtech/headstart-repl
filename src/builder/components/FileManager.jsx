@@ -105,7 +105,7 @@ export default function FileManager({ files = [], entryFile, onAddFile, onDelete
               Generate ▾
             </button>
             {generateOpen && (
-              <div style={s.generateDropdown}>
+              <div style={s.generateDropdown} className="ui-popover">
                 {TEMPLATES.map(t => (
                   <button key={t.label} style={s.generateOption} onClick={() => handleGenerate(t)}>
                     {t.label}

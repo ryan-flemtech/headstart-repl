@@ -6,7 +6,7 @@ import ScratchWorkspace from '../../app/components/ScratchWorkspace'
 import { ScratchToolboxPicker, SpriteManager, BackdropManager } from './TaskEditor'
 import { DEFAULT_SPRITES } from '../../shared/scratch'
 
-export default function LessonMetaPanel({ lesson, onUpdate }) {
+export default function LessonMetaPanel({ lesson, onUpdate, onCollapse }) {
   const [sandboxOpen, setSandboxOpen] = useState(false)
 
   function set(field, value) {
@@ -22,7 +22,14 @@ export default function LessonMetaPanel({ lesson, onUpdate }) {
 
   return (
     <div style={s.panel}>
-      <div style={s.header}>Lesson Details</div>
+      <div style={s.header}>
+        <span>Lesson Details</span>
+        {onCollapse && (
+          <button type="button" style={s.collapseBtn} onClick={onCollapse} title="Collapse panel">
+            ‹
+          </button>
+        )}
+      </div>
       <div style={s.fields}>
         <Field label="Lesson type">
           <div style={s.typeBadge}>{isPython ? 'Python' : isScratch ? 'Scratch' : 'Web'}</div>
@@ -189,9 +196,10 @@ function ScratchSandboxStarter({ value, toolbox, sprites, backdrops, assetsPath,
 
   return (
     <div style={s.scratchSandboxShell}>
-      <div style={s.workspaceTabs} role="tablist" aria-label="Sandbox starter workspace">
+      <div style={s.workspaceTabs} className="ui-tabs" role="tablist" aria-label="Sandbox starter workspace">
         <button
           type="button"
+          className="ui-tab"
           role="tab"
           aria-selected={activeTab === 'starter'}
           style={{ ...s.workspaceTab, ...(activeTab === 'starter' ? s.workspaceTabActive : {}) }}
@@ -201,6 +209,7 @@ function ScratchSandboxStarter({ value, toolbox, sprites, backdrops, assetsPath,
         </button>
         <button
           type="button"
+          className="ui-tab"
           role="tab"
           aria-selected={activeTab === 'test'}
           style={{ ...s.workspaceTab, ...(activeTab === 'test' ? s.workspaceTabActive : {}) }}
@@ -384,6 +393,26 @@ const s = {
     fontSize: '0.85rem',
     letterSpacing: '0.04em',
     padding: '10px 14px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  collapseBtn: {
+    width: 24,
+    height: 24,
+    border: '1px solid rgba(255,255,255,0.35)',
+    borderRadius: 4,
+    background: 'transparent',
+    color: '#fff',
+    cursor: 'pointer',
+    fontSize: '1.1rem',
+    fontWeight: 700,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    lineHeight: 1,
+    padding: 0,
+    flexShrink: 0,
   },
   fields: {
     padding: '12px 14px',

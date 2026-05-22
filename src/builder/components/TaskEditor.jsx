@@ -27,6 +27,7 @@ function resolveAssetsPath(rawPath) {
 }
 
 export default function TaskEditor({ task, lesson, onUpdate }) {
+  const [optionsOpen, setOptionsOpen]   = useState(false)
   const [output, setOutput]             = useState('')
   const [runStatus, setRunStatus]       = useState(null)
   const [running, setRunning]           = useState(false)
@@ -42,6 +43,7 @@ export default function TaskEditor({ task, lesson, onUpdate }) {
   const isPython  = lesson.type === 'python'
   const isScratch = lesson.type === 'scratch'
   const isQuiz = task.taskType === 'quiz'
+  const isInformation = task.taskType === 'information'
   const [quizSelectedAnswer, setQuizSelectedAnswer] = useState('')
   const [selectedFile, setSelectedFile] = useState(task.starterFiles?.[0]?.name ?? '')
   const [codeTab, setCodeTab] = useState('starter')
@@ -61,6 +63,27 @@ export default function TaskEditor({ task, lesson, onUpdate }) {
 
   function set(field, value) {
     onUpdate({ ...task, [field]: value })
+  }
+
+  function normalizeHints(hints) {
+    return Array.isArray(hints) ? hints.map(h => String(h ?? '')) : []
+  }
+
+  function updateHints(nextHints) {
+    const cleaned = nextHints.map(h => h.replace(/\s*\r?\n\s*/g, ' '))
+    onUpdate({ ...task, hints: cleaned.length > 0 ? cleaned : undefined })
+  }
+
+  function addHint() {
+    updateHints([...normalizeHints(task.hints), ''])
+  }
+
+  function updateHint(index, value) {
+    updateHints(normalizeHints(task.hints).map((hint, i) => i === index ? value : hint))
+  }
+
+  function removeHint(index) {
+    updateHints(normalizeHints(task.hints).filter((_, i) => i !== index))
   }
 
   function cloneBlocks(blocks) {
@@ -138,9 +161,46 @@ export default function TaskEditor({ task, lesson, onUpdate }) {
       return
     }
 
+    if (taskType === 'information') {
+      const {
+        options: _options,
+        check: _check,
+        carryCodeFrom: _carryCodeFrom,
+        carryBlocksFrom: _carryBlocksFrom,
+        starterCode: _starterCode,
+        completeCode: _completeCode,
+        starterFiles: _starterFiles,
+        completeFiles: _completeFiles,
+        entryFile: _entryFile,
+        completeEntryFile: _completeEntryFile,
+        toolbox: _toolbox,
+        starterBlocks: _starterBlocks,
+        completeBlocks: _completeBlocks,
+        interactionMode: _interactionMode,
+        _checkTested,
+        ...rest
+      } = task
+      onUpdate({
+        ...rest,
+        taskType: 'information',
+        explainer: task.explainer ?? '',
+      })
+      return
+    }
+
     const { taskType: _taskType, options: _options, ...rest } = task
+    const typeFields = lesson.type === 'python'
+      ? { starterCode: task.starterCode ?? '', carryCodeFrom: task.carryCodeFrom ?? null }
+      : lesson.type === 'scratch'
+      ? { toolbox: task.toolbox ?? '', starterBlocks: task.starterBlocks ?? null, carryBlocksFrom: task.carryBlocksFrom ?? null }
+      : {
+          starterFiles: task.starterFiles?.length ? task.starterFiles : [{ name: 'index.html', type: 'html', content: '<!DOCTYPE html>\n<html>\n<body>\n\n</body>\n</html>' }],
+          entryFile: task.entryFile ?? 'index.html',
+          carryCodeFrom: task.carryCodeFrom ?? null,
+        }
     onUpdate({
       ...rest,
+      ...typeFields,
       check: null,
     })
   }
@@ -291,14 +351,26 @@ export default function TaskEditor({ task, lesson, onUpdate }) {
       </Field>
 
       <Field label="Task format">
-        <select
-          style={s.select}
-          value={isQuiz ? 'quiz' : 'code'}
-          onChange={e => handleTaskTypeChange(e.target.value)}
-        >
-          <option value="code">{lesson.type === 'scratch' ? 'Scratch' : 'Code'}</option>
-          <option value="quiz">Quiz</option>
-        </select>
+        <div style={s.taskFormatGrid}>
+          {[
+            { value: 'code', label: lesson.type === 'scratch' ? 'Scratch' : 'Code', iconType: lesson.type === 'scratch' ? 'scratch' : 'code' },
+            { value: 'information', label: 'Information', iconType: 'information' },
+            { value: 'quiz', label: 'Quiz', iconType: 'quiz' },
+          ].map(({ value, label, iconType }) => {
+            const active = value === (isQuiz ? 'quiz' : isInformation ? 'information' : 'code')
+            return (
+              <button
+                key={value}
+                type="button"
+                style={{ ...s.taskFormatBtn, ...(active ? s.taskFormatBtnActive : {}) }}
+                onClick={() => handleTaskTypeChange(value)}
+              >
+                <TaskFormatIcon type={iconType} />
+                <span style={s.taskFormatLabel}>{label}</span>
+              </button>
+            )
+          })}
+        </div>
       </Field>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -324,83 +396,142 @@ export default function TaskEditor({ task, lesson, onUpdate }) {
         )}
       </div>
 
-      {!isQuiz && (
-        <>
-          <CarryThroughPicker task={task} lesson={lesson} onUpdate={onUpdate} isScratch={isScratch} isPython={isPython} />
+      {!isQuiz && !isInformation && (() => {
+        const hints = normalizeHints(task.hints)
+        const summaryParts = []
+        if (hints.length > 0) summaryParts.push(`${hints.length} hint${hints.length !== 1 ? 's' : ''}`)
+        if (task.check) summaryParts.push('check enabled')
+        if (task.interactionMode === 'submit') summaryParts.push('submit mode')
+        const summary = summaryParts.join(' · ')
 
-          {!isScratch && (
-            <Field label="Student interaction">
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ display: 'flex', gap: 24 }}>
-                  <label style={s.carryRadioLabel}>
-                    <input
-                      type="radio"
-                      name={`interaction-${task.id}`}
-                      checked={!task.interactionMode || task.interactionMode === 'run'}
-                      onChange={() => handleInteractionModeChange('run')}
-                    />
-                    Run - students run their code and see output
-                  </label>
-                  <label style={s.carryRadioLabel}>
-                    <input
-                      type="radio"
-                      name={`interaction-${task.id}`}
-                      checked={task.interactionMode === 'submit'}
-                      onChange={() => handleInteractionModeChange('submit')}
-                    />
-                    Submit - students submit code without running it
-                  </label>
-                </div>
-                {task.interactionMode === 'submit' && (
-                  <p style={{ margin: 0, fontFamily: 'var(--font-body)', fontSize: '0.82rem', color: '#6b7280', lineHeight: 1.5 }}>
-                    Submit mode hides the Run button. Only code-based checks can be evaluated on submit.
-                  </p>
+        return (
+          <div style={s.optionsSection}>
+            <button
+              type="button"
+              style={s.optionsSectionToggle}
+              onClick={() => setOptionsOpen(o => !o)}
+              aria-expanded={optionsOpen}
+            >
+              <span style={s.optionsSectionTitle}>Task options</span>
+              {!optionsOpen && summary && (
+                <span style={s.optionsSummaryText}>{summary}</span>
+              )}
+              <span style={{ ...s.optionsChevron, transform: optionsOpen ? 'rotate(180deg)' : 'none' }}>▾</span>
+            </button>
+
+            {optionsOpen && (
+              <div style={s.optionsBody}>
+                <Field label="Hints">
+                  <div style={s.hintsEditor}>
+                    {hints.length === 0 ? (
+                      <p style={s.hintsEmpty}>No hints added.</p>
+                    ) : hints.map((hint, index) => (
+                      <div key={index} style={s.hintRow}>
+                        <span style={s.hintIndex}>Hint {index + 1}</span>
+                        <input
+                          style={s.hintInput}
+                          value={hint}
+                          onChange={e => updateHint(index, e.target.value)}
+                          placeholder="Single-line Markdown hint"
+                        />
+                        <button
+                          type="button"
+                          style={s.removeBtn}
+                          onClick={() => removeHint(index)}
+                          title="Remove hint"
+                        >
+                          x
+                        </button>
+                      </div>
+                    ))}
+                    <button type="button" className="btn-ghost" style={s.addHintBtn} onClick={addHint}>
+                      + Add hint
+                    </button>
+                  </div>
+                </Field>
+
+                {!isQuiz && !isInformation && (
+                  <>
+                    <CarryThroughPicker task={task} lesson={lesson} onUpdate={onUpdate} isScratch={isScratch} isPython={isPython} />
+
+                    {!isScratch && (
+                      <Field label="Student interaction">
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          <div style={{ display: 'flex', gap: 24 }}>
+                            <label style={s.carryRadioLabel}>
+                              <input
+                                type="radio"
+                                name={`interaction-${task.id}`}
+                                checked={!task.interactionMode || task.interactionMode === 'run'}
+                                onChange={() => handleInteractionModeChange('run')}
+                              />
+                              Run - students run their code and see output
+                            </label>
+                            <label style={s.carryRadioLabel}>
+                              <input
+                                type="radio"
+                                name={`interaction-${task.id}`}
+                                checked={task.interactionMode === 'submit'}
+                                onChange={() => handleInteractionModeChange('submit')}
+                              />
+                              Submit - students submit code without running it
+                            </label>
+                          </div>
+                          {task.interactionMode === 'submit' && (
+                            <p style={{ margin: 0, fontFamily: 'var(--font-body)', fontSize: '0.82rem', color: '#6b7280', lineHeight: 1.5 }}>
+                              Submit mode hides the Run button. Only code-based checks can be evaluated on submit.
+                            </p>
+                          )}
+                        </div>
+                      </Field>
+                    )}
+
+                    <Field label="Completion check">
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <label style={s.checkToggle}>
+                          <input
+                            type="checkbox"
+                            checked={!!task.check}
+                            onChange={e => set('check', e.target.checked
+                              ? (isScratch
+                                ? [{ type: 'block_used', evaluation: 'after_run', opcode: 'motion_movesteps' }]
+                                : task.interactionMode === 'submit'
+                                  ? [{ type: 'code_contains', value: '' }]
+                                  : isPython
+                                  ? [{ type: 'code_no_error' }]
+                                  : [{ type: 'output_contains', value: '' }])
+                              : null)}
+                          />
+                          Enable check
+                        </label>
+                      </div>
+                      {task.check && isScratch ? (
+                        <ScratchCheckListEditor
+                          checks={normalizeChecks(task.check)}
+                          onChange={checks => set('check', checks)}
+                          sprites={task.sprites?.length > 0 ? task.sprites : DEFAULT_SPRITES}
+                        />
+                      ) : task.check && (
+                        <CheckListEditor
+                          checks={normalizeChecks(task.check)}
+                          onChange={checks => set('check', checks)}
+                          interactionMode={task.interactionMode ?? 'run'}
+                          allowCodeNoError={isPython && task.interactionMode !== 'submit'}
+                          allowDomChecks={!isPython && !isScratch && task.interactionMode !== 'submit'}
+                        />
+                      )}
+                    </Field>
+                  </>
                 )}
               </div>
-            </Field>
-          )}
-
-          <Field label="Completion check">
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <label style={s.checkToggle}>
-                <input
-                  type="checkbox"
-                  checked={!!task.check}
-                  onChange={e => set('check', e.target.checked
-                    ? (isScratch
-                      ? [{ type: 'block_used', evaluation: 'after_run', opcode: 'motion_movesteps' }]
-                      : task.interactionMode === 'submit'
-                        ? [{ type: 'code_contains', value: '' }]
-                        : isPython
-                        ? [{ type: 'code_no_error' }]
-                        : [{ type: 'output_contains', value: '' }])
-                    : null)}
-                />
-                Enable check
-              </label>
-            </div>
-            {task.check && isScratch ? (
-              <ScratchCheckListEditor
-                checks={normalizeChecks(task.check)}
-                onChange={checks => set('check', checks)}
-                sprites={task.sprites?.length > 0 ? task.sprites : DEFAULT_SPRITES}
-              />
-            ) : task.check && (
-              <CheckListEditor
-                checks={normalizeChecks(task.check)}
-                onChange={checks => set('check', checks)}
-                interactionMode={task.interactionMode ?? 'run'}
-                allowCodeNoError={isPython && task.interactionMode !== 'submit'}
-                allowDomChecks={!isPython && !isScratch && task.interactionMode !== 'submit'}
-              />
             )}
-          </Field>
-        </>
-      )}
+          </div>
+        )
+      })()}
 
-      <div style={s.divider} />
+      {!isInformation && <div style={s.divider} />}
 
-      {isQuiz ? (
+      {isInformation ? null : isQuiz ? (
         <>
           <QuizOptionsBuilder task={task} onUpdate={onUpdate} />
           <div style={s.previewPanel}>
@@ -431,15 +562,13 @@ export default function TaskEditor({ task, lesson, onUpdate }) {
         <>
           <CodeWorkspaceTabs activeTab={codeTab} onChange={handleCodeTabChange} />
 
-          <Field label={isCompleteTab ? 'Complete code' : 'Starter code'}>
-            <div style={s.pythonEditor}>
-              <CodeEditor
-                value={activePythonCode}
-                language="python"
-                onChange={v => isCompleteTab ? set('completeCode', v) : set('starterCode', v)}
-              />
-            </div>
-          </Field>
+          <div style={s.pythonEditor}>
+            <CodeEditor
+              value={activePythonCode}
+              language="python"
+              onChange={v => isCompleteTab ? set('completeCode', v) : set('starterCode', v)}
+            />
+          </div>
 
           {task.interactionMode === 'submit' ? (
             <>
@@ -465,11 +594,11 @@ export default function TaskEditor({ task, lesson, onUpdate }) {
                     {checkResults.length === 1 ? (
                       checkResults[0].passed
                         ? 'Check passes — students will see the completion banner.'
-                        : `Check does not pass — review your check value ("${checkResults[0].value ?? ''}")`
+                        : formatCheckFailure(checkResults[0])
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                         {checkResults.map((r, i) => (
-                          <div key={i}>{r.passed ? `Check ${i + 1} passes.` : `Check ${i + 1} does not pass — review value ("${r.value ?? ''}")`}</div>
+                          <div key={i}>{r.passed ? `Check ${i + 1} passes.` : `Check ${i + 1} does not pass — ${formatCheckFailureDetail(r)}`}</div>
                         ))}
                         <div style={{ marginTop: 4, fontWeight: 700 }}>{allPassed ? 'All checks pass — students will see the completion banner.' : 'Not all checks pass.'}</div>
                       </div>
@@ -620,20 +749,22 @@ export default function TaskEditor({ task, lesson, onUpdate }) {
         </>
       ) : (
         <>
-          <CodeWorkspaceTabs activeTab={codeTab} onChange={handleCodeTabChange} />
-
-          <div style={s.htmlSplit}>
-            <div style={s.htmlSplitHeader}>
-              <span style={s.htmlSplitLabel}>{isCompleteTab ? 'Complete files' : 'Starter files'}</span>
+          <CodeWorkspaceTabs
+            activeTab={codeTab}
+            onChange={handleCodeTabChange}
+            rightAction={
               <button
                 className="btn-primary"
                 onClick={task.interactionMode === 'submit' ? handleTestChecks : handleRun}
                 disabled={task.interactionMode === 'submit' ? !task.check : running}
-                style={{ padding: '8px 22px', fontSize: 14 }}
+                style={{ padding: '7px 18px', fontSize: 13 }}
               >
                 {task.interactionMode === 'submit' ? 'Test checks' : running ? 'Running...' : 'Run'}
               </button>
-            </div>
+            }
+          />
+
+          <div style={s.htmlSplit}>
             <SplitPane
               defaultSplit={34}
               style={{ flex: 1, minHeight: 0 }}
@@ -707,11 +838,11 @@ export default function TaskEditor({ task, lesson, onUpdate }) {
                           {checkResults.length === 1 ? (
                             checkResults[0].passed
                               ? 'Check passes - students will see the completion banner.'
-                              : `Check does not pass - review your check value ("${checkResults[0].value ?? ''}")`
+                              : formatCheckFailure(checkResults[0])
                           ) : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                               {checkResults.map((r, i) => (
-                                <div key={i}>{r.passed ? `Check ${i + 1} passes.` : `Check ${i + 1} does not pass - review value ("${r.value ?? ''}")`}</div>
+                                <div key={i}>{r.passed ? `Check ${i + 1} passes.` : `Check ${i + 1} does not pass - ${formatCheckFailureDetail(r)}`}</div>
                               ))}
                               <div style={{ marginTop: 4, fontWeight: 700 }}>{allPassed ? 'All checks pass - students will see the completion banner.' : 'Not all checks pass.'}</div>
                             </div>
@@ -762,11 +893,11 @@ export default function TaskEditor({ task, lesson, onUpdate }) {
                   {checkResults.length === 1 ? (
                     checkResults[0].passed
                       ? 'Check passes - students will see the completion banner.'
-                      : `Check does not pass - review your check value ("${checkResults[0].value ?? ''}")`
+                      : formatCheckFailure(checkResults[0])
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                       {checkResults.map((r, i) => (
-                        <div key={i}>{r.passed ? `✅ Check ${i + 1} passes.` : `⚠️ Check ${i + 1} does not pass - review value ("${r.value ?? ''}")`}</div>
+                        <div key={i}>{r.passed ? `✅ Check ${i + 1} passes.` : `⚠️ Check ${i + 1} does not pass - ${formatCheckFailureDetail(r)}`}</div>
                       ))}
                       <div style={{ marginTop: 4, fontWeight: 700 }}>{allPassed ? '✅ All checks pass - students will see the completion banner.' : '⚠️ Not all checks pass.'}</div>
                     </div>
@@ -863,6 +994,17 @@ function QuizOptionsBuilder({ task, onUpdate }) {
       </div>
     </Field>
   )
+}
+
+function formatCheckFailure(result) {
+  return `Check does not pass - ${formatCheckFailureDetail(result)}`
+}
+
+function formatCheckFailureDetail(result) {
+  if (result.type === 'element_exists') return `no element matches selector "${result.selector ?? ''}"`
+  if (result.type === 'element_count') return `expected ${result.value ?? ''} elements matching selector "${result.selector ?? ''}"`
+  if (result.type === 'element_value') return `review expected text or input value "${result.value ?? ''}"`
+  return `review your check value "${result.value ?? ''}"`
 }
 
 function CheckListEditor({ checks, onChange, interactionMode = 'run', allowCodeNoError = false, allowDomChecks = false }) {
@@ -1353,11 +1495,12 @@ function ScratchCheckEditor({ check, onChange, sprites = [{ id: 'sprite1', name:
   )
 }
 
-function CodeWorkspaceTabs({ activeTab, onChange, starterLabel = 'Starter code', testLabel = 'Complete code' }) {
+function CodeWorkspaceTabs({ activeTab, onChange, starterLabel = 'Starter code', testLabel = 'Complete code', rightAction = null }) {
   return (
-    <div style={s.workspaceTabs} role="tablist" aria-label="Code workspace">
+    <div style={s.workspaceTabs} className="ui-tabs ui-tabs--editor" role="tablist" aria-label="Code workspace">
       <button
         type="button"
+        className="ui-tab"
         role="tab"
         aria-selected={activeTab === 'starter'}
         style={{ ...s.workspaceTab, ...(activeTab === 'starter' ? s.workspaceTabActive : {}) }}
@@ -1367,6 +1510,7 @@ function CodeWorkspaceTabs({ activeTab, onChange, starterLabel = 'Starter code',
       </button>
       <button
         type="button"
+        className="ui-tab"
         role="tab"
         aria-selected={activeTab === 'complete'}
         style={{ ...s.workspaceTab, ...(activeTab === 'complete' ? s.workspaceTabActive : {}) }}
@@ -1374,6 +1518,7 @@ function CodeWorkspaceTabs({ activeTab, onChange, starterLabel = 'Starter code',
       >
         {testLabel}
       </button>
+      {rightAction && <div style={s.workspaceTabActions}>{rightAction}</div>}
     </div>
   )
 }
@@ -1479,6 +1624,38 @@ function CarryThroughPicker({ task, lesson, onUpdate, isScratch, isPython }) {
         )}
       </div>
     </Field>
+  )
+}
+
+function TaskFormatIcon({ type }) {
+  const common = { width: 24, height: 24, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round' }
+  if (type === 'scratch') return (
+    <svg {...common}>
+      <rect x="2" y="2" width="9" height="9" rx="1.5" />
+      <rect x="13" y="2" width="9" height="9" rx="1.5" />
+      <rect x="2" y="13" width="9" height="9" rx="1.5" />
+      <rect x="13" y="13" width="9" height="9" rx="1.5" />
+    </svg>
+  )
+  if (type === 'information') return (
+    <svg {...common}>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 16v-4" />
+      <path d="M12 8h.01" />
+    </svg>
+  )
+  if (type === 'quiz') return (
+    <svg {...common}>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+      <path d="M12 17h.01" />
+    </svg>
+  )
+  return (
+    <svg {...common}>
+      <polyline points="16 18 22 12 16 6" />
+      <polyline points="8 6 2 12 8 18" />
+    </svg>
   )
 }
 
@@ -1743,6 +1920,54 @@ const s = {
     maxWidth: 1120,
     margin: '0 auto',
   },
+  optionsSection: {
+    border: '1px solid #e5e7eb',
+    borderRadius: 8,
+    overflow: 'hidden',
+    background: '#fff',
+  },
+  optionsSectionToggle: {
+    width: '100%',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    padding: '10px 14px',
+    background: '#fafafa',
+    border: 'none',
+    cursor: 'pointer',
+    textAlign: 'left',
+  },
+  optionsSectionTitle: {
+    fontFamily: 'var(--font-body)',
+    fontWeight: 700,
+    fontSize: '0.88rem',
+    color: 'var(--colour-text)',
+    flexShrink: 0,
+  },
+  optionsSummaryText: {
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.82rem',
+    color: '#6b7280',
+    flex: 1,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  optionsChevron: {
+    marginLeft: 'auto',
+    color: '#6b7280',
+    fontSize: '1rem',
+    lineHeight: 1,
+    flexShrink: 0,
+    transition: 'transform 0.15s ease',
+  },
+  optionsBody: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 16,
+    padding: '14px 14px 16px',
+    borderTop: '1px solid #e5e7eb',
+  },
   input: {
     padding: '8px 10px',
     border: '1px solid #e5e7eb',
@@ -1838,6 +2063,53 @@ const s = {
     fontSize: '0.86rem',
     color: '#4b5563',
     background: '#f9fafb',
+  },
+  hintsEditor: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+    border: '1px solid #e5e7eb',
+    borderRadius: 8,
+    background: '#fff',
+    padding: 10,
+  },
+  hintsEmpty: {
+    margin: 0,
+    color: '#9ca3af',
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.86rem',
+  },
+  hintRow: {
+    display: 'grid',
+    gridTemplateColumns: '72px minmax(0, 1fr) 28px',
+    gap: 8,
+    alignItems: 'start',
+  },
+  hintIndex: {
+    paddingTop: 9,
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.82rem',
+    fontWeight: 700,
+    color: 'var(--colour-primary)',
+  },
+  hintInput: {
+    padding: '8px 10px',
+    border: '1px solid #e5e7eb',
+    borderRadius: 6,
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.9rem',
+    color: 'var(--colour-text)',
+    outline: 'none',
+    resize: 'vertical',
+    minHeight: 38,
+    lineHeight: 1.45,
+  },
+  addHintBtn: {
+    alignSelf: 'flex-start',
+    color: 'var(--colour-primary)',
+    border: '1px dashed var(--colour-primary)',
+    padding: '6px 12px',
+    fontSize: '0.83rem',
   },
   quizOptions: {
     display: 'flex',
@@ -2178,6 +2450,12 @@ const s = {
     background: 'var(--colour-primary)',
     color: '#fff',
   },
+  workspaceTabActions: {
+    marginLeft: 'auto',
+    display: 'flex',
+    alignItems: 'center',
+    paddingLeft: 8,
+  },
   pythonEditor: {
     height: 300,
     border: '1px solid #e5e7eb',
@@ -2198,6 +2476,17 @@ const s = {
     borderRadius: 8,
     background: '#fff',
     padding: 12,
+  },
+  infoNotice: {
+    border: '1px solid #d8b4fe',
+    borderRadius: 8,
+    background: '#f5f3ff',
+    color: 'var(--colour-primary)',
+    padding: '12px 14px',
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.9rem',
+    fontWeight: 600,
+    lineHeight: 1.5,
   },
   previewHeader: {
     display: 'flex',
@@ -2517,5 +2806,35 @@ const s = {
     borderRadius: 5,
     cursor: 'pointer',
     flexShrink: 0,
+  },
+  taskFormatGrid: {
+    display: 'flex',
+    gap: 10,
+  },
+  taskFormatBtn: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    padding: '14px 8px',
+    border: '2px solid #e5e7eb',
+    borderRadius: 10,
+    background: '#fff',
+    color: 'var(--colour-primary)',
+    cursor: 'pointer',
+    transition: 'border-color 0.12s, background 0.12s, color 0.12s',
+  },
+  taskFormatBtnActive: {
+    borderColor: 'var(--colour-primary)',
+    background: 'var(--colour-primary)',
+    color: '#fff',
+  },
+  taskFormatLabel: {
+    fontFamily: 'var(--font-body)',
+    fontWeight: 600,
+    fontSize: '0.82rem',
+    lineHeight: 1,
   },
 }

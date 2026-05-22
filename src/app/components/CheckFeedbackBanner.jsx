@@ -4,11 +4,23 @@ export default function CheckFeedbackBanner({
   passed,
   failureMessage = 'Check again, something is not right.',
   successMessage = 'Correct!',
+  onHintsClick,
+  onShowCompleteCode,
 }) {
   return (
     <div style={{ ...s.banner, ...(passed ? s.pass : s.fail) }} role="status">
       <span style={{ ...s.icon, background: passed ? '#166534' : '#92400e' }}>{passed ? '✓' : '!'}</span>
       <span style={s.text}>{passed ? successMessage : failureMessage}</span>
+      {!passed && onHintsClick && (
+        <button type="button" style={s.actionLink} onClick={onHintsClick}>
+          Hints
+        </button>
+      )}
+      {!passed && onShowCompleteCode && (
+        <button type="button" style={s.actionLink} onClick={onShowCompleteCode}>
+          See complete code
+        </button>
+      )}
     </div>
   )
 }
@@ -49,6 +61,20 @@ const s = {
     lineHeight: 1,
   },
   text: {
+    flex: 1,
     minWidth: 0,
+  },
+  actionLink: {
+    flexShrink: 0,
+    background: 'none',
+    border: 'none',
+    padding: '2px 0',
+    fontFamily: 'var(--font-body)',
+    fontWeight: 700,
+    fontSize: '0.88rem',
+    color: '#92400e',
+    cursor: 'pointer',
+    textDecoration: 'underline',
+    textUnderlineOffset: 3,
   },
 }

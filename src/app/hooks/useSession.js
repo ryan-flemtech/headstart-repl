@@ -51,6 +51,7 @@ export function useSession(lessonId) {
       currentTaskId:         1,
       createdAt:             Date.now(),
       activeStudentView:     null,
+      visibleHint:           null,
       isPaused:              false,
       sandboxCode:           null,
       sandboxCodePushedAt:   null,
@@ -72,6 +73,7 @@ export function useSession(lessonId) {
     await update(ref(db, `sessions/${lessonId}`), {
       state:                 'ended',
       activeStudentView:     null,
+      visibleHint:           null,
       sandboxCode:           null,
       sandboxCodePushedAt:   null,
       sandboxFiles:          null,
@@ -84,7 +86,7 @@ export function useSession(lessonId) {
   }
 
   async function setTaskId(taskId) {
-    const updates = { currentTaskId: taskId }
+    const updates = { currentTaskId: taskId, visibleHint: null }
     for (const anonymousId of Object.keys(session?.students ?? {})) {
       updates[`students/${anonymousId}/checkPassed`]    = false
       updates[`students/${anonymousId}/lastRunStatus`]  = null
@@ -97,7 +99,7 @@ export function useSession(lessonId) {
   }
 
   async function enterSandbox({ code = null, files = null } = {}) {
-    const updates = { state: 'sandbox' }
+    const updates = { state: 'sandbox', visibleHint: null }
     if (code != null) {
       updates.sandboxCode        = code
       updates.sandboxCodePushedAt = Date.now()
@@ -113,6 +115,7 @@ export function useSession(lessonId) {
   async function exitSandbox() {
     await update(ref(db, `sessions/${lessonId}`), {
       state:                 'active',
+      visibleHint:           null,
       sandboxCode:           null,
       sandboxCodePushedAt:   null,
       sandboxFiles:          null,
@@ -146,6 +149,10 @@ export function useSession(lessonId) {
       // Clear on unexpected disconnect
       onDisconnect(r2).set(null)
     }
+  }
+
+  async function setVisibleHint(hint) {
+    await set(ref(db, `sessions/${lessonId}/visibleHint`), hint || null)
   }
 
   async function renameStudent(anonymousId, newName) {
@@ -219,7 +226,7 @@ export function useSession(lessonId) {
     // teacher
     createSession, restartSession, startSession, endSession,
     setTaskId, enterSandbox, exitSandbox, pushSandboxCode, pushSandboxFiles,
-    setPaused, setActiveStudentView, renameStudent, removeStudent, pushResetToStudent,
+    setPaused, setActiveStudentView, setVisibleHint, renameStudent, removeStudent, pushResetToStudent,
     // student
     registerPresence, joinSession, writeStudentRun, writeStudentCode, writeStudentFiles, writeStudentOutput,
   }

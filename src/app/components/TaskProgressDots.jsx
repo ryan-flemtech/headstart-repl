@@ -1,7 +1,7 @@
 import React from 'react'
 import { useIsMobile } from '../../shared/useIsMobile'
 
-export default function TaskProgressDots({ tasks, currentTaskId, viewingTaskId, onDotClick, isSolo }) {
+export default function TaskProgressDots({ tasks, currentTaskId, viewingTaskId, onDotClick, isSolo, canSelectTask }) {
   const isMobile = useIsMobile()
 
   if (isMobile) {
@@ -20,7 +20,7 @@ export default function TaskProgressDots({ tasks, currentTaskId, viewingTaskId, 
         const isViewing  = task.id === viewingTaskId
         const isPast     = task.id < currentTaskId
         const isFuture   = task.id > currentTaskId
-        const clickable  = isPast || isSolo
+        const clickable  = isPast || (isSolo && (canSelectTask ? canSelectTask(task.id) : true))
 
         return (
           <button

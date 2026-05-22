@@ -6,9 +6,10 @@ export default function ExplainerEditor({ title, value, onChange }) {
 
   return (
     <div style={s.wrap}>
-      <div style={s.tabs} role="tablist" aria-label="Explainer editor views">
+      <div style={s.tabs} className="ui-tabs" role="tablist" aria-label="Explainer editor views">
         <button
           type="button"
+          className="ui-tab"
           role="tab"
           aria-selected={tab === 'entry'}
           style={tab === 'entry' ? { ...s.tab, ...s.tabActive } : s.tab}
@@ -18,6 +19,7 @@ export default function ExplainerEditor({ title, value, onChange }) {
         </button>
         <button
           type="button"
+          className="ui-tab"
           role="tab"
           aria-selected={tab === 'preview'}
           style={tab === 'preview' ? { ...s.tab, ...s.tabActive } : s.tab}

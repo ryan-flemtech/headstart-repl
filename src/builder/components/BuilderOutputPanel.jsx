@@ -172,6 +172,9 @@ function checkHint(result) {
   if (result.type === 'code_contains') return <>— the code does not contain (<code style={s.code}>{result.value}</code>).</>
   if (result.type === 'code_does_not_contain') return <>— the code contains (<code style={s.code}>{result.value}</code>) but shouldn't.</>
   if (result.type === 'code_equals') return <>— the code does not exactly match the expected value.</>
+  if (result.type === 'element_exists') return <>— no element matches selector (<code style={s.code}>{result.selector}</code>).</>
+  if (result.type === 'element_count') return <>— the matching element count is not <code style={s.code}>{result.value}</code> for selector (<code style={s.code}>{result.selector}</code>).</>
+  if (result.type === 'element_value') return <>— the first matching element does not contain (<code style={s.code}>{result.value}</code>).</>
   return <>with this output — review your check value (<code style={s.code}>{result.value}</code>).</>
 }
 

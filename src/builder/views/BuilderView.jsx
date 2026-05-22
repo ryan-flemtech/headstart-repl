@@ -19,8 +19,13 @@ function validateLesson(lesson) {
   tasks.forEach((task, i) => {
     const n = i + 1
     if (!task.title)    errors.push(`Task ${n} is missing a title`)
+    if (task.taskType === 'information' && !task.explainer?.trim()) {
+      errors.push(`Task ${n} is an information task but has no explainer`)
+    }
 
-    if (task.taskType === 'quiz') {
+    if (task.taskType === 'information') {
+      // Information tasks only render explainer markdown.
+    } else if (task.taskType === 'quiz') {
       if (!task.options || task.options.length < 2) {
         errors.push(`Task ${n} is a quiz but has fewer than 2 options.`)
       }
@@ -40,7 +45,9 @@ function validateLesson(lesson) {
       }
     }
 
-    if (task.taskType === 'quiz') {
+    if (task.taskType === 'information') {
+      // Information tasks have no checks.
+    } else if (task.taskType === 'quiz') {
       // Quiz checks are validated above.
     } else if (type === 'scratch') {
       if (task.toolbox) {
@@ -74,14 +81,16 @@ function validateLesson(lesson) {
       }
     }
 
-    const carryFrom = task.taskType === 'quiz' ? null : type === 'scratch' ? task.carryBlocksFrom : task.carryCodeFrom
+    const carryFrom = task.taskType === 'quiz' || task.taskType === 'information' ? null : type === 'scratch' ? task.carryBlocksFrom : task.carryCodeFrom
     if (carryFrom != null) {
       const exists = tasks.some(t => t.id === carryFrom)
       if (!exists) errors.push(`Task ${n} references task ${carryFrom} for carry-through but that task does not exist`)
     }
 
     // Warnings
-    const hasStarter = task.taskType === 'quiz'
+    const hasStarter = task.taskType === 'information'
+      ? true
+      : task.taskType === 'quiz'
       ? task.options?.some(option => option.text?.trim())
       : type === 'python'
       ? !!task.starterCode
@@ -89,11 +98,13 @@ function validateLesson(lesson) {
         ? !!task.starterBlocks
         : task.starterFiles?.some(f => f.content.trim())
     if (!hasStarter) warnings.push(`Task ${n} has no starter code — students will start with an empty editor`)
-    const checkHasValue = task.taskType === 'quiz'
+    const checkHasValue = task.taskType === 'information'
+      ? false
+      : task.taskType === 'quiz'
       ? !!task.check?.value
       : type === 'scratch'
       ? !!task.check
-      : normalizeChecks(task.check).some(c => c.type === 'code_no_error' || c.type === 'output_not_empty' || c.value)
+      : normalizeChecks(task.check).some(c => c.type === 'code_no_error' || c.type === 'output_not_empty' || c.type === 'element_exists' || c.value)
     if (checkHasValue && !task._checkTested)
       warnings.push(`Task ${n} has a completion check that hasn't been tested — run the task to verify it`)
   })
@@ -101,9 +112,28 @@ function validateLesson(lesson) {
   return { errors, warnings }
 }
 
+function normalizeTaskForExport(task, index) {
+  const hints = Array.isArray(task.hints) ? task.hints.map(h => String(h ?? '').trim()).filter(Boolean) : []
+
+  if (task.taskType !== 'information') {
+    const { hints: _hints, ...rest } = task
+    return hints.length > 0 ? { ...rest, id: index + 1, hints } : { ...rest, id: index + 1 }
+  }
+
+  const exported = {
+    id: index + 1,
+    taskType: 'information',
+    title: task.title,
+    explainer: task.explainer ?? '',
+  }
+  if (hints.length > 0) exported.hints = hints
+  return exported
+}
+
 export default function BuilderView({ lesson, dirty, onUpdate, onNew, onMarkSaved }) {
   const [selectedTaskId, setSelectedTaskId] = useState(lesson.tasks[0]?.id ?? null)
   const [previewing, setPreviewing] = useState(false)
+  const [metaOpen, setMetaOpen] = useState(false)
 
   if (previewing) {
     return <PreviewView lesson={lesson} onClose={() => setPreviewing(false)} />
@@ -123,7 +153,7 @@ export default function BuilderView({ lesson, dirty, onUpdate, onNew, onMarkSave
     // Renumber task IDs sequentially
     const exported = {
       ...lesson,
-      tasks: lesson.tasks.map((t, i) => ({ ...t, id: i + 1 })),
+      tasks: lesson.tasks.map(normalizeTaskForExport),
     }
     const blob = new Blob([JSON.stringify(exported, null, 2)], { type: 'application/json' })
     const url  = URL.createObjectURL(blob)
@@ -223,10 +253,22 @@ export default function BuilderView({ lesson, dirty, onUpdate, onNew, onMarkSave
         </div>
       </header>
 
-      <div style={s.body}>
-        <aside style={s.metaPane}>
-          <LessonMetaPanel lesson={lesson} onUpdate={onUpdate} />
-          <ValidationPanel errors={errors} warnings={warnings} />
+      <div style={{ ...s.body, gridTemplateColumns: metaOpen ? '320px 280px minmax(0, 1fr)' : '40px 280px minmax(0, 1fr)' }}>
+        <aside style={metaOpen ? s.metaPane : s.metaPaneCollapsed}>
+          {metaOpen ? (
+            <LessonMetaPanel lesson={lesson} onUpdate={onUpdate} onCollapse={() => setMetaOpen(false)} />
+          ) : (
+            <div style={s.collapsedMetaStrip}>
+              <button
+                type="button"
+                style={s.expandMetaBtn}
+                onClick={() => setMetaOpen(true)}
+                title="Expand lesson details"
+              >
+                ›
+              </button>
+            </div>
+          )}
         </aside>
 
         <aside style={s.taskPane}>
@@ -252,6 +294,7 @@ export default function BuilderView({ lesson, dirty, onUpdate, onNew, onMarkSave
               onUpdate(prev => ({ ...prev, tasks: renumbered }))
             }}
           />
+          <ValidationPanel errors={errors} warnings={warnings} />
         </aside>
 
         <main style={s.main}>
@@ -279,40 +322,65 @@ export default function BuilderView({ lesson, dirty, onUpdate, onNew, onMarkSave
 }
 
 function ValidationPanel({ errors, warnings }) {
+  const [open, setOpen] = useState(errors.length > 0)
   const [activeTab, setActiveTab] = useState(errors.length ? 'errors' : 'warnings')
+
+  const total = errors.length + warnings.length
+  const summaryParts = []
+  if (errors.length) summaryParts.push(`${errors.length} error${errors.length !== 1 ? 's' : ''}`)
+  if (warnings.length) summaryParts.push(`${warnings.length} warning${warnings.length !== 1 ? 's' : ''}`)
+  const summary = summaryParts.join(', ') || 'No issues'
+
   const items = activeTab === 'errors' ? errors : warnings
   const count = activeTab === 'errors' ? errors.length : warnings.length
 
   return (
     <section style={s.validation}>
-      <div style={s.validationTabs}>
-        <button
-          style={{ ...s.validationTab, ...(activeTab === 'errors' ? s.validationTabActive : {}) }}
-          onClick={() => setActiveTab('errors')}
-        >
-          Errors <span style={s.countBadge}>{errors.length}</span>
-        </button>
-        <button
-          style={{ ...s.validationTab, ...(activeTab === 'warnings' ? s.validationTabActive : {}) }}
-          onClick={() => setActiveTab('warnings')}
-        >
-          Warnings <span style={s.countBadge}>{warnings.length}</span>
-        </button>
-      </div>
+      <button
+        type="button"
+        style={s.validationHeader}
+        onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+      >
+        <span style={s.validationHeaderTitle}>Validation</span>
+        <span style={{ ...s.validationSummary, color: errors.length ? '#ef4444' : warnings.length ? '#f59e0b' : '#22c55e' }}>
+          {summary}
+        </span>
+        <span style={{ ...s.optionsChevron, transform: open ? 'rotate(180deg)' : 'none' }}>▾</span>
+      </button>
 
-      <div style={s.validationBody}>
-        {count === 0 ? (
-          <p style={s.validationEmpty}>
-            No {activeTab === 'errors' ? 'errors' : 'warnings'} found.
-          </p>
-        ) : (
-          items.map((item, i) => (
-            <div key={`${activeTab}-${i}`} style={activeTab === 'errors' ? s.errorItem : s.warningItem}>
-              {item}
-            </div>
-          ))
-        )}
-      </div>
+      {open && (
+        <>
+          <div style={s.validationTabs}>
+            <button
+              style={{ ...s.validationTab, ...(activeTab === 'errors' ? s.validationTabActive : {}) }}
+              onClick={() => setActiveTab('errors')}
+            >
+              Errors <span style={s.countBadge}>{errors.length}</span>
+            </button>
+            <button
+              style={{ ...s.validationTab, ...(activeTab === 'warnings' ? s.validationTabActive : {}) }}
+              onClick={() => setActiveTab('warnings')}
+            >
+              Warnings <span style={s.countBadge}>{warnings.length}</span>
+            </button>
+          </div>
+
+          <div style={s.validationBody}>
+            {count === 0 ? (
+              <p style={s.validationEmpty}>
+                No {activeTab === 'errors' ? 'errors' : 'warnings'} found.
+              </p>
+            ) : (
+              items.map((item, i) => (
+                <div key={`${activeTab}-${i}`} style={activeTab === 'errors' ? s.errorItem : s.warningItem}>
+                  {item}
+                </div>
+              ))
+            )}
+          </div>
+        </>
+      )}
     </section>
   )
 }
@@ -355,6 +423,54 @@ const s = {
     display: 'flex',
     flexDirection: 'column',
   },
+  metaPaneCollapsed: {
+    background: '#fff',
+    borderRight: '1px solid #e5e7eb',
+    overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+  },
+  collapsedMetaStrip: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 10,
+    paddingTop: 10,
+    width: '100%',
+  },
+  expandMetaBtn: {
+    width: 28,
+    height: 28,
+    border: '1px solid #e5e7eb',
+    borderRadius: 6,
+    background: '#fff',
+    color: 'var(--colour-primary)',
+    cursor: 'pointer',
+    fontSize: '1.15rem',
+    fontWeight: 700,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    lineHeight: 1,
+    padding: 0,
+  },
+  collapsedErrorDot: {
+    width: 10,
+    height: 10,
+    borderRadius: '50%',
+    background: '#ef4444',
+    display: 'block',
+    flexShrink: 0,
+  },
+  collapsedWarningDot: {
+    width: 10,
+    height: 10,
+    borderRadius: '50%',
+    background: '#f59e0b',
+    display: 'block',
+    flexShrink: 0,
+  },
   taskPane: {
     background: '#fff',
     borderRight: '1px solid #e5e7eb',
@@ -382,7 +498,40 @@ const s = {
     borderTop: '1px solid #e5e7eb',
     display: 'flex',
     flexDirection: 'column',
-    minHeight: 180,
+    flexShrink: 0,
+  },
+  validationHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    padding: '10px 14px',
+    background: '#fafafa',
+    border: 'none',
+    cursor: 'pointer',
+    textAlign: 'left',
+    width: '100%',
+  },
+  validationHeaderTitle: {
+    fontFamily: 'var(--font-body)',
+    fontWeight: 700,
+    fontSize: '0.82rem',
+    color: 'var(--colour-text)',
+    flexShrink: 0,
+  },
+  validationSummary: {
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.8rem',
+    flex: 1,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  optionsChevron: {
+    marginLeft: 'auto',
+    color: '#6b7280',
+    fontSize: '1rem',
+    lineHeight: 1,
+    flexShrink: 0,
   },
   validationTabs: {
     display: 'grid',

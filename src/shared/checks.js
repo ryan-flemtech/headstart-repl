@@ -47,6 +47,11 @@ export function evaluateSingleCheck(check, output, context = {}) {
     return normalizeOutput(output).length > 0
   }
 
+  if (check.type === 'element_exists') {
+    if (!context.iframeDoc || !check.selector) return false
+    try { return context.iframeDoc.querySelectorAll(check.selector).length > 0 } catch { return false }
+  }
+
   if (check.value == null) return false
 
   if (check.type === 'answer_equals') {
@@ -71,11 +76,6 @@ export function evaluateSingleCheck(check, output, context = {}) {
 
   if (check.type === 'code_equals') {
     return normalizeExactOutput(context.code ?? '') === normalizeExactOutput(check.value)
-  }
-
-  if (check.type === 'element_exists') {
-    if (!context.iframeDoc || !check.selector) return false
-    try { return context.iframeDoc.querySelectorAll(check.selector).length > 0 } catch { return false }
   }
 
   if (check.type === 'element_count') {

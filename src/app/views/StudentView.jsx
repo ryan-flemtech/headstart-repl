@@ -10,6 +10,7 @@ import NameEntry from '../components/NameEntry'
 import WaitingRoom from '../components/WaitingRoom'
 import TaskProgressDots from '../components/TaskProgressDots'
 import ExplainerPanel from '../components/ExplainerPanel'
+import HintPanel from '../components/HintPanel'
 import PythonEditor from '../components/PythonEditor'
 import HtmlEditor from '../components/HtmlEditor'
 import OutputPanel from '../components/OutputPanel'
@@ -95,7 +96,8 @@ function TaskSlideTransition({ transitionKey, children, style }) {
   )
 }
 
-export default function StudentView({ lessonId, soloMode = false }) {
+export default function StudentView({ lessonId: lessonIdProp, soloMode = false, lesson: lessonProp = null }) {
+  const lessonId = lessonIdProp ?? lessonProp?.id ?? 'preview'
   const { session, loading: sessionLoading, registerPresence, joinSession, writeStudentRun, writeStudentCode, writeStudentFiles, writeStudentOutput } = useSession(lessonId)
   const { identity, loaded: identityLoaded, createIdentity, updateTimestamp, updateDisplayName } = useIdentity()
 
@@ -119,6 +121,8 @@ export default function StudentView({ lessonId, soloMode = false }) {
   const [selectedAnswer, setSelectedAnswer] = useState('')
   const [scratchSandboxProject, setScratchSandboxProject] = useState(null)
   const [scratchExternalState, setScratchExternalState] = useState(null)
+  const [hintModalOpen, setHintModalOpen] = useState(false)
+  const [viewedHintIndexes, setViewedHintIndexes] = useState([])
   const isMobile = useIsMobile()
   const iframeRef = useRef(null)
   const appendOutputRef = useRef(null)
@@ -149,7 +153,7 @@ export default function StudentView({ lessonId, soloMode = false }) {
     if (!id || !currentLesson) return
 
     const task = currentLesson.tasks?.find(t => t.id === taskId)
-    if (task?.taskType === 'quiz') return
+    if (task?.taskType === 'quiz' || task?.taskType === 'information') return
 
     if (currentLesson.type === 'python') {
       saveCode(lessonId, taskId, id.anonymousId, {
@@ -163,14 +167,19 @@ export default function StudentView({ lessonId, soloMode = false }) {
     // Scratch: blocks are saved immediately in handleScratchChange — no snapshot needed
   }
 
-  // Load lesson JSON
+  // Load lesson JSON (or use lessonProp directly when provided by builder preview)
   useEffect(() => {
+    if (lessonProp != null) {
+      setLesson(lessonProp)
+      setLessonLoading(false)
+      return
+    }
     const base = import.meta.env.BASE_URL
     fetch(`${base}lessons/${lessonId}.json`)
       .then(r => r.json())
       .then(data => { setLesson(data); setLessonLoading(false) })
       .catch(() => setLessonLoading(false))
-  }, [lessonId])
+  }, [lessonId, lessonProp])
 
   useEffect(() => {
     if (lesson?.type === 'html') setHtmlPreviewCollapsed(true)
@@ -297,6 +306,8 @@ export default function StudentView({ lessonId, soloMode = false }) {
       setCheckPassed(false)
       setCheckAttempted(false)
       setSelectedAnswer('')
+      setHintModalOpen(false)
+      setViewedHintIndexes([])
       loadTaskContent(session.currentTaskId)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -381,7 +392,7 @@ export default function StudentView({ lessonId, soloMode = false }) {
     if (!lesson || !identity) return
     const task = lesson.tasks.find(t => t.id === taskId)
     if (!task) return
-    if (task.taskType === 'quiz') {
+    if (task.taskType === 'quiz' || task.taskType === 'information') {
       setCode('')
       setFiles([])
       setActiveFile('')
@@ -482,8 +493,12 @@ export default function StudentView({ lessonId, soloMode = false }) {
   function handleSoloNavigate(taskId) {
     if (!identity) return
     const currentTask = lesson?.tasks.find(t => t.id === currentTaskId)
+    if (phase === 'solo' && taskId > currentTaskId) {
+      const canAdvance = !currentTask?.check || currentTask?.taskType === 'information' || checkPassed
+      if (!canAdvance || taskId > currentTaskId + 1) return
+    }
     // Persist current editing state before leaving the task
-    if (currentTask?.taskType === 'quiz') {
+    if (currentTask?.taskType === 'quiz' || currentTask?.taskType === 'information') {
       // Quiz answers are not local editor work.
     } else if (lesson?.type === 'python') {
       saveCode(lessonId, currentTaskId, identity.anonymousId, { code, output, runStatus })
@@ -497,8 +512,41 @@ export default function StudentView({ lessonId, soloMode = false }) {
     setCheckPassed(false)
     setCheckAttempted(false)
     setSelectedAnswer('')
+    setHintModalOpen(false)
+    setViewedHintIndexes([])
     setIframeSrc(null)
     setCurrentTaskId(taskId)
+  }
+
+  function handleShowCompleteCode() {
+    if (!identity) return
+    const task = lesson?.tasks.find(t => t.id === currentTaskId)
+    if (!task) return
+
+    if (lesson.type === 'python') {
+      const completeCode = task.completeCode ?? ''
+      setCode(completeCode)
+      setOutput('')
+      setRunStatus(null)
+      setCheckPassed(true)
+      setCheckAttempted(false)
+      saveCode(lessonId, currentTaskId, identity.anonymousId, { code: completeCode, output: '', runStatus: null })
+    } else if (lesson.type === 'html') {
+      const completeFiles = (task.completeFiles ?? []).map(f => ({ ...f }))
+      setFiles(completeFiles)
+      setActiveFile(task.completeEntryFile ?? task.entryFile ?? completeFiles[0]?.name ?? '')
+      setIframeSrc(null)
+      setRunStatus(null)
+      setCheckPassed(true)
+      setCheckAttempted(false)
+      completeFiles.forEach(f => saveFile(lessonId, currentTaskId, f.name, identity.anonymousId, f.content))
+    } else if (lesson.type === 'scratch') {
+      const completeBlocks = task.completeBlocks ?? null
+      setScratchExternalState(completeBlocks)
+      setCheckPassed(true)
+      setCheckAttempted(false)
+      if (completeBlocks) saveCode(lessonId, currentTaskId, identity.anonymousId, { state: completeBlocks })
+    }
   }
 
   async function handleRun() {
@@ -510,6 +558,7 @@ export default function StudentView({ lessonId, soloMode = false }) {
     setOutput('')
     setRunStatus(null)
     setCheckPassed(false)
+    setHintModalOpen(false)
     setCheckAttempted(false)
 
     if (lesson.type === 'python') {
@@ -688,7 +737,7 @@ export default function StudentView({ lessonId, soloMode = false }) {
 
   // ─── Render helpers ────────────────────────────────────────────────────────
 
-  if (phase === 'loading' || sessionLoading || lessonLoading || !identityLoaded) {
+  if (phase === 'loading' || (!soloMode && sessionLoading) || lessonLoading || !identityLoaded) {
     return <LoadingScreen message="Loading…" />
   }
 
@@ -748,13 +797,29 @@ export default function StudentView({ lessonId, soloMode = false }) {
   const isSandbox = phase === 'sandbox'
   const isSolo = phase === 'solo'
   const isQuizTask = task?.taskType === 'quiz'
+  const isInformationTask = task?.taskType === 'information'
+  const visibleHint = session?.visibleHint?.taskId === currentTaskId ? session.visibleHint : null
+  const currentTask = lesson.tasks.find(t => t.id === currentTaskId)
+  const canAdvanceSolo = !currentTask?.check || currentTask?.taskType === 'information' || checkPassed
+  const hasCompleteSolution = lesson.type === 'python'
+    ? !!task?.completeCode
+    : lesson.type === 'scratch'
+    ? !!task?.completeBlocks
+    : (task?.completeFiles?.length > 0)
+  const taskHints = Array.isArray(task?.hints) ? task.hints.map(h => String(h ?? '').trim()).filter(Boolean) : []
+  const hasHints = taskHints.length > 0
+  const allHintsViewed = taskHints.length === 0 || viewedHintIndexes.length >= taskHints.length
   const taskContentStyle = isQuizTask
     ? styles.taskContentQuiz
+    : isInformationTask
+    ? styles.taskContentInfo
     : lesson.type === 'python' || lesson.type === 'html'
     ? styles.taskContentScroll
     : styles.taskContent
   const editorAreaStyle = isQuizTask
     ? styles.editorAreaQuiz
+    : isInformationTask
+    ? styles.editorAreaInfo
     : lesson.type === 'scratch'
     ? styles.editorAreaScratch
     : lesson.type === 'python' || lesson.type === 'html'
@@ -786,6 +851,7 @@ export default function StudentView({ lessonId, soloMode = false }) {
               currentTaskId={currentTaskId}
               viewingTaskId={viewingTaskId}
               isSolo={isSolo}
+              canSelectTask={id => !isSolo || id <= currentTaskId || (id === currentTaskId + 1 && canAdvanceSolo)}
               onDotClick={id => {
                 if (isSolo) {
                   if (id !== currentTaskId) handleSoloNavigate(id)
@@ -797,6 +863,12 @@ export default function StudentView({ lessonId, soloMode = false }) {
           )
         }
       />
+
+      {!isSandbox && task?.title && (
+        <div style={styles.taskTitleHeader}>
+          {task.title}
+        </div>
+      )}
 
       {isViewingPrev && (
         <div style={styles.prevBanner}>
@@ -811,13 +883,28 @@ export default function StudentView({ lessonId, soloMode = false }) {
         </div>
       )}
 
-      <div style={isSolo && isQuizTask ? { ...styles.body, overflow: 'hidden' } : styles.body}>
+      <div style={isSolo && (isQuizTask || isInformationTask) ? { ...styles.body, overflow: 'hidden' } : styles.body}>
         <TaskSlideTransition
           transitionKey={`${phase}-${viewingTaskId ?? currentTaskId}`}
           style={taskContentStyle}
         >
-          {task?.explainer && !isSandbox && !isQuizTask && (
+          {task?.explainer && !isSandbox && !isQuizTask && !isInformationTask && (
             <ExplainerPanel title={task.title} content={task.explainer} />
+          )}
+          {isSolo && !isSandbox && (
+            <HintPanel
+              hints={task?.hints}
+              mode="solo"
+              open={hintModalOpen}
+              viewedHintIndexes={viewedHintIndexes}
+              hasCompleteSolution={hasCompleteSolution}
+              onShowComplete={handleShowCompleteCode}
+              onViewHint={index => setViewedHintIndexes(prev => prev.includes(index) ? prev : [...prev, index])}
+              onClose={() => setHintModalOpen(false)}
+            />
+          )}
+          {!isSandbox && !isSolo && !isViewingPrev && (
+            <HintPanel hints={task?.hints} mode="live" visibleHint={visibleHint} />
           )}
 
         <div style={editorAreaStyle}>
@@ -825,9 +912,13 @@ export default function StudentView({ lessonId, soloMode = false }) {
             <CheckFeedbackBanner
               passed={checkPassed}
               failureMessage={isQuizTask ? 'Wrong answer, try again.' : undefined}
+              onHintsClick={isSolo && hasHints && !allHintsViewed ? () => setHintModalOpen(true) : undefined}
+              onShowCompleteCode={isSolo && hasCompleteSolution && allHintsViewed ? handleShowCompleteCode : undefined}
             />
           )}
-          {task?.taskType === 'quiz' ? (
+          {isInformationTask ? (
+            <ExplainerPanel title={task.title} content={task.explainer ?? ''} collapsible={false} fill />
+          ) : task?.taskType === 'quiz' ? (
             <QuizTask
               task={task}
               showQuestion
@@ -877,6 +968,40 @@ export default function StudentView({ lessonId, soloMode = false }) {
           })()
           : lesson.type === 'python' ? (
             <>
+              {!isViewingPrev && (
+                <div style={styles.studentEditorHeader} className="ui-tabs ui-tabs--editor">
+                  <span style={styles.studentEditorTitle}>Code</span>
+                  <div style={styles.studentEditorActions}>
+                    {task?.interactionMode === 'submit' ? (
+                      <button
+                        className="btn-primary"
+                        style={styles.studentEditorPrimaryBtn}
+                        onClick={handleSubmit}
+                      >
+                        Submit
+                      </button>
+                    ) : (
+                      <button
+                        className={running ? 'btn-danger' : 'btn-primary'}
+                        style={styles.studentEditorPrimaryBtn}
+                        onClick={running ? handleStop : handleRun}
+                        disabled={!running && pyodideStatus === 'loading'}
+                      >
+                        {running ? 'Stop' : pyodideStatus === 'loading' ? 'Getting Python ready…' : 'Run'}
+                      </button>
+                    )}
+                    <button
+                      className="btn-ghost-outline"
+                      style={styles.resetBtn}
+                      onClick={handleResetCode}
+                      disabled={running}
+                      title="Reset code to the starter code for this task"
+                    >
+                      Reset Code
+                    </button>
+                  </div>
+                </div>
+              )}
               <PythonEditor
                 code={isViewingPrev ? (loadSavedCode(lessonId, viewingTaskId, identity?.anonymousId)?.code ?? '') : code}
                 readOnly={isViewingPrev}
@@ -886,13 +1011,6 @@ export default function StudentView({ lessonId, soloMode = false }) {
               {!isViewingPrev && (
                 task?.interactionMode === 'submit' ? (
                   <>
-                    <button
-                      className="btn-primary"
-                      style={{ margin: '8px 0', alignSelf: 'flex-start', padding: '10px 28px', fontSize: 15 }}
-                      onClick={handleSubmit}
-                    >
-                      Submit
-                    </button>
                     {runStatus === 'submitted' && (
                       task?.check
                         ? null
@@ -901,29 +1019,6 @@ export default function StudentView({ lessonId, soloMode = false }) {
                   </>
                 ) : (
                   <>
-                    <div style={styles.buttonRow}>
-                      <button
-                        className="btn-primary"
-                        style={{
-                          padding: '10px 28px',
-                          fontSize: 15,
-                          ...(running ? { backgroundColor: '#ef4444', borderColor: '#ef4444' } : {}),
-                        }}
-                        onClick={running ? handleStop : handleRun}
-                        disabled={!running && pyodideStatus === 'loading'}
-                      >
-                        {running ? 'Stop' : pyodideStatus === 'loading' ? 'Getting Python ready…' : 'Run'}
-                      </button>
-                      <button
-                        className="btn-ghost-outline"
-                        style={styles.resetBtn}
-                        onClick={handleResetCode}
-                        disabled={running}
-                        title="Reset code to the starter code for this task"
-                      >
-                        Reset Code
-                      </button>
-                    </div>
                     <OutputPanel
                       output={output}
                       runStatus={runStatus}
@@ -948,27 +1043,16 @@ export default function StudentView({ lessonId, soloMode = false }) {
             </>
           ) : isMobile ? (
             <div style={styles.htmlMobile}>
-              {!isViewingPrev && (
-                <div style={styles.htmlMobileButtonRow}>
-                  <button
-                    className="btn-primary"
-                    style={{ padding: '10px 28px', fontSize: 15, flexShrink: 0 }}
-                    onClick={task?.interactionMode === 'submit' ? handleSubmit : handleRun}
-                    disabled={running}
-                  >
-                    {task?.interactionMode === 'submit' ? 'Submit' : running ? 'Running…' : 'Run'}
-                  </button>
-                  <button
-                    className="btn-ghost-outline"
-                    style={styles.resetBtn}
-                    onClick={handleResetCode}
-                    title="Reset code to the starter code for this task"
-                  >
-                    Reset Code
-                  </button>
-                </div>
-              )}
               <div style={styles.htmlLeft}>
+                {!isViewingPrev && (
+                  <StudentEditorHeader
+                    task={task}
+                    running={running}
+                    onRun={handleRun}
+                    onSubmit={handleSubmit}
+                    onReset={handleResetCode}
+                  />
+                )}
                 <HtmlEditor
                   files={files}
                   activeFile={activeFile}
@@ -995,26 +1079,6 @@ export default function StudentView({ lessonId, soloMode = false }) {
             </div>
           ) : (
             <>
-            {!isViewingPrev && (
-              <div style={styles.htmlMobileButtonRow}>
-                <button
-                  className="btn-primary"
-                  style={{ padding: '10px 28px', fontSize: 15, flexShrink: 0 }}
-                  onClick={task?.interactionMode === 'submit' ? handleSubmit : handleRun}
-                  disabled={running}
-                >
-                  {task?.interactionMode === 'submit' ? 'Submit' : running ? 'Running…' : 'Run'}
-                </button>
-                <button
-                  className="btn-ghost-outline"
-                  style={styles.resetBtn}
-                  onClick={handleResetCode}
-                  title="Reset code to the starter code for this task"
-                >
-                  Reset Code
-                </button>
-              </div>
-            )}
             <SplitPane
               style={styles.htmlSplitPane}
               rightCollapsed={htmlPreviewCollapsed}
@@ -1028,6 +1092,15 @@ export default function StudentView({ lessonId, soloMode = false }) {
               }
               left={
                 <div style={styles.htmlLeft}>
+                  {!isViewingPrev && (
+                    <StudentEditorHeader
+                      task={task}
+                      running={running}
+                      onRun={handleRun}
+                      onSubmit={handleSubmit}
+                      onReset={handleResetCode}
+                    />
+                  )}
                   <HtmlEditor
                     files={files}
                     activeFile={activeFile}
@@ -1082,7 +1155,7 @@ export default function StudentView({ lessonId, soloMode = false }) {
         </div>
         </TaskSlideTransition>
         {isSolo && (
-          <div style={isQuizTask ? styles.soloNavStatic : styles.soloNav}>
+          <div style={isQuizTask || isInformationTask ? styles.soloNavStatic : styles.soloNav}>
             <button
               className="btn-secondary"
               style={styles.soloNavBtn}
@@ -1098,12 +1171,13 @@ export default function StudentView({ lessonId, soloMode = false }) {
               className={`btn-secondary${checkPassed && currentTaskId < lesson.tasks.length ? ' btn-next-success' : ''}`}
               style={{
                 ...styles.soloNavBtn,
-                ...(checkPassed && currentTaskId < lesson.tasks.length
+                ...(canAdvanceSolo && currentTaskId < lesson.tasks.length
                   ? { fontSize: 18, padding: '14px 36px' }
                   : {}),
               }}
-              disabled={currentTaskId >= lesson.tasks.length}
+              disabled={currentTaskId >= lesson.tasks.length || !canAdvanceSolo}
               onClick={() => handleSoloNavigate(currentTaskId + 1)}
+              title={!canAdvanceSolo ? 'Pass the completion check before moving on' : 'Next task'}
             >
               Next
             </button>
@@ -1118,6 +1192,34 @@ function LoadingScreen({ message }) {
   return (
     <div style={styles.centreScreen}>
       <p style={{ color: 'var(--colour-text)', fontFamily: 'var(--font-body)' }}>{message}</p>
+    </div>
+  )
+}
+
+function StudentEditorHeader({ task, running, onRun, onSubmit, onReset }) {
+  const isSubmit = task?.interactionMode === 'submit'
+
+  return (
+    <div style={styles.studentEditorHeader} className="ui-tabs ui-tabs--editor">
+      <span style={styles.studentEditorTitle}>Code</span>
+      <div style={styles.studentEditorActions}>
+        <button
+          className="btn-primary"
+          style={styles.studentEditorPrimaryBtn}
+          onClick={isSubmit ? onSubmit : onRun}
+          disabled={running}
+        >
+          {isSubmit ? 'Submit' : running ? 'Running…' : 'Run'}
+        </button>
+        <button
+          className="btn-ghost-outline"
+          style={styles.resetBtn}
+          onClick={onReset}
+          title="Reset code to the starter code for this task"
+        >
+          Reset Code
+        </button>
+      </div>
     </div>
   )
 }
@@ -1153,6 +1255,13 @@ const styles = {
     minHeight: 0,
     overflow: 'hidden',
   },
+  taskContentInfo: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    minHeight: 0,
+    overflow: 'hidden',
+  },
   editorArea: {
     flex: 1,
     display: 'flex',
@@ -1165,6 +1274,13 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     gap: '8px',
+    minHeight: 0,
+    overflow: 'hidden',
+  },
+  editorAreaInfo: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
     minHeight: 0,
     overflow: 'hidden',
   },
@@ -1201,6 +1317,29 @@ const styles = {
     margin: '0 0 4px',
     flexShrink: 0,
   },
+  studentEditorHeader: {
+    flexShrink: 0,
+  },
+  studentEditorTitle: {
+    fontFamily: 'var(--font-body)',
+    fontWeight: 700,
+    fontSize: '0.86rem',
+    color: 'var(--colour-primary)',
+    padding: '0 10px',
+  },
+  studentEditorActions: {
+    marginLeft: 'auto',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    paddingLeft: 8,
+    flexWrap: 'wrap',
+  },
+  studentEditorPrimaryBtn: {
+    padding: '7px 18px',
+    fontSize: 13,
+    flexShrink: 0,
+  },
   resetBtn: {
     fontSize: 14,
     padding: '9px 20px',
@@ -1218,7 +1357,7 @@ const styles = {
     flex: 1,
     minHeight: 420,
     overflow: 'visible',
-    gap: 8,
+    gap: 0,
     paddingBottom: 4,
   },
   htmlMobile: {
@@ -1254,6 +1393,16 @@ const styles = {
     fontWeight: 700,
     fontSize: '1.5rem',
     color: 'var(--colour-primary)',
+  },
+  taskTitleHeader: {
+    background: 'var(--colour-primary-dark)',
+    color: '#fff',
+    fontFamily: 'var(--font-title)',
+    fontWeight: 700,
+    fontSize: '1.1rem',
+    padding: '10px 16px',
+    letterSpacing: '0.04em',
+    flexShrink: 0,
   },
   prevBanner: {
     background: 'rgba(239,68,68,0.08)',

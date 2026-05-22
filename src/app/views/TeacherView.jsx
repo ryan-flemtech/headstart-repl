@@ -12,6 +12,7 @@ import CollapsibleIframePreview from '../components/CollapsibleIframePreview'
 import ScratchWorkspace from '../components/ScratchWorkspace'
 import SplitPane from '../../shared/SplitPane'
 import ExplainerPanel from '../components/ExplainerPanel'
+import HintPanel from '../components/HintPanel'
 import StudentGrid from '../components/StudentGrid'
 import QuizTask from '../components/QuizTask'
 
@@ -58,7 +59,7 @@ export default function TeacherView({ lessonId }) {
     session, loading,
     createSession, restartSession, startSession, endSession,
     setTaskId, enterSandbox, exitSandbox, pushSandboxCode, pushSandboxFiles,
-    setPaused, setActiveStudentView, renameStudent, removeStudent, pushResetToStudent,
+    setPaused, setActiveStudentView, setVisibleHint, renameStudent, removeStudent, pushResetToStudent,
   } = useSession(lessonId)
 
   const [lesson, setLesson]             = useState(null)
@@ -111,7 +112,7 @@ export default function TeacherView({ lessonId }) {
     if (!lesson) return
     const task = lesson.tasks.find(t => t.id === taskId)
     if (!task) return
-    if (task.taskType === 'quiz') {
+    if (task.taskType === 'quiz' || task.taskType === 'information') {
       setCode('')
       setFiles([])
       setActiveFile('')
@@ -254,6 +255,19 @@ export default function TeacherView({ lessonId }) {
     await setTaskId(taskId)
   }
 
+  async function handleRevealHint(hint) {
+    if (!hint) {
+      await setVisibleHint(null)
+      return
+    }
+    await setVisibleHint({
+      taskId: currentTaskId,
+      index: hint.index,
+      content: hint.content,
+      shownAt: Date.now(),
+    })
+  }
+
   function handleEnterSandbox() {
     if (lesson.type === 'python') {
       setCode(getSandboxStarterCode())
@@ -352,6 +366,8 @@ export default function TeacherView({ lessonId }) {
   const isInSandbox = isSandbox || sandboxStaging
   const task = lesson?.tasks.find(t => t.id === currentTaskId)
   const showingComplete = teacherCodeTab === 'complete' && !isInSandbox
+  const isInformationTask = task?.taskType === 'information'
+  const visibleHint = session?.visibleHint?.taskId === currentTaskId ? session.visibleHint : null
   const students = session ? Object.entries(session.students ?? {}).map(([id, s]) => ({ ...s, anonymousId: id })) : []
 
   if (lessonLoading || !lesson) {
@@ -457,6 +473,10 @@ export default function TeacherView({ lessonId }) {
         }
       />
 
+      {!isInSandbox && task?.title && (
+        <div style={s.taskTitleHeader}>{task.title}</div>
+      )}
+
       <div style={{ ...s.body, gridTemplateColumns: `${leftCollapsed ? '40px' : '220px'} 1fr ${rightCollapsed ? '40px' : '280px'}` }}>
         {/* Left — Task Navigator */}
         <aside style={s.left}>
@@ -475,9 +495,18 @@ export default function TeacherView({ lessonId }) {
         </aside>
 
         {/* Centre — Teacher Editor */}
-        <main style={{ ...s.centre, ...(lesson.type === 'html' || lesson.type === 'scratch' ? { overflow: 'hidden' } : {}) }}>
-          {task?.explainer && !isInSandbox && task?.taskType !== 'quiz' && (
+        <main style={{ ...s.centre, ...(isInformationTask || lesson.type === 'html' || lesson.type === 'scratch' ? { overflow: 'hidden' } : {}) }}>
+          {task?.explainer && !isInSandbox && task?.taskType !== 'quiz' && !isInformationTask && (
             <ExplainerPanel title={task.title} content={task.explainer} />
+          )}
+
+          {!isInSandbox && (
+            <HintPanel
+              hints={task?.hints}
+              mode="teacher"
+              visibleHint={visibleHint}
+              onReveal={handleRevealHint}
+            />
           )}
 
           {isInSandbox && (
@@ -519,24 +548,44 @@ export default function TeacherView({ lessonId }) {
             </div>
           )}
 
-          {!isInSandbox && task?.taskType !== 'quiz' && (lesson.type === 'python' || lesson.type === 'html') && (
-            <div style={s.codeTabStrip}>
+          {!isInSandbox && task?.taskType !== 'quiz' && !isInformationTask && (lesson.type === 'python' || lesson.type === 'html') && (
+            <div style={s.codeTabStrip} className="ui-tabs ui-tabs--editor" role="tablist" aria-label="Teacher code workspace">
               <button
+                type="button"
+                className="ui-tab"
+                role="tab"
+                aria-selected={teacherCodeTab === 'starter'}
                 style={{ ...s.codeTabBtn, ...(teacherCodeTab === 'starter' ? s.codeTabBtnActive : {}) }}
                 onClick={() => setTeacherCodeTab('starter')}
               >
-                Starter Code
+                Starter code
               </button>
               <button
+                type="button"
+                className="ui-tab"
+                role="tab"
+                aria-selected={teacherCodeTab === 'complete'}
                 style={{ ...s.codeTabBtn, ...(teacherCodeTab === 'complete' ? s.codeTabBtnActive : {}) }}
                 onClick={() => { setTeacherCodeTab('complete'); setActiveCompleteFile(task?.completeFiles?.[0]?.name ?? '') }}
               >
-                Complete Code
+                Complete code
               </button>
+              <div style={s.codeTabActions}>
+                <button
+                  className="btn-primary"
+                  onClick={handleRun}
+                  disabled={running || (lesson.type === 'python' && pyodideStatus === 'loading')}
+                  style={{ padding: '7px 18px', fontSize: 13 }}
+                >
+                  {running ? 'Running…' : 'Run'}
+                </button>
+              </div>
             </div>
           )}
 
-          {!isInSandbox && task?.taskType === 'quiz' ? (
+          {!isInSandbox && isInformationTask ? (
+            <ExplainerPanel title={task.title} content={task.explainer ?? ''} collapsible={false} fill />
+          ) : !isInSandbox && task?.taskType === 'quiz' ? (
             <QuizTask task={task} showQuestion disabled />
           ) : lesson.type === 'python' ? (
             <>
@@ -550,13 +599,15 @@ export default function TeacherView({ lessonId }) {
                 pyodideStatus={pyodideStatus}
               />
               <div style={{ display: 'flex', gap: 8 }}>
-                <button
-                  className="btn-primary"
-                  onClick={handleRun}
-                  disabled={running || pyodideStatus === 'loading'}
-                >
-                  {running ? 'Running…' : 'Run'}
-                </button>
+                {isInSandbox && (
+                  <button
+                    className="btn-primary"
+                    onClick={handleRun}
+                    disabled={running || pyodideStatus === 'loading'}
+                  >
+                    {running ? 'Running…' : 'Run'}
+                  </button>
+                )}
               </div>
               <OutputPanel
                 output={output}
@@ -611,13 +662,15 @@ export default function TeacherView({ lessonId }) {
                     assets={lesson.assets}
                   />
                   <div style={{ display: 'flex', gap: 8, flexShrink: 0, padding: '8px 0 4px' }}>
-                    <button
-                      className="btn-primary"
-                      onClick={handleRun}
-                      disabled={running}
-                    >
-                      {running ? 'Running…' : 'Run'}
-                    </button>
+                    {isInSandbox && (
+                      <button
+                        className="btn-primary"
+                        onClick={handleRun}
+                        disabled={running}
+                      >
+                        {running ? 'Running…' : 'Run'}
+                      </button>
+                    )}
                   </div>
                 </div>
               }
@@ -690,6 +743,16 @@ export default function TeacherView({ lessonId }) {
 }
 
 const s = {
+  taskTitleHeader: {
+    background: 'var(--colour-primary-dark)',
+    color: '#fff',
+    fontFamily: 'var(--font-title)',
+    fontWeight: 700,
+    fontSize: '1.1rem',
+    padding: '10px 16px',
+    letterSpacing: '0.04em',
+    flexShrink: 0,
+  },
   shareOverlay: {
     position: 'fixed',
     inset: 0,
@@ -813,6 +876,12 @@ const s = {
   codeTabBtnActive: {
     background: 'var(--colour-primary)',
     color: '#fff',
+  },
+  codeTabActions: {
+    marginLeft: 'auto',
+    display: 'flex',
+    alignItems: 'center',
+    paddingLeft: 8,
   },
   sandboxBanner: {
     display: 'flex',

@@ -14,6 +14,7 @@ export default function StudentCard({ student, lesson, lessonId, session, onRena
   const currentTask = lesson?.tasks?.find(t => t.id === session?.currentTaskId)
   const isSubmitMode = currentTask?.interactionMode === 'submit'
   const isQuiz = currentTask?.taskType === 'quiz'
+  const isInformation = currentTask?.taskType === 'information'
   const quizAnswerText = isQuiz ? getQuizOptionText(currentTask, student.currentAnswer) : ''
 
   const statusColour =
@@ -74,7 +75,11 @@ export default function StudentCard({ student, lesson, lessonId, session, onRena
       </div>
 
       {/* Output / preview snippet */}
-      {isQuiz ? (
+      {isInformation ? (
+        <div style={s.iframeThumb}>
+          <span style={{ color: '#6b7280', fontSize: 12 }}>Information task</span>
+        </div>
+      ) : isQuiz ? (
         <div style={s.quizAnswer}>
           {student.currentAnswer
             ? (
