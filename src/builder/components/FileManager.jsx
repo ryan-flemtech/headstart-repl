@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 
-const HTML_ONLY = `<!DOCTYPE html>
+export const HTML_ONLY = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">

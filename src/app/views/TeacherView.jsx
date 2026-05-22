@@ -13,6 +13,7 @@ import ScratchWorkspace from '../components/ScratchWorkspace'
 import SplitPane from '../../shared/SplitPane'
 import ExplainerPanel from '../components/ExplainerPanel'
 import StudentGrid from '../components/StudentGrid'
+import QuizTask from '../components/QuizTask'
 
 function resolveAssetsPath(rawPath) {
   if (!rawPath) return ''
@@ -42,13 +43,22 @@ function parseScratchState(raw) {
   try { return JSON.parse(raw) } catch { return null }
 }
 
+function cloneFiles(files = []) {
+  return files.map(file => ({ ...file }))
+}
+
+function cloneScratchState(state) {
+  if (!state) return null
+  return JSON.parse(JSON.stringify(state))
+}
+
 export default function TeacherView({ lessonId }) {
   const navigate = useNavigate()
   const {
     session, loading,
     createSession, restartSession, startSession, endSession,
-    setTaskId, enterSandbox, exitSandbox, pushSandboxCode,
-    setPaused, setActiveStudentView, renameStudent, removeStudent,
+    setTaskId, enterSandbox, exitSandbox, pushSandboxCode, pushSandboxFiles,
+    setPaused, setActiveStudentView, renameStudent, removeStudent, pushResetToStudent,
   } = useSession(lessonId)
 
   const [lesson, setLesson]             = useState(null)
@@ -70,9 +80,12 @@ export default function TeacherView({ lessonId }) {
   const [sandboxStaging, setSandboxStaging] = useState(false)
   const [scratchState, setScratchState] = useState(null)
   const [teacherCodeTab, setTeacherCodeTab] = useState('starter')
+  const [showSharePanel, setShowSharePanel] = useState(false)
+  const [copiedLink, setCopiedLink] = useState(null) // 'live' | 'solo' | null
   const [activeCompleteFile, setActiveCompleteFile] = useState('')
   const iframeRef = useRef(null)
   const appendOutputRef = useRef(null)
+  const sandboxDraftRef = useRef({ code: null, files: null, scratchState: null })
 
   // Load lesson JSON
   useEffect(() => {
@@ -98,6 +111,12 @@ export default function TeacherView({ lessonId }) {
     if (!lesson) return
     const task = lesson.tasks.find(t => t.id === taskId)
     if (!task) return
+    if (task.taskType === 'quiz') {
+      setCode('')
+      setFiles([])
+      setActiveFile('')
+      setScratchState(null)
+    } else
     if (lesson.type === 'python') {
       setCode(task.starterCode ?? '')
     } else if (lesson.type === 'scratch') {
@@ -112,30 +131,50 @@ export default function TeacherView({ lessonId }) {
     setIframeSrc(null)
   }
 
-  function getSandboxStarterCode() {
+  function getSandboxStarterCode({ preferDraft = true } = {}) {
     const task = lesson?.tasks.find(t => t.id === currentTaskId)
+    if (preferDraft && sandboxDraftRef.current.code != null) return sandboxDraftRef.current.code
     if (session?.state === 'sandbox' && session.sandboxCode != null) return session.sandboxCode
     if (lesson?.sandboxStarter != null) return lesson.sandboxStarter
     if (code) return code
     return task?.starterCode ?? ''
   }
 
-  function getSandboxStarterFiles() {
+  function getSandboxStarterFiles({ preferDraft = true } = {}) {
     const task = lesson?.tasks.find(t => t.id === currentTaskId)
+    if (preferDraft && sandboxDraftRef.current.files?.length > 0) return cloneFiles(sandboxDraftRef.current.files)
     const liveFiles = session?.state === 'sandbox' ? decodeSessionFiles(session.sandboxFiles) : []
-    if (liveFiles.length > 0) return liveFiles
-    if (lesson?.sandboxStarterFiles?.length > 0) return lesson.sandboxStarterFiles
-    if (files.length > 0) return files
-    return task?.starterFiles ?? []
+    if (liveFiles.length > 0) return cloneFiles(liveFiles)
+    if (lesson?.sandboxStarterFiles?.length > 0) return cloneFiles(lesson.sandboxStarterFiles)
+    if (files.length > 0) return cloneFiles(files)
+    return cloneFiles(task?.starterFiles ?? [])
   }
 
-  function getSandboxStarterScratch() {
+  function getSandboxStarterScratch({ preferDraft = true } = {}) {
     const task = lesson?.tasks.find(t => t.id === currentTaskId)
+    if (preferDraft && sandboxDraftRef.current.scratchState) return cloneScratchState(sandboxDraftRef.current.scratchState)
     if (session?.state === 'sandbox' && session.sandboxCode != null) {
       return parseScratchState(session.sandboxCode)
     }
     if (scratchState) return scratchState
     return task?.starterBlocks ?? null
+  }
+
+  function getSandboxConfiguredCode() {
+    const task = lesson?.tasks.find(t => t.id === currentTaskId)
+    return lesson?.sandboxStarter ?? task?.starterCode ?? ''
+  }
+
+  function getSandboxConfiguredFiles() {
+    const task = lesson?.tasks.find(t => t.id === currentTaskId)
+    if (lesson?.sandboxStarterFiles?.length > 0) return cloneFiles(lesson.sandboxStarterFiles)
+    return cloneFiles(task?.starterFiles ?? [])
+  }
+
+  function getSandboxConfiguredScratch() {
+    const task = lesson?.tasks.find(t => t.id === currentTaskId)
+    if (lesson?.sandboxStarter != null) return parseScratchState(lesson.sandboxStarter)
+    return cloneScratchState(task?.starterBlocks ?? null)
   }
 
   // Load task content when task changes
@@ -238,22 +277,51 @@ export default function TeacherView({ lessonId }) {
 
   async function handleGoLiveSandbox() {
     if (lesson.type === 'python') {
+      sandboxDraftRef.current.code = code
       await enterSandbox({ code })
     } else if (lesson.type === 'scratch') {
+      sandboxDraftRef.current.scratchState = cloneScratchState(scratchState)
       await enterSandbox({ code: JSON.stringify(scratchState ?? {}) })
     } else {
+      sandboxDraftRef.current.files = cloneFiles(files)
       await enterSandbox({ files })
     }
     setSandboxStaging(false)
   }
 
   async function handlePushScratchSandbox() {
+    sandboxDraftRef.current.scratchState = cloneScratchState(scratchState)
     await pushSandboxCode(JSON.stringify(scratchState ?? {}))
   }
 
+  async function handleResetSandboxStarter() {
+    setOutput('')
+    setRunStatus(null)
+    setIframeSrc(null)
 
+    if (lesson.type === 'python') {
+      const starterCode = getSandboxConfiguredCode()
+      sandboxDraftRef.current.code = starterCode
+      setCode(starterCode)
+      if (isSandbox) await pushSandboxCode(starterCode)
+    } else if (lesson.type === 'scratch') {
+      const starterScratch = getSandboxConfiguredScratch()
+      sandboxDraftRef.current.scratchState = cloneScratchState(starterScratch)
+      setScratchState(starterScratch)
+      if (isSandbox) await pushSandboxCode(JSON.stringify(starterScratch ?? {}))
+    } else {
+      const starterFiles = getSandboxConfiguredFiles()
+      sandboxDraftRef.current.files = cloneFiles(starterFiles)
+      setFiles(starterFiles)
+      setActiveFile(starterFiles[0]?.name ?? '')
+      if (isSandbox) await pushSandboxFiles(starterFiles)
+    }
+  }
 
   async function handleDeactivateSandbox() {
+    if (lesson.type === 'python') sandboxDraftRef.current.code = code
+    else if (lesson.type === 'scratch') sandboxDraftRef.current.scratchState = cloneScratchState(scratchState)
+    else sandboxDraftRef.current.files = cloneFiles(files)
     setSandboxStaging(false)
     await exitSandbox()
     loadCurrentTaskContent(currentTaskId)
@@ -265,10 +333,19 @@ export default function TeacherView({ lessonId }) {
     if (goHome) navigate('/')
   }
 
-  async function handleShareLink() {
-    const url = `${window.location.origin}${window.location.pathname}#/lesson/${lessonId}`
+  function getLessonLinks() {
+    const base = `${window.location.origin}${window.location.pathname}#/lesson/${lessonId}`
+    return {
+      live: `${base}?live=true`,
+      solo: base,
+    }
+  }
+
+  async function handleCopyLink(type) {
+    const url = getLessonLinks()[type]
     await navigator.clipboard.writeText(url).catch(() => {})
-    alert(`Share link copied!\n${url}`)
+    setCopiedLink(type)
+    setTimeout(() => setCopiedLink(null), 2000)
   }
 
   const isSandbox = session?.state === 'sandbox'
@@ -315,9 +392,43 @@ export default function TeacherView({ lessonId }) {
             <span style={{ fontSize: 13, opacity: 0.85 }}>
               {session ? `Session: ${session.state}` : 'No session'}
             </span>
-            <button className="btn-ghost" style={{ fontSize: 13, padding: '5px 12px' }} onClick={handleShareLink}>
-              Share Link
-            </button>
+            <div style={{ position: 'relative' }}>
+              <button
+                className="btn-ghost"
+                style={{ fontSize: 13, padding: '5px 12px' }}
+                onClick={() => setShowSharePanel(v => !v)}
+              >
+                Share Links
+              </button>
+              {showSharePanel && (
+                <>
+                  <div style={s.shareOverlay} onClick={() => setShowSharePanel(false)} />
+                  <div style={s.sharePanel}>
+                    <span style={s.sharePanelTitle}>Share lesson links</span>
+                    {(['live', 'solo']).map(type => {
+                      const links = getLessonLinks()
+                      return (
+                        <div key={type} style={s.shareLinkRow}>
+                          <div style={s.shareLinkInfo}>
+                            <span style={s.shareLinkType}>
+                              {type === 'live' ? 'Live (with teacher)' : 'Solo (practice)'}
+                            </span>
+                            <span style={s.shareLinkUrl}>{links[type]}</span>
+                          </div>
+                          <button
+                            className="btn-secondary"
+                            style={s.shareCopyBtn}
+                            onClick={() => handleCopyLink(type)}
+                          >
+                            {copiedLink === type ? 'Copied!' : 'Copy'}
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
             {session?.state === 'waiting' && (
               <button className="btn-primary" style={{ fontSize: 13, padding: '5px 12px' }} onClick={startSession}>
                 Start Session
@@ -365,7 +476,7 @@ export default function TeacherView({ lessonId }) {
 
         {/* Centre — Teacher Editor */}
         <main style={{ ...s.centre, ...(lesson.type === 'html' || lesson.type === 'scratch' ? { overflow: 'hidden' } : {}) }}>
-          {task?.explainer && !isInSandbox && (
+          {task?.explainer && !isInSandbox && task?.taskType !== 'quiz' && (
             <ExplainerPanel title={task.title} content={task.explainer} />
           )}
 
@@ -382,6 +493,9 @@ export default function TeacherView({ lessonId }) {
                     <button className="btn-ghost" style={{ ...s.sandboxBannerBtn, color: '#92400e', borderColor: '#92400e', background: 'transparent' }} onClick={handleCancelSandbox}>
                       Cancel
                     </button>
+                    <button className="btn-ghost" style={{ ...s.sandboxBannerBtn, color: '#92400e', borderColor: '#92400e', background: 'transparent' }} onClick={handleResetSandboxStarter}>
+                      Reset to Sandbox Starter
+                    </button>
                     <button className="btn-primary" style={s.sandboxBannerBtn} onClick={handleGoLiveSandbox}>
                       Go Live &amp; Send to Students
                     </button>
@@ -393,6 +507,9 @@ export default function TeacherView({ lessonId }) {
                         Push to All
                       </button>
                     )}
+                    <button className="btn-ghost" style={{ ...s.sandboxBannerBtn, background: 'transparent' }} onClick={handleResetSandboxStarter}>
+                      Reset to Sandbox Starter
+                    </button>
                     <button className="btn-danger" style={s.sandboxBannerBtn} onClick={handleDeactivateSandbox}>
                       Deactivate Sandbox
                     </button>
@@ -402,7 +519,7 @@ export default function TeacherView({ lessonId }) {
             </div>
           )}
 
-          {!isInSandbox && (lesson.type === 'python' || lesson.type === 'html') && (
+          {!isInSandbox && task?.taskType !== 'quiz' && (lesson.type === 'python' || lesson.type === 'html') && (
             <div style={s.codeTabStrip}>
               <button
                 style={{ ...s.codeTabBtn, ...(teacherCodeTab === 'starter' ? s.codeTabBtnActive : {}) }}
@@ -419,11 +536,16 @@ export default function TeacherView({ lessonId }) {
             </div>
           )}
 
-          {lesson.type === 'python' ? (
+          {!isInSandbox && task?.taskType === 'quiz' ? (
+            <QuizTask task={task} showQuestion disabled />
+          ) : lesson.type === 'python' ? (
             <>
               <PythonEditor
                 code={showingComplete ? (task?.completeCode ?? '') : code}
-                onChange={showingComplete ? undefined : setCode}
+                onChange={showingComplete ? undefined : value => {
+                  setCode(value)
+                  if (isInSandbox) sandboxDraftRef.current.code = value
+                }}
                 readOnly={showingComplete}
                 pyodideStatus={pyodideStatus}
               />
@@ -453,7 +575,10 @@ export default function TeacherView({ lessonId }) {
                 assetsPath={resolveAssetsPath(lesson.assetsPath) || undefined}
                 initialState={scratchState}
                 externalState={scratchState}
-                onStateChange={setScratchState}
+                onStateChange={state => {
+                  setScratchState(state)
+                  if (isInSandbox) sandboxDraftRef.current.scratchState = cloneScratchState(state)
+                }}
               />
             </div>
           ) : (
@@ -475,7 +600,11 @@ export default function TeacherView({ lessonId }) {
                     activeFile={showingComplete ? activeCompleteFile : activeFile}
                     onTabChange={showingComplete ? setActiveCompleteFile : setActiveFile}
                     onFileChange={showingComplete ? undefined : (name, content) =>
-                      setFiles(prev => prev.map(f => f.name === name ? { ...f, content } : f))
+                      setFiles(prev => {
+                        const next = prev.map(f => f.name === name ? { ...f, content } : f)
+                        if (isInSandbox) sandboxDraftRef.current.files = cloneFiles(next)
+                        return next
+                      })
                     }
                     readOnly={showingComplete}
                     assetsPath={resolveAssetsPath(lesson.assetsPath) || undefined}
@@ -516,6 +645,7 @@ export default function TeacherView({ lessonId }) {
             onRemove={removeStudent}
             onGoLive={setActiveStudentView}
             onStopLive={() => setActiveStudentView(null)}
+            onRemoteReset={pushResetToStudent}
             collapsed={rightCollapsed}
             onToggle={() => setRightCollapsed(v => !v)}
           />
@@ -560,6 +690,66 @@ export default function TeacherView({ lessonId }) {
 }
 
 const s = {
+  shareOverlay: {
+    position: 'fixed',
+    inset: 0,
+    zIndex: 99,
+  },
+  sharePanel: {
+    position: 'absolute',
+    top: 'calc(100% + 8px)',
+    right: 0,
+    background: '#fff',
+    borderRadius: 12,
+    boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+    padding: '14px 16px',
+    zIndex: 100,
+    width: 360,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 10,
+  },
+  sharePanelTitle: {
+    fontFamily: 'var(--font-title)',
+    fontWeight: 700,
+    fontSize: '0.85rem',
+    color: 'var(--colour-primary)',
+  },
+  shareLinkRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    padding: '10px 12px',
+    background: '#f9fafb',
+    borderRadius: 8,
+    border: '1px solid #e5e7eb',
+  },
+  shareLinkInfo: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 2,
+    minWidth: 0,
+  },
+  shareLinkType: {
+    fontFamily: 'var(--font-body)',
+    fontWeight: 600,
+    fontSize: '0.82rem',
+    color: 'var(--colour-text)',
+  },
+  shareLinkUrl: {
+    fontFamily: 'var(--font-code)',
+    fontSize: '0.7rem',
+    color: '#6b7280',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  shareCopyBtn: {
+    fontSize: 12,
+    padding: '6px 14px',
+    flexShrink: 0,
+  },
   page: {
     display: 'flex',
     flexDirection: 'column',

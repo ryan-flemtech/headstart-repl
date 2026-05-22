@@ -2,7 +2,9 @@ import React, { useState } from 'react'
 import LessonMetaPanel from '../components/LessonMetaPanel'
 import TaskList from '../components/TaskList'
 import TaskEditor from '../components/TaskEditor'
-import { normalizeChecks } from '../../shared/checks'
+import PreviewView from './PreviewView'
+import { checkAllowedForSubmit, normalizeChecks } from '../../shared/checks'
+import { HTML_ONLY } from '../components/FileManager'
 
 function validateLesson(lesson) {
   const errors = []
@@ -18,7 +20,17 @@ function validateLesson(lesson) {
     const n = i + 1
     if (!task.title)    errors.push(`Task ${n} is missing a title`)
 
-    if (type === 'html') {
+    if (task.taskType === 'quiz') {
+      if (!task.options || task.options.length < 2) {
+        errors.push(`Task ${n} is a quiz but has fewer than 2 options.`)
+      }
+      if (task.options?.some(option => !option.text?.trim())) {
+        errors.push(`Task ${n} is a quiz but has an empty option text field.`)
+      }
+      if (task.check?.type !== 'answer_equals' || !task.check.value) {
+        errors.push(`Task ${n} is a quiz but no correct answer has been selected.`)
+      }
+    } else if (type === 'html') {
       if (!task.starterFiles || task.starterFiles.length === 0) errors.push(`Task ${n} has no files`)
       else {
         const names = task.starterFiles.map(f => f.name)
@@ -28,7 +40,9 @@ function validateLesson(lesson) {
       }
     }
 
-    if (type === 'scratch') {
+    if (task.taskType === 'quiz') {
+      // Quiz checks are validated above.
+    } else if (type === 'scratch') {
       if (task.toolbox) {
         try {
           const parsed = new DOMParser().parseFromString(task.toolbox, 'text/xml')
@@ -49,25 +63,35 @@ function validateLesson(lesson) {
       }
     } else if (task.check) {
       const checksArr = normalizeChecks(task.check)
-      if (checksArr.some(c => c.type !== 'code_no_error' && c.type !== 'output_not_empty' && !c.value && c.value !== 0)) {
+      if (task.interactionMode === 'submit' && checksArr.some(c => !checkAllowedForSubmit(c))) {
+        errors.push(`Task ${n} uses submit mode but has a check that requires running the code`)
+      }
+      if (checksArr.some(c => ['element_exists', 'element_count', 'element_value'].includes(c.type) && !c.selector?.trim())) {
+        errors.push(`Task ${n} has an element check but no CSS selector`)
+      }
+      if (checksArr.some(c => !['code_no_error', 'output_not_empty', 'element_exists'].includes(c.type) && !c.value && c.value !== 0)) {
         errors.push(`Task ${n} has a check enabled but no check value`)
       }
     }
 
-    const carryFrom = type === 'scratch' ? task.carryBlocksFrom : task.carryCodeFrom
+    const carryFrom = task.taskType === 'quiz' ? null : type === 'scratch' ? task.carryBlocksFrom : task.carryCodeFrom
     if (carryFrom != null) {
       const exists = tasks.some(t => t.id === carryFrom)
       if (!exists) errors.push(`Task ${n} references task ${carryFrom} for carry-through but that task does not exist`)
     }
 
     // Warnings
-    const hasStarter = type === 'python'
+    const hasStarter = task.taskType === 'quiz'
+      ? task.options?.some(option => option.text?.trim())
+      : type === 'python'
       ? !!task.starterCode
       : type === 'scratch'
         ? !!task.starterBlocks
         : task.starterFiles?.some(f => f.content.trim())
     if (!hasStarter) warnings.push(`Task ${n} has no starter code — students will start with an empty editor`)
-    const checkHasValue = type === 'scratch'
+    const checkHasValue = task.taskType === 'quiz'
+      ? !!task.check?.value
+      : type === 'scratch'
       ? !!task.check
       : normalizeChecks(task.check).some(c => c.type === 'code_no_error' || c.type === 'output_not_empty' || c.value)
     if (checkHasValue && !task._checkTested)
@@ -79,6 +103,11 @@ function validateLesson(lesson) {
 
 export default function BuilderView({ lesson, dirty, onUpdate, onNew, onMarkSaved }) {
   const [selectedTaskId, setSelectedTaskId] = useState(lesson.tasks[0]?.id ?? null)
+  const [previewing, setPreviewing] = useState(false)
+
+  if (previewing) {
+    return <PreviewView lesson={lesson} onClose={() => setPreviewing(false)} />
+  }
 
   function handleDownload() {
     const { errors, warnings } = validateLesson(lesson)
@@ -133,17 +162,31 @@ export default function BuilderView({ lesson, dirty, onUpdate, onNew, onMarkSave
   function handleAddTask() {
     const maxId = lesson.tasks.reduce((m, t) => Math.max(m, t.id), 0)
     const newId = maxId + 1
-    const newTask = {
-      id: newId,
-      title: '',
-      explainer: '',
-      ...(lesson.type === 'python'
-        ? { starterCode: '', carryCodeFrom: null }
-        : lesson.type === 'scratch'
-          ? { toolbox: '', starterBlocks: null, carryBlocksFrom: null }
-          : { starterFiles: [{ name: 'index.html', type: 'html', content: '<!DOCTYPE html>\n<html>\n<body>\n\n</body>\n</html>\n' }], entryFile: 'index.html', carryCodeFrom: null }
-      ),
+    const prevTask = lesson.tasks[lesson.tasks.length - 1] ?? null
+
+    let typeFields
+    if (lesson.type === 'python') {
+      typeFields = {
+        starterCode: prevTask ? (prevTask.completeCode ?? prevTask.starterCode ?? '') : '',
+        carryCodeFrom: prevTask?.id ?? null,
+      }
+    } else if (lesson.type === 'scratch') {
+      typeFields = {
+        toolbox: '',
+        starterBlocks: prevTask ? (prevTask.completeBlocks ?? prevTask.starterBlocks ?? null) : null,
+        carryBlocksFrom: prevTask?.id ?? null,
+      }
+    } else {
+      typeFields = {
+        starterFiles: prevTask
+          ? (prevTask.completeFiles ?? prevTask.starterFiles ?? []).map(f => ({ ...f }))
+          : [{ name: 'index.html', type: 'html', content: HTML_ONLY }],
+        entryFile: prevTask ? (prevTask.completeEntryFile ?? prevTask.entryFile ?? 'index.html') : 'index.html',
+        carryCodeFrom: prevTask?.id ?? null,
+      }
     }
+
+    const newTask = { id: newId, title: '', explainer: '', ...typeFields }
     onUpdate(prev => ({ ...prev, tasks: [...prev.tasks, newTask] }))
     setSelectedTaskId(newId)
   }
@@ -160,6 +203,15 @@ export default function BuilderView({ lesson, dirty, onUpdate, onNew, onMarkSave
           {dirty && <span style={s.dirtyDot} title="Unsaved changes" />}
           <button className="btn-ghost" style={{ fontSize: 13, padding: '5px 12px' }} onClick={onNew}>New</button>
           <button className="btn-ghost" style={{ fontSize: 13, padding: '5px 12px' }} onClick={handleUpload}>Upload</button>
+          <button
+            className="btn-ghost"
+            style={{ fontSize: 13, padding: '5px 12px' }}
+            onClick={() => setPreviewing(true)}
+            disabled={lesson.tasks.length === 0}
+            title={lesson.tasks.length === 0 ? 'Add at least one task to preview' : 'Preview as student'}
+          >
+            Preview
+          </button>
           <button
             className="btn-primary"
             style={{ fontSize: 13, padding: '5px 14px' }}

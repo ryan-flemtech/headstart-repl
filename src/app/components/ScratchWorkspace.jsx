@@ -250,6 +250,7 @@ export default function ScratchWorkspace({
   const [status, setStatus]         = useState('loading')
   const [running, setRunning]       = useState(false)
   const [checkPassed, setCheckPassed] = useState(false)
+  const [checkAttempted, setCheckAttempted] = useState(false)
   const [spriteStates, setSpriteStates] = useState(() => initSpriteStates(sprites))
   const [askPrompt, setAskPrompt]   = useState(null)
   const [askValue, setAskValue]     = useState('')
@@ -599,6 +600,7 @@ export default function ScratchWorkspace({
 
   const notifyCheck = useCallback((passed, force = false) => {
     setCheckPassed(passed)
+    setCheckAttempted(true)
     if (!force && lastCheckRef.current === passed) return
     lastCheckRef.current = passed
     let workspaceStates = null
@@ -634,6 +636,7 @@ export default function ScratchWorkspace({
     lastCheckRef.current = null
     runningRef.current = true
     setRunning(true)
+    setCheckAttempted(false)
     const signal = createSignal()
     signalRef.current = signal
     try { await runAllSprites(buildSpriteWorkspaces(), signal) } catch {}
@@ -646,6 +649,7 @@ export default function ScratchWorkspace({
     lastCheckRef.current = null
     runningRef.current = true
     setRunning(true)
+    setCheckAttempted(false)
     const signal = createSignal()
     signalRef.current = signal
     const startBlock = block.type === 'event_whenflagclicked' ? block.getNextBlock() : block
@@ -659,6 +663,7 @@ export default function ScratchWorkspace({
     lastCheckRef.current = null
     runningRef.current = true
     setRunning(true)
+    setCheckAttempted(false)
     const signal = createSignal()
     signalRef.current = signal
     try { await runAllSpritesEvent(buildSpriteWorkspaces(), eventType, signal, option) } catch {}
@@ -684,6 +689,7 @@ export default function ScratchWorkspace({
     setBackdropName(defaultBackdrop)
     lastCheckRef.current = null
     setCheckPassed(false)
+    setCheckAttempted(false)
   }
 
   function handleCheck() {
@@ -770,6 +776,7 @@ export default function ScratchWorkspace({
         lastCheckRef.current = null
         runningRef.current = true
         setRunning(true)
+        setCheckAttempted(false)
         const signal = createSignal()
         signalRef.current = signal
         const sws = buildSpriteWorkspaces().filter(s => s.id === draggedId)
@@ -940,11 +947,10 @@ export default function ScratchWorkspace({
             {!readOnly && showManualCheck && (
               <button className="btn-secondary" style={s.checkBtn} onClick={handleCheck}>Check</button>
             )}
-            {scratchChecks.length > 0 && checkPassed && <span style={s.checkPass}>✅ Check passed!</span>}
-            {scratchChecks.length > 0 && !checkPassed && showManualCheck && !running && (
+            {scratchChecks.length > 0 && !checkAttempted && showManualCheck && !running && (
               <span style={s.checkNone}>Run your code, then click Check</span>
             )}
-            {scratchChecks.length > 0 && !checkPassed && hasAfterRunCheck && !showManualCheck && !running && (
+            {scratchChecks.length > 0 && !checkAttempted && hasAfterRunCheck && !showManualCheck && !running && (
               <span style={s.checkNone}>Run your code to check</span>
             )}
           </div>
@@ -994,6 +1000,5 @@ const s = {
   centre:     { display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', padding: 32 },
   loadingText: { fontFamily: 'var(--font-body)', color: 'var(--colour-text)', fontSize: '1rem' },
   errorText:   { fontFamily: 'var(--font-body)', color: '#ef4444', fontSize: '1rem' },
-  checkPass:   { fontFamily: 'var(--font-body)', fontSize: '0.95rem', color: '#16a34a', fontWeight: 600 },
   checkNone:   { fontFamily: 'var(--font-body)', fontSize: '0.85rem', color: '#9ca3af' },
 }

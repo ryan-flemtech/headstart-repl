@@ -7,10 +7,34 @@
     {
       "id": 1,
       "title": "🔁 While Loops",
-      "explainer": "Have a look at the code below. What do you think the output would be? ",
+      "explainer": "Have a look at the code below. What do you think the output would be? \n```python\ncount = 0\nwhile count < 5:\n  print(\"I love Python\")\n  count += 1\n```",
       "starterCode": "count = 1\nwhile count <= 3:\n  print(\"Python is fun!\")\n  count = count + 1",
       "carryCodeFrom": null,
-      "check": null
+      "check": {
+        "type": "answer_equals",
+        "value": "d"
+      },
+      "carryBlocksFrom": null,
+      "_checkTested": true,
+      "taskType": "quiz",
+      "options": [
+        {
+          "id": "a",
+          "text": "I love Python"
+        },
+        {
+          "id": "b",
+          "text": "I hate Python"
+        },
+        {
+          "id": "c",
+          "text": "I love Python 3 times"
+        },
+        {
+          "id": "d",
+          "text": "I love Python 5 times"
+        }
+      ]
     },
     {
       "id": 2,
@@ -19,7 +43,14 @@
       "starterCode": "",
       "carryCodeFrom": null,
       "completeCode": "count = 0",
-      "check": null
+      "check": [
+        {
+          "type": "code_contains",
+          "value": "count = 0"
+        }
+      ],
+      "interactionMode": "submit",
+      "_checkTested": true
     },
     {
       "id": 3,
@@ -27,7 +58,15 @@
       "explainer": "Now we want to add the `python:while` loop. \n\nWe want to add a **condition** that checks if our counter is less than 5. \n\n> 💡 What happens when count becomes 5?\n",
       "starterCode": "count = 0",
       "carryCodeFrom": 2,
-      "completeCode": "count = 0\n\nwhile count < 5:"
+      "completeCode": "count = 0\n\nwhile count < 5:",
+      "check": [
+        {
+          "type": "code_contains",
+          "value": "while count < 5:"
+        }
+      ],
+      "interactionMode": "submit",
+      "_checkTested": true
     },
     {
       "id": 4,
@@ -48,8 +87,8 @@
       "id": 5,
       "title": "🚀 Printing Numbers Challenge",
       "explainer": "Can you print the numbers 1 to 10 using a `python:while` loop? \n> ❌ Not by `python:print(\"1 2 3 4 5 6 7 8 9 10\")` by printing the `python:num` **variable**",
-      "starterCode": "num = 1\n\nwhile ",
-      "carryCodeFrom": null,
+      "starterCode": "count = 0\n\nwhile count < 5:\n  print(\"Ryan\")\n  count += 1",
+      "carryCodeFrom": 4,
       "completeCode": "num = 1\n\nwhile num <= 10:\n  print(num)\n  num += 1",
       "check": [
         {
@@ -64,7 +103,16 @@
       "title": "🔂 For Loop - For",
       "explainer": "Let's build a `python:for` loop!\n\nStart by writing `python:for` in the editor below!",
       "starterCode": "",
-      "carryCodeFrom": null
+      "carryCodeFrom": null,
+      "interactionMode": "submit",
+      "check": [
+        {
+          "type": "code_contains",
+          "value": "for"
+        }
+      ],
+      "_checkTested": true,
+      "completeCode": "for"
     },
     {
       "id": 7,
@@ -73,7 +121,14 @@
       "starterCode": "for",
       "carryCodeFrom": 6,
       "completeCode": "for i ",
-      "check": null
+      "check": [
+        {
+          "type": "code_contains",
+          "value": "for i"
+        }
+      ],
+      "interactionMode": "submit",
+      "_checkTested": true
     },
     {
       "id": 8,
@@ -82,7 +137,14 @@
       "starterCode": "for i",
       "carryCodeFrom": 7,
       "completeCode": "for i in",
-      "check": null
+      "check": [
+        {
+          "type": "code_contains",
+          "value": "for i in"
+        }
+      ],
+      "interactionMode": "submit",
+      "_checkTested": true
     },
     {
       "id": 9,
@@ -91,7 +153,14 @@
       "starterCode": "for i in",
       "carryCodeFrom": 8,
       "completeCode": "for i in range()",
-      "check": null
+      "check": [
+        {
+          "type": "code_contains",
+          "value": "for i in range()"
+        }
+      ],
+      "interactionMode": "submit",
+      "_checkTested": true
     },
     {
       "id": 10,
@@ -100,7 +169,14 @@
       "starterCode": "for i in range()",
       "carryCodeFrom": 9,
       "completeCode": "for i in range(5):",
-      "check": null
+      "check": [
+        {
+          "type": "code_contains",
+          "value": "for i in range(5):"
+        }
+      ],
+      "interactionMode": "submit",
+      "_checkTested": true
     },
     {
       "id": 11,

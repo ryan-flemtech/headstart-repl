@@ -5,6 +5,7 @@ import IframePreview from './IframePreview'
 import ScratchWorkspace from './ScratchWorkspace'
 import { buildIframeSrc } from '../../shared/iframe'
 import { decodeFileKey } from '../hooks/useSession'
+import QuizTask from './QuizTask'
 
 function resolveAssetsPath(rawPath) {
   if (!rawPath) return ''
@@ -29,7 +30,7 @@ function parseSpriteState(raw) {
   }
 }
 
-export default function StudentModal({ student, lesson, session, isLive, onGoLive, onStopLive, onClose, hasPrev, hasNext, onPrev, onNext }) {
+export default function StudentModal({ student, lesson, session, isLive, onGoLive, onStopLive, onClose, hasPrev, hasNext, onPrev, onNext, onRemoteReset }) {
   const overlayRef = useRef(null)
   const iframeRef  = useRef(null)
 
@@ -42,14 +43,33 @@ export default function StudentModal({ student, lesson, session, isLive, onGoLiv
       })
     : []
   const task      = lesson?.tasks?.find(t => t.id === session?.currentTaskId)
+  const isQuiz    = task?.taskType === 'quiz'
   const scratchState = isScratch ? parseScratchState(student.currentCode) : null
   const spriteState = isScratch ? parseSpriteState(student.currentOutput) : null
-  const iframeSrc = !isPython && !isScratch && files.length
+  const iframeSrc = !isPython && !isScratch && !isQuiz && files.length
     ? buildIframeSrc(files, task?.entryFile ?? 'index.html')
     : null
 
   const [activeFile, setActiveFile] = useState(task?.entryFile ?? files[0]?.name ?? '')
   const activeFileObj = files.find(f => f.name === activeFile) ?? files[0]
+
+  const hasComplete = isQuiz
+    ? false
+    : isPython
+    ? !!task?.completeCode
+    : isScratch
+    ? !!task?.completeBlocks
+    : (task?.completeFiles?.length > 0)
+
+  function handleResetToStarter() {
+    if (!window.confirm(`Reset ${student.displayName}'s code to the starter code?`)) return
+    onRemoteReset?.(student.anonymousId, 'starter')
+  }
+
+  function handleSetToComplete() {
+    if (!window.confirm(`Set ${student.displayName}'s code to the complete code?`)) return
+    onRemoteReset?.(student.anonymousId, 'complete')
+  }
 
   // Close on Escape
   useEffect(() => {
@@ -100,6 +120,25 @@ export default function StudentModal({ student, lesson, session, isLive, onGoLiv
                 →
               </button>
             </div>
+            {onRemoteReset && (
+              <>
+                <button
+                  style={s.teacherActionBtn}
+                  onClick={handleResetToStarter}
+                  title="Reset this student's code to the task starter code"
+                >
+                  Reset to Starter
+                </button>
+                <button
+                  style={{ ...s.teacherActionBtn, ...s.teacherActionBtnComplete, opacity: hasComplete ? 1 : 0.4 }}
+                  disabled={!hasComplete}
+                  onClick={hasComplete ? handleSetToComplete : undefined}
+                  title={hasComplete ? 'Set this student\'s code to the complete code' : 'No complete code for this task'}
+                >
+                  Set to Complete
+                </button>
+              </>
+            )}
             <button
               className={isLive ? 'btn-danger' : 'btn-primary'}
               style={{ fontSize: 13, padding: '5px 14px' }}
@@ -119,8 +158,17 @@ export default function StudentModal({ student, lesson, session, isLive, onGoLiv
         </div>
 
         {/* Content */}
-        <div style={isPython ? s.bodyPython : isScratch ? s.bodyScratch : s.bodyHtml}>
-          {isPython ? (
+        <div style={isQuiz ? s.bodyQuiz : isPython ? s.bodyPython : isScratch ? s.bodyScratch : s.bodyHtml}>
+          {isQuiz ? (
+            <QuizTask
+              task={task}
+              showQuestion
+              selectedAnswer={student.currentAnswer ?? ''}
+              submitted={student.lastRunStatus === 'submitted'}
+              checkPassed={student.checkPassed}
+              disabled
+            />
+          ) : isPython ? (
             <>
               <div style={s.editorWrap}>
                 <CodeEditor
@@ -130,12 +178,18 @@ export default function StudentModal({ student, lesson, session, isLive, onGoLiv
                   style={{ height: '100%' }}
                 />
               </div>
-              <OutputPanel
-                output={student.currentOutput ?? ''}
-                runStatus={student.lastRunStatus}
-                hasCheck={!!task?.check}
-                checkPassed={student.checkPassed}
-              />
+              {task?.interactionMode === 'submit' ? (
+                <div style={s.submitNotice}>
+                  {student.lastRunStatus === 'submitted' ? 'Code submitted' : 'Waiting for submission'}
+                </div>
+              ) : (
+                <OutputPanel
+                  output={student.currentOutput ?? ''}
+                  runStatus={student.lastRunStatus}
+                  hasCheck={!!task?.check}
+                  checkPassed={student.checkPassed}
+                />
+              )}
             </>
           ) : isScratch ? (
             <ScratchWorkspace
@@ -277,6 +331,13 @@ const s = {
     padding: 16,
     display: 'flex',
   },
+  bodyQuiz: {
+    flex: 1,
+    overflow: 'auto',
+    padding: 16,
+    display: 'flex',
+    alignItems: 'flex-start',
+  },
   htmlEditorPane: {
     flex: 1,
     display: 'flex',
@@ -328,5 +389,33 @@ const s = {
     overflow: 'hidden',
     display: 'flex',
     flexDirection: 'column',
+  },
+  teacherActionBtn: {
+    fontSize: 12,
+    padding: '4px 10px',
+    background: 'rgba(253,211,77,0.15)',
+    color: '#fde68a',
+    border: '1px solid rgba(253,211,77,0.4)',
+    borderRadius: 5,
+    cursor: 'pointer',
+    fontFamily: 'var(--font-body)',
+    fontWeight: 600,
+    whiteSpace: 'nowrap',
+  },
+  teacherActionBtnComplete: {
+    background: 'rgba(134,239,172,0.15)',
+    color: '#86efac',
+    border: '1px solid rgba(134,239,172,0.4)',
+  },
+  submitNotice: {
+    padding: '10px 14px',
+    borderRadius: 8,
+    background: '#eff6ff',
+    border: '1px solid #bfdbfe',
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.9rem',
+    color: '#1e40af',
+    fontWeight: 600,
+    flexShrink: 0,
   },
 }

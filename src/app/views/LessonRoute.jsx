@@ -11,7 +11,8 @@ export default function LessonRoute() {
   const { lessonId }    = useParams()
   const [searchParams]  = useSearchParams()
   const isTeacher       = searchParams.get('teacher') === 'true'
+  const isLive          = searchParams.get('live') === 'true'
 
   if (isTeacher) return <TeacherView lessonId={lessonId} />
-  return <StudentView lessonId={lessonId} />
+  return <StudentView lessonId={lessonId} soloMode={!isLive} />
 }

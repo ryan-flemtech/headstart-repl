@@ -213,7 +213,6 @@ button:disabled {
 
 .task-slide-viewport {
   position: relative;
-  overflow: hidden;
 }
 
 .task-slide-panel {
@@ -224,7 +223,6 @@ button:disabled {
   min-height: 0;
 }
 
-.task-slide-panel--entering,
 .task-slide-panel--leaving {
   position: absolute;
   inset: 0;
@@ -338,6 +336,22 @@ button:disabled {
 
 .scratch-workspace .blocklySelected > .blocklyPath {
   filter: drop-shadow(0 0 0 rgba(0, 0, 0, 0)) drop-shadow(0 0 8px rgba(251, 165, 4, 0.7));
+}
+
+/* Solo mode — Next button pulse when check passes */
+@keyframes solo-next-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 2px 10px rgba(98, 34, 204, 0.25);
+  }
+  50% {
+    transform: scale(1.08);
+    box-shadow: 0 6px 24px rgba(98, 34, 204, 0.55);
+  }
+}
+
+.btn-next-success {
+  animation: solo-next-pulse 1s ease-in-out infinite;
 }
 
 /* Retro terminal cursor and animations */

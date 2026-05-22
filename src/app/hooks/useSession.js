@@ -91,6 +91,7 @@ export function useSession(lessonId) {
       updates[`students/${anonymousId}/currentOutput`]  = ''
       updates[`students/${anonymousId}/currentCode`]    = ''
       updates[`students/${anonymousId}/currentFiles`]   = null
+      updates[`students/${anonymousId}/currentAnswer`]  = null
     }
     await update(ref(db, `sessions/${lessonId}`), updates)
   }
@@ -158,6 +159,13 @@ export function useSession(lessonId) {
     await remove(ref(db, `sessions/${lessonId}/students/${anonymousId}`))
   }
 
+  async function pushResetToStudent(anonymousId, action) {
+    await update(ref(db, `sessions/${lessonId}/students/${anonymousId}`), {
+      remoteResetAction:   action,
+      remoteResetPushedAt: Date.now(),
+    })
+  }
+
   // ─── Student helpers ──────────────────────────────────────────────────────
 
   async function registerPresence(anonymousId) {
@@ -172,13 +180,14 @@ export function useSession(lessonId) {
       joinedAt:      Date.now(),
       currentCode:   '',
       currentOutput: '',
+      currentAnswer: null,
       lastRunStatus: null,
       checkPassed:   false,
       lastRunAt:     null,
     })
   }
 
-  async function writeStudentRun(anonymousId, { code, files, output, status, checkPassed }) {
+  async function writeStudentRun(anonymousId, { code, files, output, answer, status, checkPassed }) {
     const updates = {
       lastRunStatus: status,
       checkPassed:   checkPassed ?? false,
@@ -187,6 +196,7 @@ export function useSession(lessonId) {
     if (code  != null) updates.currentCode   = code
     if (files != null) updates.currentFiles  = encodeFileKeys(files)
     if (output != null) updates.currentOutput = output
+    if (answer != null) updates.currentAnswer = answer
     await update(ref(db, `sessions/${lessonId}/students/${anonymousId}`), updates)
   }
 
@@ -209,7 +219,7 @@ export function useSession(lessonId) {
     // teacher
     createSession, restartSession, startSession, endSession,
     setTaskId, enterSandbox, exitSandbox, pushSandboxCode, pushSandboxFiles,
-    setPaused, setActiveStudentView, renameStudent, removeStudent,
+    setPaused, setActiveStudentView, renameStudent, removeStudent, pushResetToStudent,
     // student
     registerPresence, joinSession, writeStudentRun, writeStudentCode, writeStudentFiles, writeStudentOutput,
   }

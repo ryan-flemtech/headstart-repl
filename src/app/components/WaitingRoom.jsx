@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 
-export default function WaitingRoom({ lessonTitle, lessonDescription, onGoSolo }) {
+export default function WaitingRoom({ lessonTitle, lessonDescription }) {
   const [dots, setDots] = useState('.')
 
   useEffect(() => {
@@ -21,14 +21,6 @@ export default function WaitingRoom({ lessonTitle, lessonDescription, onGoSolo }
         <div style={s.body}>
           <p style={s.waiting}>Your teacher is getting ready{dots}</p>
           <p style={s.sub}>The session will start shortly. Sit tight!</p>
-          {onGoSolo && (
-            <button
-              onClick={onGoSolo}
-              style={s.soloBtn}
-            >
-              Work Solo instead
-            </button>
-          )}
         </div>
       </div>
     </div>
@@ -96,16 +88,5 @@ const s = {
     fontSize: '0.95rem',
     color: 'var(--colour-text)',
     lineHeight: 1.6,
-  },
-  soloBtn: {
-    marginTop: 8,
-    background: 'none',
-    border: 'none',
-    fontFamily: 'var(--font-body)',
-    fontSize: '0.85rem',
-    color: '#9ca3af',
-    cursor: 'pointer',
-    textDecoration: 'underline',
-    padding: 0,
   },
 }

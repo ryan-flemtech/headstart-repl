@@ -73,6 +73,7 @@ const s = {
     padding: '4px 4px 0',
     borderRadius: '8px 8px 0 0',
     overflowX: 'auto',
+    flexShrink: 0,
   },
   tab: {
     background: 'transparent',
