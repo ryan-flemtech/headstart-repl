@@ -17,7 +17,6 @@ function validateLesson(lesson) {
   tasks.forEach((task, i) => {
     const n = i + 1
     if (!task.title)    errors.push(`Task ${n} is missing a title`)
-    if (!task.explainer) errors.push(`Task ${n} is missing an explainer`)
 
     if (type === 'html') {
       if (!task.starterFiles || task.starterFiles.length === 0) errors.push(`Task ${n} has no files`)
@@ -50,7 +49,7 @@ function validateLesson(lesson) {
       }
     } else if (task.check) {
       const checksArr = normalizeChecks(task.check)
-      if (checksArr.some(c => !c.value && c.value !== 0)) {
+      if (checksArr.some(c => c.type !== 'code_no_error' && c.type !== 'output_not_empty' && !c.value && c.value !== 0)) {
         errors.push(`Task ${n} has a check enabled but no check value`)
       }
     }
@@ -70,7 +69,7 @@ function validateLesson(lesson) {
     if (!hasStarter) warnings.push(`Task ${n} has no starter code — students will start with an empty editor`)
     const checkHasValue = type === 'scratch'
       ? !!task.check
-      : normalizeChecks(task.check).some(c => c.value)
+      : normalizeChecks(task.check).some(c => c.type === 'code_no_error' || c.type === 'output_not_empty' || c.value)
     if (checkHasValue && !task._checkTested)
       warnings.push(`Task ${n} has a completion check that hasn't been tested — run the task to verify it`)
   })

@@ -1,5 +1,11 @@
 import React, { useRef, useEffect, useState } from 'react'
 
+const CODE_FONT_STYLE = {
+  fontFamily: "'JetBrains Mono', monospace",
+  fontVariantLigatures: 'none',
+  fontFeatureSettings: '"liga" 0, "calt" 0',
+}
+
 export default function OutputPanel({
   output = '',
   runStatus = null,
@@ -187,7 +193,7 @@ const s = {
     flex: 1,
     margin: 0,
     padding: '10px 14px',
-    fontFamily: "'JetBrains Mono', monospace",
+    ...CODE_FONT_STYLE,
     fontSize: '14px',
     lineHeight: 1.6,
     overflowY: 'auto',
@@ -208,7 +214,7 @@ const s = {
   },
   input: {
     flex: 1,
-    fontFamily: "'JetBrains Mono', monospace",
+    ...CODE_FONT_STYLE,
     fontSize: '14px',
     border: 'none',
     borderBottom: '2px solid var(--colour-primary)',

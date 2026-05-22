@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useLayoutEffect, useState, useRef } from 'react'
 import { useIsMobile } from '../../shared/useIsMobile'
 import { useSession, decodeFileKey } from '../hooks/useSession'
 import { useIdentity } from '../hooks/useIdentity'
@@ -13,7 +13,7 @@ import ExplainerPanel from '../components/ExplainerPanel'
 import PythonEditor from '../components/PythonEditor'
 import HtmlEditor from '../components/HtmlEditor'
 import OutputPanel from '../components/OutputPanel'
-import IframePreview from '../components/IframePreview'
+import CollapsibleIframePreview from '../components/CollapsibleIframePreview'
 import ScratchWorkspace from '../components/ScratchWorkspace'
 import SplitPane from '../../shared/SplitPane'
 import JoinSessionPrompt from '../components/JoinSessionPrompt'
@@ -48,6 +48,52 @@ function saveFile(lessonId, taskId, filename, anonymousId, content) {
   localStorage.setItem(LS_FILE_KEY(lessonId, taskId, filename, anonymousId), JSON.stringify({ content }))
 }
 
+const TASK_TRANSITION_MS = 380
+
+function TaskSlideTransition({ transitionKey, children, style }) {
+  const previousRenderRef = useRef({ key: transitionKey, children })
+  const [leavingRender, setLeavingRender] = useState(null)
+  const [isAnimating, setIsAnimating] = useState(false)
+
+  useLayoutEffect(() => {
+    if (previousRenderRef.current.key === transitionKey) {
+      previousRenderRef.current = { key: transitionKey, children }
+      return undefined
+    }
+
+    setLeavingRender(previousRenderRef.current)
+    setIsAnimating(true)
+    previousRenderRef.current = { key: transitionKey, children }
+
+    const timeoutId = window.setTimeout(() => {
+      setLeavingRender(null)
+      setIsAnimating(false)
+    }, TASK_TRANSITION_MS)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [transitionKey, children])
+
+  return (
+    <div className="task-slide-viewport" style={style}>
+      {leavingRender && (
+        <div
+          key={`leaving-${leavingRender.key}`}
+          className="task-slide-panel task-slide-panel--leaving"
+          aria-hidden="true"
+        >
+          {leavingRender.children}
+        </div>
+      )}
+      <div
+        key={`entering-${transitionKey}`}
+        className={isAnimating ? 'task-slide-panel task-slide-panel--entering' : 'task-slide-panel'}
+      >
+        {children}
+      </div>
+    </div>
+  )
+}
+
 export default function StudentView({ lessonId }) {
   const { session, loading: sessionLoading, registerPresence, joinSession, writeStudentRun, writeStudentCode, writeStudentFiles, writeStudentOutput } = useSession(lessonId)
   const { identity, loaded: identityLoaded, createIdentity, updateTimestamp, updateDisplayName } = useIdentity()
@@ -65,6 +111,7 @@ export default function StudentView({ lessonId }) {
   const [running, setRunning]           = useState(false)
   const [pyodideStatus, setPyodideStatus] = useState('idle') // idle | loading | ready
   const [iframeSrc, setIframeSrc]         = useState(null)
+  const [htmlPreviewCollapsed, setHtmlPreviewCollapsed] = useState(true)
   const [inputPrompt, setInputPrompt]     = useState(null)
   const [checkPassed, setCheckPassed]     = useState(false)
   const [scratchSandboxProject, setScratchSandboxProject] = useState(null)
@@ -119,6 +166,10 @@ export default function StudentView({ lessonId }) {
       .then(data => { setLesson(data); setLessonLoading(false) })
       .catch(() => setLessonLoading(false))
   }, [lessonId])
+
+  useEffect(() => {
+    if (lesson?.type === 'html') setHtmlPreviewCollapsed(true)
+  }, [lesson?.type, currentTaskId])
 
   // Warm up Pyodide for Python lessons
   useEffect(() => {
@@ -419,7 +470,7 @@ export default function StudentView({ lessonId }) {
       const status = result.status
       setRunStatus(status)
 
-      const passed = evaluateCheck(task?.check, accumulated)
+      const passed = evaluateCheck(task?.check, accumulated, { status })
       setCheckPassed(passed)
 
       saveCode(lessonId, currentTaskId, identity.anonymousId, { code, output: accumulated, runStatus: status })
@@ -431,6 +482,7 @@ export default function StudentView({ lessonId }) {
     }
 
     // HTML — build iframe
+    setHtmlPreviewCollapsed(false)
     const src = buildIframeSrc(files, task?.entryFile ?? 'index.html', {
       assets: lesson.assets ?? [],
       assetsPath: resolveAssetsPath(lesson.assetsPath),
@@ -563,7 +615,13 @@ export default function StudentView({ lessonId }) {
   }
 
   if (phase === 'waiting') {
-    return <WaitingRoom lessonTitle={lesson.title} onGoSolo={handleGoSolo} />
+    return (
+      <WaitingRoom
+        lessonTitle={lesson.title}
+        lessonDescription={lesson.description}
+        onGoSolo={handleGoSolo}
+      />
+    )
   }
 
   if (phase === 'ended') {
@@ -650,10 +708,13 @@ export default function StudentView({ lessonId }) {
       )}
 
       <div style={styles.body}>
-        <div key={`task-${currentTaskId}`} className="task-enter" style={styles.taskContent}>
-        {task?.explainer && !isSandbox && (
-          <ExplainerPanel content={task.explainer} />
-        )}
+        <TaskSlideTransition
+          transitionKey={`${phase}-${viewingTaskId ?? currentTaskId}`}
+          style={styles.taskContent}
+        >
+          {task?.explainer && !isSandbox && (
+            <ExplainerPanel title={task.title} content={task.explainer} />
+          )}
 
         <div style={lesson.type === 'scratch' ? styles.editorAreaScratch : styles.editorArea}>
           {lesson.type === 'scratch' ? (() => {
@@ -741,12 +802,28 @@ export default function StudentView({ lessonId }) {
                 )}
               </div>
               <div style={styles.htmlMobilePreview}>
-                <IframePreview src={iframeSrc} iframeRef={iframeRef} fill />
+                <CollapsibleIframePreview
+                  src={iframeSrc}
+                  iframeRef={iframeRef}
+                  fill
+                  collapsed={htmlPreviewCollapsed}
+                  onToggle={() => setHtmlPreviewCollapsed(v => !v)}
+                  animate
+                />
               </div>
             </div>
           ) : (
             <SplitPane
               style={{ flex: 1, minHeight: 320 }}
+              rightCollapsed={htmlPreviewCollapsed}
+              collapsedRight={
+                <CollapsibleIframePreview
+                  src={iframeSrc}
+                  iframeRef={iframeRef}
+                  collapsed
+                  onToggle={() => setHtmlPreviewCollapsed(false)}
+                />
+              }
               left={
                 <div style={styles.htmlLeft}>
                   <HtmlEditor
@@ -770,11 +847,20 @@ export default function StudentView({ lessonId }) {
                   )}
                 </div>
               }
-              right={<IframePreview src={iframeSrc} iframeRef={iframeRef} fill />}
+              right={
+                <CollapsibleIframePreview
+                  src={iframeSrc}
+                  iframeRef={iframeRef}
+                  fill
+                  collapsed={false}
+                  onToggle={() => setHtmlPreviewCollapsed(true)}
+                  animate
+                />
+              }
             />
           )}
 
-          {isSolo && (
+          {false && isSolo && (
             <div style={styles.soloNav}>
               <button
                 className="btn-secondary"
@@ -798,7 +884,30 @@ export default function StudentView({ lessonId }) {
             </div>
           )}
         </div>
-        </div>
+        </TaskSlideTransition>
+        {isSolo && (
+          <div style={styles.soloNav}>
+            <button
+              className="btn-secondary"
+              style={styles.soloNavBtn}
+              disabled={currentTaskId <= 1}
+              onClick={() => handleSoloNavigate(currentTaskId - 1)}
+            >
+              Previous
+            </button>
+            <span style={styles.soloNavLabel}>
+              Task {currentTaskId} of {lesson.tasks.length}
+            </span>
+            <button
+              className="btn-secondary"
+              style={styles.soloNavBtn}
+              disabled={currentTaskId >= lesson.tasks.length}
+              onClick={() => handleSoloNavigate(currentTaskId + 1)}
+            >
+              Next
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -844,7 +953,7 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     gap: '8px',
-    minHeight: 520,
+    minHeight: 0,
   },
   htmlLeft: {
     display: 'flex',

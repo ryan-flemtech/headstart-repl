@@ -1,10 +1,14 @@
-import React, { useState, useRef, useCallback } from 'react'
+import React, { useEffect, useState, useRef, useCallback } from 'react'
 
-export default function SplitPane({ left, right, defaultSplit = 50, style }) {
+export default function SplitPane({ left, right, defaultSplit = 50, style, rightCollapsed = false, collapsedRight = null, collapsedRightWidth = 44 }) {
   const [splitPct, setSplitPct] = useState(defaultSplit)
   const [isDragging, setIsDragging] = useState(false)
   const containerRef = useRef(null)
   const dragging = useRef(false)
+
+  useEffect(() => {
+    if (!rightCollapsed) setSplitPct(defaultSplit)
+  }, [defaultSplit, rightCollapsed])
 
   const onMouseDown = useCallback((e) => {
     e.preventDefault()
@@ -34,26 +38,34 @@ export default function SplitPane({ left, right, defaultSplit = 50, style }) {
   }, [])
 
   const paneStyle = isDragging ? { pointerEvents: 'none' } : undefined
+  const leftStyle = rightCollapsed
+    ? { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'auto', ...paneStyle }
+    : { width: `${splitPct}%`, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'auto', ...paneStyle }
+  const rightStyle = rightCollapsed
+    ? { width: collapsedRightWidth, minWidth: collapsedRightWidth, display: 'flex', flexDirection: 'column', overflow: 'hidden', flexShrink: 0 }
+    : { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', ...paneStyle }
 
   return (
     <div ref={containerRef} style={{ display: 'flex', minHeight: 0, overflow: 'hidden', ...style }}>
-      <div style={{ width: `${splitPct}%`, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'auto', ...paneStyle }}>
+      <div style={leftStyle}>
         {left}
       </div>
-      <div
-        onMouseDown={onMouseDown}
-        onMouseEnter={e => { e.currentTarget.style.background = '#c4b5fd' }}
-        onMouseLeave={e => { e.currentTarget.style.background = '#e5e7eb' }}
-        style={{
-          width: 5,
-          cursor: 'col-resize',
-          background: '#e5e7eb',
-          flexShrink: 0,
-          transition: 'background 0.15s',
-        }}
-      />
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', ...paneStyle }}>
-        {right}
+      {!rightCollapsed && (
+        <div
+          onMouseDown={onMouseDown}
+          onMouseEnter={e => { e.currentTarget.style.background = '#c4b5fd' }}
+          onMouseLeave={e => { e.currentTarget.style.background = '#e5e7eb' }}
+          style={{
+            width: 5,
+            cursor: 'col-resize',
+            background: '#e5e7eb',
+            flexShrink: 0,
+            transition: 'background 0.15s',
+          }}
+        />
+      )}
+      <div style={rightStyle}>
+        {rightCollapsed ? collapsedRight : right}
       </div>
     </div>
   )

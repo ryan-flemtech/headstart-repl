@@ -4,8 +4,18 @@ export function normalizeChecks(check) {
   return [check]
 }
 
-export function evaluateSingleCheck(check, output) {
-  if (!check?.type || check.value == null) return false
+export function evaluateSingleCheck(check, output, context = {}) {
+  if (!check?.type) return false
+
+  if (check.type === 'code_no_error') {
+    return context.status === 'success'
+  }
+
+  if (check.type === 'output_not_empty') {
+    return normalizeOutput(output).length > 0
+  }
+
+  if (check.value == null) return false
 
   if (check.type === 'output_equals') {
     return normalizeExactOutput(output) === normalizeExactOutput(check.value)
@@ -20,10 +30,10 @@ export function evaluateSingleCheck(check, output) {
   return actual.includes(expected)
 }
 
-export function evaluateCheck(check, output) {
+export function evaluateCheck(check, output, context = {}) {
   const checks = normalizeChecks(check)
   if (checks.length === 0) return false
-  return checks.every(c => evaluateSingleCheck(c, output))
+  return checks.every(c => evaluateSingleCheck(c, output, context))
 }
 
 function normalizeOutput(value) {

@@ -3,7 +3,8 @@ import SplitPane from '../../shared/SplitPane'
 import { CodeEditor } from '../../shared/CodeEditor'
 import FileManager from './FileManager'
 import ScratchWorkspace from '../../app/components/ScratchWorkspace'
-import { ScratchToolboxPicker } from './TaskEditor'
+import { ScratchToolboxPicker, SpriteManager, BackdropManager } from './TaskEditor'
+import { DEFAULT_SPRITES } from '../../shared/scratch'
 
 export default function LessonMetaPanel({ lesson, onUpdate }) {
   const [sandboxOpen, setSandboxOpen] = useState(false)
@@ -120,8 +121,13 @@ export default function LessonMetaPanel({ lesson, onUpdate }) {
               <ScratchSandboxStarter
                 value={lesson.sandboxStarter}
                 toolbox={lesson.sandboxToolbox ?? ''}
+                sprites={lesson.sandboxSprites?.length > 0 ? lesson.sandboxSprites : DEFAULT_SPRITES}
+                backdrops={lesson.sandboxBackdrops?.length > 0 ? lesson.sandboxBackdrops : [{ id: 'backdrop1', name: 'Backdrop 1', colour: '#ffffff' }]}
+                assetsPath={lesson.assetsPath ?? ''}
                 onChange={state => set('sandboxStarter', state ? JSON.stringify(state) : undefined)}
                 onToolboxChange={v => set('sandboxToolbox', v || undefined)}
+                onSpritesChange={sprites => set('sandboxSprites', sprites)}
+                onBackdropsChange={backdrops => set('sandboxBackdrops', backdrops)}
               />
             ) : (
               <SandboxStarterFiles
@@ -145,35 +151,114 @@ function parseScratchStarter(value) {
   }
 }
 
-function ScratchSandboxStarter({ value, toolbox, onChange, onToolboxChange }) {
-  const [toolboxOpen, setToolboxOpen] = useState(false)
+function cloneScratchStarter(value) {
+  if (!value) return null
+  if (typeof structuredClone === 'function') return structuredClone(value)
+  return JSON.parse(JSON.stringify(value))
+}
+
+function ScratchSandboxStarter({ value, toolbox, sprites, backdrops, assetsPath, onChange, onToolboxChange, onSpritesChange, onBackdropsChange }) {
+  const [activeTab, setActiveTab] = useState('starter')
+  const [testBlocks, setTestBlocks] = useState(() => cloneScratchStarter(parseScratchStarter(value)))
+  const [syncNowKey, setSyncNowKey] = useState(0)
+  const starterBlocksRef = React.useRef(parseScratchStarter(value))
+
+  function resolveAssetsPath(rawPath) {
+    if (!rawPath) return ''
+    const base = import.meta.env.BASE_URL.replace(/\/$/, '')
+    const encoded = rawPath.split('/').map(seg => (seg ? encodeURIComponent(seg) : seg)).join('/')
+    return window.location.origin + base + encoded
+  }
+
+  function handleTabChange(tab) {
+    if (tab === activeTab) return
+    if (tab === 'test') {
+      setSyncNowKey(key => key + 1)
+      requestAnimationFrame(() => {
+        const snapshot = starterBlocksRef.current ?? parseScratchStarter(value)
+        setTestBlocks(cloneScratchStarter(snapshot))
+        setActiveTab('test')
+      })
+      return
+    }
+    setActiveTab('starter')
+  }
+
+  const resolvedAssets = assetsPath ? resolveAssetsPath(assetsPath) : ''
+  const spriteIds = (sprites ?? []).map(sp => sp.id).join(',')
 
   return (
-    <div style={s.scratchSandboxEditor}>
-      <div style={{ flex: 1, minHeight: 0, minWidth: 0, display: 'flex' }}>
-        <ScratchWorkspace
-          key="scratch-sandbox-starter"
-          task={{ toolbox, check: null }}
-          initialState={parseScratchStarter(value)}
-          onStateChange={onChange}
-        />
-      </div>
-      <div style={s.toolboxCollapsible}>
+    <div style={s.scratchSandboxShell}>
+      <div style={s.workspaceTabs} role="tablist" aria-label="Sandbox starter workspace">
         <button
           type="button"
-          style={s.collapsibleHeader}
-          onClick={() => setToolboxOpen(o => !o)}
-          aria-expanded={toolboxOpen}
+          role="tab"
+          aria-selected={activeTab === 'starter'}
+          style={{ ...s.workspaceTab, ...(activeTab === 'starter' ? s.workspaceTabActive : {}) }}
+          onClick={() => handleTabChange('starter')}
         >
-          <span style={s.collapsibleLabel}>Toolbox blocks</span>
-          <span style={{ ...s.collapsibleChevron, transform: toolboxOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▾</span>
+          Starter Blocks
         </button>
-        {toolboxOpen && (
-          <ScratchToolboxPicker
-            toolbox={toolbox}
-            onChange={onToolboxChange}
-          />
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'test'}
+          style={{ ...s.workspaceTab, ...(activeTab === 'test' ? s.workspaceTabActive : {}) }}
+          onClick={() => handleTabChange('test')}
+        >
+          Test Code
+        </button>
+      </div>
+
+      <div style={s.scratchSandboxEditor}>
+        {activeTab === 'starter' && (
+          <div style={s.scratchConfigSidebar}>
+            <div style={s.sidebarSection}>
+              <span style={s.sidebarSectionTitle}>Toolbox blocks</span>
+              <ScratchToolboxPicker toolbox={toolbox} onChange={onToolboxChange} />
+            </div>
+            <div style={s.sidebarSection}>
+              <span style={s.sidebarSectionTitle}>Sprites</span>
+              <SpriteManager
+                sprites={sprites}
+                onChange={onSpritesChange}
+                assetsPath={resolvedAssets}
+              />
+            </div>
+            <div style={s.sidebarSection}>
+              <span style={s.sidebarSectionTitle}>Backdrops</span>
+              <BackdropManager
+                backdrops={backdrops}
+                onChange={onBackdropsChange}
+                assetsPath={resolvedAssets}
+              />
+            </div>
+          </div>
         )}
+        <div style={{ flex: 1, minHeight: 0, minWidth: 0, display: 'flex' }}>
+          {activeTab === 'starter' ? (
+            <ScratchWorkspace
+              key={`scratch-sandbox-starter-${spriteIds}`}
+              task={{ toolbox, check: null, sprites, backdrops }}
+              hideStage
+              assetsPath={resolvedAssets}
+              initialState={parseScratchStarter(value)}
+              onStateChange={state => {
+                starterBlocksRef.current = state
+                onChange(state)
+              }}
+              syncNowKey={syncNowKey}
+            />
+          ) : (
+            <ScratchWorkspace
+              key={`scratch-sandbox-test-${spriteIds}`}
+              task={{ toolbox, check: null, sprites, backdrops }}
+              assetsPath={resolvedAssets}
+              initialState={testBlocks}
+              onStateChange={setTestBlocks}
+            />
+          )}
+        </div>
       </div>
     </div>
   )
@@ -193,6 +278,7 @@ function SandboxStarterFiles({ files, onChange }) {
           selectedFile={selectedFile}
           onSelectFile={setSelectedFile}
           onAddFile={f => { onChange([...files, f]); setSelectedFile(f.name) }}
+          onSetFiles={(newFiles, newEntry) => { onChange(newFiles); setSelectedFile(newFiles[0]?.name ?? '') }}
           onDeleteFile={name => {
             const next = files.filter(f => f.name !== name)
             onChange(next)
@@ -420,8 +506,8 @@ const s = {
     padding: 24,
   },
   modal: {
-    width: 'min(980px, 94vw)',
-    height: 'min(680px, 88vh)',
+    width: 'min(1120px, 94vw)',
+    height: 'min(760px, 88vh)',
     background: '#fff',
     borderRadius: 8,
     boxShadow: '0 24px 70px rgba(0, 0, 0, 0.28)',
@@ -478,45 +564,73 @@ const s = {
     minWidth: 0,
     flex: '1 1 auto',
   },
+  scratchSandboxShell: {
+    flex: 1,
+    minHeight: 0,
+    minWidth: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 12,
+  },
+  workspaceTabs: {
+    display: 'inline-grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: 4,
+    alignSelf: 'flex-start',
+    border: '1px solid #e5e7eb',
+    borderRadius: 8,
+    padding: 4,
+    background: '#fff',
+    flexShrink: 0,
+  },
+  workspaceTab: {
+    border: 0,
+    borderRadius: 6,
+    background: 'transparent',
+    color: '#4b5563',
+    padding: '8px 12px',
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.86rem',
+    fontWeight: 700,
+    cursor: 'pointer',
+  },
+  workspaceTabActive: {
+    background: 'var(--colour-primary)',
+    color: '#fff',
+  },
   scratchSandboxEditor: {
     flex: 1,
     minHeight: 0,
     minWidth: 0,
     width: '100%',
     display: 'flex',
-    flexDirection: 'column',
+    overflow: 'hidden',
   },
-  toolboxCollapsible: {
+  scratchConfigSidebar: {
+    width: 300,
     flexShrink: 0,
-    borderTop: '1px solid #e5e7eb',
-    background: '#fafafa',
-    maxHeight: 260,
     overflowY: 'auto',
-  },
-  collapsibleHeader: {
-    width: '100%',
     display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '10px 14px',
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    fontFamily: 'var(--font-body)',
-    fontWeight: 600,
-    fontSize: '0.82rem',
-    color: 'var(--colour-text)',
+    flexDirection: 'column',
+    gap: 16,
+    borderRight: '1px solid #e5e7eb',
+    background: '#fafafa',
+    padding: '12px 10px',
   },
-  collapsibleLabel: {
-    fontFamily: 'var(--font-body)',
-    fontWeight: 600,
-    fontSize: '0.82rem',
-    color: 'var(--colour-text)',
+  sidebarSection: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 6,
   },
-  collapsibleChevron: {
-    fontSize: '1rem',
-    transition: 'transform 0.15s ease',
-    lineHeight: 1,
+  sidebarSectionTitle: {
+    fontFamily: 'var(--font-body)',
+    fontWeight: 700,
+    fontSize: '0.78rem',
+    color: '#6b7280',
+    textTransform: 'uppercase',
+    letterSpacing: '0.06em',
+    paddingBottom: 4,
+    borderBottom: '1px solid #e5e7eb',
   },
   noFile: {
     flex: 1,

@@ -1,26 +1,48 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { MarkdownRenderer } from '../../shared/markdown'
 
-export default function ExplainerEditor({ value, onChange }) {
+export default function ExplainerEditor({ title, value, onChange }) {
+  const [tab, setTab] = useState('entry')
+
   return (
     <div style={s.wrap}>
-      <div style={s.pane}>
-        <div style={s.paneLabel}>Markdown</div>
-        <textarea
-          style={s.textarea}
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          placeholder="Write the task explainer in Markdown…"
-          spellCheck
-        />
+      <div style={s.tabs} role="tablist" aria-label="Explainer editor views">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'entry'}
+          style={tab === 'entry' ? { ...s.tab, ...s.tabActive } : s.tab}
+          onClick={() => setTab('entry')}
+        >
+          Entry
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'preview'}
+          style={tab === 'preview' ? { ...s.tab, ...s.tabActive } : s.tab}
+          onClick={() => setTab('preview')}
+        >
+          Preview
+        </button>
       </div>
+
       <div style={s.pane}>
-        <div style={s.paneLabel}>Preview</div>
-        <div style={s.preview}>
-          {value
-            ? <MarkdownRenderer content={value} />
-            : <span style={{ color: '#9ca3af', fontFamily: 'var(--font-body)', fontSize: '0.9rem' }}>Preview will appear here…</span>}
-        </div>
+        {tab === 'entry' ? (
+          <textarea
+            style={s.textarea}
+            value={value}
+            onChange={e => onChange(e.target.value)}
+            placeholder="Write the task explainer in Markdown..."
+            spellCheck
+          />
+        ) : (
+          <div style={s.preview}>
+            {value || title
+              ? <MarkdownRenderer title={title} content={value} />
+              : <span style={s.empty}>Preview will appear here...</span>}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -28,30 +50,46 @@ export default function ExplainerEditor({ value, onChange }) {
 
 const s = {
   wrap: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: 12,
+    display: 'flex',
+    flexDirection: 'column',
     height: 240,
     minHeight: 180,
+  },
+  tabs: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 4,
+    padding: 4,
+    border: '1px solid #e5e7eb',
+    borderBottom: 'none',
+    borderRadius: '8px 8px 0 0',
+    background: '#f7f7f7',
+    flexShrink: 0,
+  },
+  tab: {
+    border: 'none',
+    borderRadius: 6,
+    background: 'transparent',
+    color: '#6b7280',
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.82rem',
+    fontWeight: 700,
+    padding: '6px 12px',
+    cursor: 'pointer',
+  },
+  tabActive: {
+    background: '#ffffff',
+    color: 'var(--colour-primary-dark)',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.08)',
   },
   pane: {
     display: 'flex',
     flexDirection: 'column',
     border: '1px solid #e5e7eb',
-    borderRadius: 8,
+    borderRadius: '0 0 8px 8px',
     overflow: 'hidden',
-  },
-  paneLabel: {
-    background: '#f0f0f0',
-    fontFamily: 'var(--font-body)',
-    fontWeight: 600,
-    fontSize: '0.78rem',
-    color: '#6b7280',
-    padding: '4px 10px',
-    borderBottom: '1px solid #e5e7eb',
-    flexShrink: 0,
-    textTransform: 'uppercase',
-    letterSpacing: '0.05em',
+    minHeight: 0,
+    flex: 1,
   },
   textarea: {
     flex: 1,
@@ -68,5 +106,10 @@ const s = {
     flex: 1,
     padding: '10px 12px',
     overflowY: 'auto',
+  },
+  empty: {
+    color: '#9ca3af',
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.9rem',
   },
 }

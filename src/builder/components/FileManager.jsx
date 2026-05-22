@@ -1,6 +1,81 @@
-import React from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 
-export default function FileManager({ files = [], entryFile, onAddFile, onDeleteFile, onRenameFile, onChangeType, onChangeEntryFile, selectedFile, onSelectFile }) {
+const HTML_ONLY = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>My Page</title>
+</head>
+<body>
+
+</body>
+</html>`
+
+const HTML_WITH_CSS = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>My Page</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+</body>
+</html>`
+
+const HTML_WITH_CSS_JS = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>My Page</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <script src="script.js"></script>
+</body>
+</html>`
+
+const TEMPLATES = [
+  {
+    label: 'HTML',
+    files: [{ name: 'index.html', type: 'html', content: HTML_ONLY }],
+    entry: 'index.html',
+  },
+  {
+    label: 'HTML + CSS',
+    files: [
+      { name: 'index.html', type: 'html', content: HTML_WITH_CSS },
+      { name: 'style.css', type: 'css', content: '' },
+    ],
+    entry: 'index.html',
+  },
+  {
+    label: 'HTML + CSS + JS',
+    files: [
+      { name: 'index.html', type: 'html', content: HTML_WITH_CSS_JS },
+      { name: 'style.css', type: 'css', content: '' },
+      { name: 'script.js', type: 'javascript', content: '' },
+    ],
+    entry: 'index.html',
+  },
+]
+
+export default function FileManager({ files = [], entryFile, onAddFile, onDeleteFile, onRenameFile, onChangeType, onChangeEntryFile, onSetFiles, selectedFile, onSelectFile }) {
+  const [generateOpen, setGenerateOpen] = useState(false)
+  const generateRef = useRef(null)
+
+  useEffect(() => {
+    if (!generateOpen) return
+    function onPointerDown(e) {
+      if (generateRef.current && !generateRef.current.contains(e.target)) {
+        setGenerateOpen(false)
+      }
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [generateOpen])
+
   function handleAdd() {
     const name = prompt('Filename (e.g. about.html, style.css, script.js):')
     if (!name || !name.trim()) return
@@ -15,11 +90,32 @@ export default function FileManager({ files = [], entryFile, onAddFile, onDelete
     onAddFile({ name: trimmed, type, content: '' })
   }
 
+  function handleGenerate(template) {
+    setGenerateOpen(false)
+    onSetFiles?.(template.files, template.entry)
+  }
+
   return (
     <div style={s.wrap}>
       <div style={s.header}>
         <span style={s.label}>Files</span>
-        <button className="btn-primary" style={s.addBtn} onClick={handleAdd}>+ File</button>
+        <div style={s.headerBtns}>
+          <div ref={generateRef} style={s.generateWrap}>
+            <button style={s.generateBtn} onClick={() => setGenerateOpen(o => !o)}>
+              Generate ▾
+            </button>
+            {generateOpen && (
+              <div style={s.generateDropdown}>
+                {TEMPLATES.map(t => (
+                  <button key={t.label} style={s.generateOption} onClick={() => handleGenerate(t)}>
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <button className="btn-primary" style={s.addBtn} onClick={handleAdd}>+ File</button>
+        </div>
       </div>
 
       {files.map(f => (
@@ -76,7 +172,6 @@ const s = {
   wrap: {
     border: '1px solid #e5e7eb',
     borderRadius: 8,
-    overflow: 'hidden',
   },
   header: {
     background: '#f0f0f0',
@@ -85,6 +180,7 @@ const s = {
     justifyContent: 'space-between',
     alignItems: 'center',
     borderBottom: '1px solid #e5e7eb',
+    borderRadius: '7px 7px 0 0',
   },
   label: {
     fontFamily: 'var(--font-body)',
@@ -93,6 +189,51 @@ const s = {
     color: '#6b7280',
     textTransform: 'uppercase',
     letterSpacing: '0.05em',
+  },
+  headerBtns: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+  },
+  generateWrap: {
+    position: 'relative',
+  },
+  generateBtn: {
+    fontSize: 11,
+    padding: '3px 8px',
+    fontFamily: 'var(--font-body)',
+    fontWeight: 600,
+    border: '1px solid var(--colour-primary)',
+    borderRadius: 5,
+    background: '#fff',
+    color: 'var(--colour-primary)',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+  },
+  generateDropdown: {
+    position: 'absolute',
+    top: 'calc(100% + 4px)',
+    right: 0,
+    zIndex: 20,
+    background: '#fff',
+    border: '1px solid #e5e7eb',
+    borderRadius: 7,
+    boxShadow: '0 4px 16px rgba(0,0,0,0.13)',
+    minWidth: 160,
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+  },
+  generateOption: {
+    padding: '9px 14px',
+    border: 0,
+    background: 'transparent',
+    textAlign: 'left',
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.86rem',
+    color: 'var(--colour-text)',
+    cursor: 'pointer',
+    borderBottom: '1px solid #f3f4f6',
   },
   addBtn: { fontSize: 11, padding: '3px 8px' },
   row: {

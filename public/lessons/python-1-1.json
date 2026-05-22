@@ -7,36 +7,59 @@
     {
       "id": 1,
       "title": "Printing Your Name",
-      "explainer": "When we want to print to the screen we use `print()` - Anything inside the brackets will be printed to the console! \n\nBut we also need to put our message inside quotation marks `print(\" \")`\n\nTry it below, put between the quotation marks your name: \n```python\nprint(\"Your name\")\n```",
+      "explainer": "When we want to print to the screen we use `python:print()` - Anything inside the brackets will be printed to the console! \n\nBut we also need to put our message inside **quotation marks** `python:print(\" \")`\n\nTry it below, put *between* the quotation marks your name: \n```python\nprint(\"Your name\")\n```",
       "carryCodeFrom": null,
       "starterCode": "print(\" \")",
-      "check": null
+      "check": [
+        {
+          "type": "output_line_count",
+          "value": "1"
+        }
+      ],
+      "completeCode": "print(\"Ryan\")",
+      "_checkTested": true
     },
     {
       "id": 2,
       "title": "Printing Hello World",
-      "explainer": "Can you write a `print()` command from scratch? \n\nTry writing out the code from below: \n\n```python\nprint(\"Hello world\")\n```",
+      "explainer": "Can you write a `python:print()` command from scratch? \n\nTry writing out the code from below: \n\n```python\nprint(\"Hello world\")\n```",
       "carryCodeFrom": null,
       "starterCode": "",
       "check": {
         "type": "output_contains",
         "value": "hello world"
       },
-      "_checkTested": true
+      "_checkTested": true,
+      "completeCode": "print(\"Hello world\")"
     },
     {
       "id": 3,
       "title": "Printing Multiple Lines",
-      "explainer": "What about if we want to print out multiple lines? \n\nWe can add another line and write another `print()` command! This will be printed out in the console on the next line. \n\n```python\nprint(\"Hello world\")\nprint(\"My name is Jeff\")\n```",
+      "explainer": "What about if we want to print out multiple lines? \n\nWe can add another line and write another `python:print()` command! This will be printed out in the console on the next line. \n\n```python\nprint(\"Hello world\")\nprint(\"My name is Jeff\")\n```",
       "carryCodeFrom": 2,
-      "starterCode": "print(\"Hello world\")"
+      "starterCode": "print(\"Hello world\")",
+      "check": [
+        {
+          "type": "output_line_count",
+          "value": "2"
+        }
+      ],
+      "completeCode": "print(\"Hello world\")\nprint(\"My name is Ryan\")",
+      "_checkTested": true
     },
     {
       "id": 4,
       "title": "Debugging Errors",
-      "explainer": "What about if we write our code wrong? \n\nAn error message will show in the output. Try running the code below and seeing the error. Then see if you can fix it!\n\n**Hint:** Our message inside our print should be between quotation marks! `print(\" \")`",
+      "explainer": "What about if we write our code wrong? \n\nAn error message will show in the output. Try running the code below and seeing the error. Then see if you can fix it!\n\n**Hint:** Our message inside our print should be between quotation marks! `python:print(\" \")`",
       "carryCodeFrom": null,
-      "starterCode": "print(\"Hello)"
+      "starterCode": "print(\"Hello)",
+      "check": [
+        {
+          "type": "code_no_error"
+        }
+      ],
+      "_checkTested": true,
+      "completeCode": "print(\"Hello\")"
     },
     {
       "id": 5,
@@ -48,7 +71,8 @@
         "type": "output_equals",
         "value": "****\n****\n****\n****"
       },
-      "_checkTested": true
+      "_checkTested": true,
+      "completeCode": "print(\"****\")\nprint(\"****\")\nprint(\"****\")\nprint(\"****\")"
     },
     {
       "id": 6,
@@ -60,19 +84,21 @@
         "type": "output_contains",
         "value": "  *\n ***\n*****\n  *\n  *"
       },
-      "_checkTested": true
+      "_checkTested": true,
+      "completeCode": "print(\"  *\")\nprint(\" ***\")\nprint(\"*****\")\nprint(\"  *\")\nprint(\"  *\")\nprint(\"  *\")"
     },
     {
       "id": 7,
       "title": "Ascii Art Challenge - 3",
       "explainer": "What about this smily face? \n\n```\n  00000\n 0     0\n0  0 0  0\n0       0\n0   U   0\n 0     0\n  00000\n```",
       "carryCodeFrom": 6,
-      "starterCode": "print(\"  *  \")\nprint(\" *** \")\nprint(\"*****\")\nprint(\"  *  \")\nprint(\"  *  \")\nprint(\"  *  \")",
+      "starterCode": "print(\"  *\")\nprint(\" ***\")\nprint(\"*****\")\nprint(\"  *\")\nprint(\"  *\")\nprint(\"  *\")",
       "check": {
         "type": "output_equals",
         "value": "  00000\n 0     0\n0  0 0  0\n0       0\n0   U   0\n 0     0\n  00000"
       },
-      "_checkTested": true
+      "_checkTested": true,
+      "completeCode": "print(\"  00000\")\nprint(\" 0     0\")\nprint(\"0  0 0  0\")\nprint(\"0       0\")\nprint(\"0   U   0\")\nprint(\" 0     0\")\nprint(\"  00000\")"
     }
   ],
   "level": "Level 1"

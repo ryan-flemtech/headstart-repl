@@ -20,6 +20,11 @@ import {
 const STAGE_W = 480
 const STAGE_H = 360
 const SYNC_DEBOUNCE = 1000
+const MIN_STAGE_SCALE = 0.35
+const MIN_EDITOR_WIDTH = 420
+const MIN_EDITOR_WIDTH_COMPACT = 320
+const STAGE_VERTICAL_CHROME = 112
+const PAGE_NAVIGATION_KEYS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '])
 
 const toCanvasX = x => STAGE_W / 2 + x
 const toCanvasY = y => STAGE_H / 2 - y
@@ -207,6 +212,7 @@ export default function ScratchWorkspace({
   externalStates = null,
   externalState  = null,     // legacy alias
   syncNowKey = null,
+  hideStage = false,
 }) {
   const sprites = task?.sprites?.length > 0 ? task.sprites : DEFAULT_SPRITES
   const backdrops = task?.backdrops?.length > 0 ? task.backdrops : []
@@ -249,6 +255,7 @@ export default function ScratchWorkspace({
   const [askValue, setAskValue]     = useState('')
   const [stageCursor, setStageCursor] = useState('default')
   const [stageScale, setStageScale] = useState(1)
+  const [flyoutCollapsed, setFlyoutCollapsed] = useState(false)
   const [backdropName, setBackdropName] = useState(backdrops[0]?.name ?? null)
   const [imageVersion, setImageVersion] = useState(0)
   const canvasRef = useRef(null)
@@ -354,6 +361,19 @@ export default function ScratchWorkspace({
   }, [])
 
   // ── Build sprite workspace array for run calls ───────────────────────────────
+  const resizeBlocklyWorkspaces = useCallback(() => {
+    const Blockly = BlocklyRef.current
+    if (!Blockly) return
+    try { Blockly.WidgetDiv?.hide?.() } catch {}
+    try {
+      if (Blockly.DropDownDiv?.hideWithoutAnimation) Blockly.DropDownDiv.hideWithoutAnimation()
+      else Blockly.DropDownDiv?.hide?.()
+    } catch {}
+    for (const ws of Object.values(workspaceRefs.current)) {
+      try { Blockly.svgResize(ws) } catch {}
+    }
+  }, [])
+
   const buildSpriteWorkspaces = useCallback(() => {
     return sprites.map(sp => ({
       id: sp.id,
@@ -368,6 +388,28 @@ export default function ScratchWorkspace({
     })).filter(sp => sp.workspace)
   }, [sprites])
 
+  function buildToolboxForSprite(spriteId) {
+    const state = spriteStatesRef.current[spriteId] ?? { x: 0, y: 0 }
+    return buildAlwaysOpenToolbox(
+      unrestricted ? DEFAULT_TOOLBOX : (task?.toolbox ?? DEFAULT_TOOLBOX),
+      { position: { x: state.x, y: state.y } },
+    )
+  }
+
+  function refreshSpriteToolbox(spriteId) {
+    const ws = workspaceRefs.current[spriteId]
+    if (!ws || readOnly) return
+    try {
+      ws.updateToolbox(buildToolboxForSprite(spriteId))
+      requestAnimationFrame(() => {
+        try {
+          ws.getFlyout?.()?.setVisible(!flyoutCollapsed)
+          BlocklyRef.current?.svgResize?.(ws)
+        } catch {}
+      })
+    } catch {}
+  }
+
   // ── Initialise Blockly (one workspace per sprite) ────────────────────────────
   useEffect(() => {
     let cancelled = false
@@ -381,16 +423,15 @@ export default function ScratchWorkspace({
         await new Promise(r => requestAnimationFrame(r))
         if (cancelled) return
 
-        const toolboxConfig = buildAlwaysOpenToolbox(unrestricted ? DEFAULT_TOOLBOX : (task?.toolbox ?? DEFAULT_TOOLBOX))
-
         for (const sp of sprites) {
           const div = blocksDivRefs.current[sp.id]
           if (!div) continue
 
           const ws = Blockly.inject(div, {
-            toolbox: toolboxConfig,
+            toolbox: buildToolboxForSprite(sp.id),
             renderer: 'zelos',
             grid: { spacing: 24, length: 2, colour: '#eee', snap: true },
+            zoom: { startScale: 0.75 },
             trashcan: true,
             readOnly,
           })
@@ -464,18 +505,27 @@ export default function ScratchWorkspace({
   // ── Resize active workspace when sprite selection changes ────────────────────
   useEffect(() => {
     if (status !== 'ready' || !BlocklyRef.current) return
+    requestAnimationFrame(resizeBlocklyWorkspaces)
+  }, [selectedSpriteId, status, stageScale, resizeBlocklyWorkspaces])
+
+  // ── Apply flyout collapsed state whenever it or selected sprite changes ──────
+  useEffect(() => {
+    if (status !== 'ready' || !BlocklyRef.current) return
     const ws = workspaceRefs.current[selectedSpriteId]
-    if (ws) requestAnimationFrame(() => { try { BlocklyRef.current.svgResize(ws) } catch {} })
-  }, [selectedSpriteId, status, stageScale])
+    if (!ws) return
+    try {
+      ws.getFlyout?.()?.setVisible(!flyoutCollapsed)
+      requestAnimationFrame(() => { try { BlocklyRef.current.svgResize(ws) } catch {} })
+    } catch {}
+  }, [flyoutCollapsed, selectedSpriteId, status])
 
   // ── Update toolbox when task.toolbox changes ─────────────────────────────────
   useEffect(() => {
     if (status !== 'ready' || !BlocklyRef.current) return
     try {
-      const toolboxConfig = buildAlwaysOpenToolbox(unrestricted ? DEFAULT_TOOLBOX : (task?.toolbox ?? DEFAULT_TOOLBOX))
-      for (const ws of Object.values(workspaceRefs.current)) ws.updateToolbox(toolboxConfig)
+      for (const sp of sprites) refreshSpriteToolbox(sp.id)
     } catch {}
-  }, [task?.toolbox, unrestricted, status])
+  }, [task?.toolbox, unrestricted, status, sprites])
 
   // ── Load external state (teacher push) ───────────────────────────────────────
   useEffect(() => {
@@ -501,15 +551,25 @@ export default function ScratchWorkspace({
   useEffect(() => {
     const el = rootRef.current
     if (!el) return
+    let resizeFrame = 0
     const obs = new ResizeObserver(([entry]) => {
       const w = entry.contentRect.width
-      // Reserve at least 280px for the block editor + 8px gap; scale stage to fit the rest
-      const scale = Math.min(1, Math.max(0.5, (w - 288) / (STAGE_W + 2)))
+      const h = entry.contentRect.height
+      const editorReserve = w < 760 ? MIN_EDITOR_WIDTH_COMPACT : MIN_EDITOR_WIDTH
+      const widthScale = (w - editorReserve - 8) / (STAGE_W + 2)
+      const heightScale = hideStage ? 1 : (h - STAGE_VERTICAL_CHROME) / (STAGE_H + 2)
+      const nextScale = Math.min(1, Math.max(MIN_STAGE_SCALE, Math.min(widthScale, heightScale)))
+      const scale = Number.isFinite(nextScale) ? nextScale : 1
       setStageScale(scale)
+      cancelAnimationFrame(resizeFrame)
+      resizeFrame = requestAnimationFrame(resizeBlocklyWorkspaces)
     })
     obs.observe(el)
-    return () => obs.disconnect()
-  }, [])
+    return () => {
+      obs.disconnect()
+      cancelAnimationFrame(resizeFrame)
+    }
+  }, [hideStage, resizeBlocklyWorkspaces])
 
   // ── Signal factory ───────────────────────────────────────────────────────────
   const createSignal = useCallback(() => {
@@ -717,6 +777,8 @@ export default function ScratchWorkspace({
           .then(() => finishRun(signal))
           .catch(() => finishRun(signal))
       }
+    } else if (wasDragging && wasMoved && draggedId) {
+      refreshSpriteToolbox(draggedId)
     }
   }
 
@@ -738,6 +800,9 @@ export default function ScratchWorkspace({
     function onKeyDown(event) {
       const key = normalizeKey(event.key)
       if (!key) return
+      if (document.activeElement === canvasRef.current && PAGE_NAVIGATION_KEYS.has(event.key)) {
+        event.preventDefault()
+      }
       inputStateRef.current.keysPressed.add(key)
       if (signalRef.current) signalRef.current.keysPressed.add(key)
       runHatForAll('event_whenkeypressed', key)
@@ -755,9 +820,27 @@ export default function ScratchWorkspace({
 
   const showManualCheck = scratchChecks.some(c => c.evaluation === 'manual')
 
+  // ── Sprite strip (shared between stage mode and hideStage mode) ───────────────
+  const spriteStrip = (
+    <div style={hideStage ? s.spriteStripTop : s.spriteStrip}>
+      {sprites.map(sp => (
+        <button
+          key={sp.id}
+          type="button"
+          style={{ ...s.spriteChip, ...(sp.id === selectedSpriteId ? s.spriteChipActive : {}) }}
+          onClick={() => setSelectedSpriteId(sp.id)}
+          title={sp.name}
+        >
+          <span style={{ ...s.spriteChipDot, background: SPRITE_TYPE_COLOR[sp.type ?? 'cat'] ?? '#aaa' }} />
+          <span style={s.spriteChipName}>{sp.name}</span>
+        </button>
+      ))}
+    </div>
+  )
+
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
-    <div className="scratch-workspace" style={s.root} ref={rootRef}>
+    <div className="scratch-workspace" style={hideStage ? s.rootColumn : s.root} ref={rootRef}>
       {status !== 'ready' && (
         <div style={s.overlay}>
           <div style={s.centre}>
@@ -769,110 +852,119 @@ export default function ScratchWorkspace({
         </div>
       )}
 
+      {/* Sprite strip above editor when stage is hidden */}
+      {hideStage && sprites.length > 1 && spriteStrip}
+
       {/* Block editor — all workspace divs stacked, only selected one visible */}
       <div style={s.editorPane}>
-        {sprites.map(sp => (
-          <div
-            key={sp.id}
-            ref={el => { if (el) blocksDivRefs.current[sp.id] = el }}
-            style={{
-              position: 'absolute', inset: 0,
-              visibility: sp.id === selectedSpriteId ? 'visible' : 'hidden',
-              pointerEvents: sp.id === selectedSpriteId ? 'auto' : 'none',
-            }}
-          />
-        ))}
+        <div style={s.editorPaneHeader}>
+          <button
+            type="button"
+            onClick={() => setFlyoutCollapsed(c => !c)}
+            style={s.flyoutToggleBtn}
+            title={flyoutCollapsed ? 'Show blocks' : 'Hide blocks'}
+          >
+            {flyoutCollapsed ? '▶ Blocks' : '◀ Hide'}
+          </button>
+        </div>
+        <div style={s.editorPaneBody}>
+          {sprites.map(sp => (
+            <div
+              key={sp.id}
+              ref={el => { if (el) blocksDivRefs.current[sp.id] = el }}
+              style={{
+                position: 'absolute', inset: 0,
+                visibility: sp.id === selectedSpriteId ? 'visible' : 'hidden',
+                pointerEvents: sp.id === selectedSpriteId ? 'auto' : 'none',
+              }}
+            />
+          ))}
+        </div>
       </div>
 
       {/* Stage + controls */}
-      <div style={s.stagePane}>
-        <div style={s.stageToolbar}>
-          <button
-            type="button"
-            className="btn-primary"
-            style={s.greenFlagBtn}
-            onClick={handleRun}
-            aria-label="Run"
-            title="Run green flag scripts"
-          >
-            <span style={s.flagPole} aria-hidden="true"><span style={s.flagBanner} /></span>
-          </button>
-          <button
-            type="button"
-            className="btn-secondary"
-            style={s.stopFlagBtn}
-            onClick={handleStop}
-            aria-label="Stop"
-            title="Stop all scripts"
-          >
-            <span style={s.stopIcon} aria-hidden="true" />
-          </button>
-          <button type="button" className="btn-secondary" style={s.resetBtn} onClick={handleResetStage} title="Reset stage">
-            Reset
-          </button>
-        </div>
-
-        <div style={{ ...s.stageFrame, width: STAGE_W * stageScale, height: STAGE_H * stageScale }}>
-          <canvas
-            ref={canvasRef}
-            width={STAGE_W}
-            height={STAGE_H}
-            style={{ ...s.canvas, width: STAGE_W * stageScale, height: STAGE_H * stageScale, cursor: readOnly ? 'default' : stageCursor }}
-            onPointerDown={readOnly ? undefined : handleCanvasPointerDown}
-            onPointerMove={readOnly ? undefined : handleCanvasPointerMove}
-            onPointerUp={readOnly ? undefined : handleCanvasPointerUp}
-            onPointerLeave={readOnly ? undefined : handleCanvasPointerLeave}
-          />
-          {askPrompt && (
-            <form style={s.askBox} onSubmit={handleAskSubmit}>
-              <label style={s.askLabel}>{askPrompt}</label>
-              <div style={s.askRow}>
-                <input style={s.askInput} value={askValue} onChange={e => setAskValue(e.target.value)} autoFocus />
-                <button className="btn-primary" style={s.askBtn} type="submit">OK</button>
-              </div>
-            </form>
-          )}
-        </div>
-
-        {/* Sprite selector strip */}
-        <div style={s.spriteStrip}>
-          {sprites.map(sp => (
+      {!hideStage && (
+        <div style={s.stagePane}>
+          <div style={s.stageToolbar}>
             <button
-              key={sp.id}
               type="button"
-              style={{ ...s.spriteChip, ...(sp.id === selectedSpriteId ? s.spriteChipActive : {}) }}
-              onClick={() => setSelectedSpriteId(sp.id)}
-              title={sp.name}
+              className="btn-primary"
+              style={s.greenFlagBtn}
+              onClick={handleRun}
+              aria-label="Run"
+              title="Run green flag scripts"
             >
-              <span style={{ ...s.spriteChipDot, background: SPRITE_TYPE_COLOR[sp.type ?? 'cat'] ?? '#aaa' }} />
-              <span style={s.spriteChipName}>{sp.name}</span>
+              <span style={s.flagPole} aria-hidden="true"><span style={s.flagBanner} /></span>
             </button>
-          ))}
-        </div>
+            <button
+              type="button"
+              className="btn-secondary"
+              style={s.stopFlagBtn}
+              onClick={handleStop}
+              aria-label="Stop"
+              title="Stop all scripts"
+            >
+              <span style={s.stopIcon} aria-hidden="true" />
+            </button>
+            <button type="button" className="btn-secondary" style={s.resetBtn} onClick={handleResetStage} title="Reset stage">
+              Reset
+            </button>
+          </div>
 
-        <div style={s.controls}>
-          {!readOnly && showManualCheck && (
-            <button className="btn-secondary" style={s.checkBtn} onClick={handleCheck}>Check</button>
-          )}
-          {scratchChecks.length > 0 && checkPassed && <span style={s.checkPass}>✅ Check passed!</span>}
-          {scratchChecks.length > 0 && !checkPassed && showManualCheck && !running && (
-            <span style={s.checkNone}>Run your code, then click Check</span>
-          )}
-          {scratchChecks.length > 0 && !checkPassed && hasAfterRunCheck && !showManualCheck && !running && (
-            <span style={s.checkNone}>Run your code to check</span>
-          )}
+          <div style={{ ...s.stageFrame, width: STAGE_W * stageScale, height: STAGE_H * stageScale }}>
+            <canvas
+              ref={canvasRef}
+              width={STAGE_W}
+              height={STAGE_H}
+              tabIndex={readOnly ? undefined : 0}
+              style={{ ...s.canvas, width: STAGE_W * stageScale, height: STAGE_H * stageScale, cursor: readOnly ? 'default' : stageCursor }}
+              onPointerDown={readOnly ? undefined : handleCanvasPointerDown}
+              onPointerMove={readOnly ? undefined : handleCanvasPointerMove}
+              onPointerUp={readOnly ? undefined : handleCanvasPointerUp}
+              onPointerLeave={readOnly ? undefined : handleCanvasPointerLeave}
+            />
+            {askPrompt && (
+              <form style={s.askBox} onSubmit={handleAskSubmit}>
+                <label style={s.askLabel}>{askPrompt}</label>
+                <div style={s.askRow}>
+                  <input style={s.askInput} value={askValue} onChange={e => setAskValue(e.target.value)} autoFocus />
+                  <button className="btn-primary" style={s.askBtn} type="submit">OK</button>
+                </div>
+              </form>
+            )}
+          </div>
+
+          {spriteStrip}
+
+          <div style={s.controls}>
+            {!readOnly && showManualCheck && (
+              <button className="btn-secondary" style={s.checkBtn} onClick={handleCheck}>Check</button>
+            )}
+            {scratchChecks.length > 0 && checkPassed && <span style={s.checkPass}>✅ Check passed!</span>}
+            {scratchChecks.length > 0 && !checkPassed && showManualCheck && !running && (
+              <span style={s.checkNone}>Run your code, then click Check</span>
+            )}
+            {scratchChecks.length > 0 && !checkPassed && hasAfterRunCheck && !showManualCheck && !running && (
+              <span style={s.checkNone}>Run your code to check</span>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
 
 const s = {
-  root: { display: 'flex', flex: 1, minHeight: 0, gap: 8, height: '100%', position: 'relative' },
+  root: { display: 'flex', flex: 1, minHeight: 0, minWidth: 0, gap: 8, height: '100%', position: 'relative' },
+  rootColumn: { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, gap: 0, height: '100%', position: 'relative' },
+  spriteStripTop: { display: 'flex', gap: 6, flexWrap: 'wrap', padding: '6px 8px', borderBottom: '1px solid #e5e7eb', background: '#fafafa', flexShrink: 0 },
   overlay: { position: 'absolute', inset: 0, zIndex: 10, background: '#f5f5f5', borderRadius: 8 },
-  editorPane: { flex: 1, minWidth: 0, position: 'relative', border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden', background: '#F9F9F9' },
-  stagePane: { display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0 },
-  stageToolbar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  editorPane: { flex: '1 1 420px', minWidth: 0, border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden', background: '#F9F9F9', display: 'flex', flexDirection: 'column' },
+  editorPaneHeader: { display: 'flex', alignItems: 'center', height: 30, padding: '0 6px', borderBottom: '1px solid #e5e7eb', background: '#fafafa', flexShrink: 0 },
+  editorPaneBody: { flex: 1, minHeight: 0, position: 'relative' },
+  flyoutToggleBtn: { padding: '3px 8px', fontSize: '0.72rem', fontFamily: 'var(--font-body)', fontWeight: 600, border: '1px solid #e5e7eb', borderRadius: 4, background: '#fff', cursor: 'pointer', color: '#6b7280', display: 'flex', alignItems: 'center', gap: 4 },
+  stagePane: { display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0, minWidth: STAGE_W * MIN_STAGE_SCALE },
+  stageToolbar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, flexWrap: 'wrap' },
   canvas: { display: 'block', width: STAGE_W, height: STAGE_H, border: '1px solid #e5e7eb', borderRadius: 8 },
   stageFrame: { position: 'relative', width: STAGE_W, height: STAGE_H },
   spriteStrip: { display: 'flex', gap: 6, flexWrap: 'wrap', padding: '4px 0' },
