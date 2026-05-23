@@ -15,13 +15,14 @@ export default function BuilderOutputPanel({
   runStatus = null,
   inputPrompt = null,
   onInputSubmit,
-  checkResults = null, // null | [{type, value?, passed}]
+  checkResults = null,          // null | [{type, value?, passed}]
+  incorrectCheckResults = null, // null | [{type, value?, passed, hint?}]
   running = false,
 }) {
   const [inputValue, setInputValue] = useState('')
   const [isCollapsed, setIsCollapsed] = useState(true)
   const [displayedOutput, setDisplayedOutput] = useState('')
-  
+
   const bottomRef  = useRef(null)
   const inputRef   = useRef(null)
   const prevRunningRef = useRef(running)
@@ -46,7 +47,7 @@ export default function BuilderOutputPanel({
     const timer = setTimeout(() => {
       setDisplayedOutput(prev => {
         if (prev === output) return prev
-        
+
         let current = prev
         if (!output.startsWith(prev)) {
           current = ''
@@ -104,7 +105,7 @@ export default function BuilderOutputPanel({
     <div style={s.wrap}>
       {/* Output */}
       <div style={{ ...s.panel, minHeight: isCollapsed ? 'auto' : 100, maxHeight: isCollapsed ? 'auto' : 240 }} className="card">
-        <div 
+        <div
           style={{ ...s.header, borderRadius: isCollapsed ? '10px' : '10px 10px 0 0', cursor: 'pointer', userSelect: 'none' }}
           onClick={() => setIsCollapsed(prev => !prev)}
         >
@@ -136,10 +137,9 @@ export default function BuilderOutputPanel({
         )}
       </div>
 
-      {/* Check verification */}
+      {/* Completion check verification */}
       {!isCollapsed && checkResults !== null && (
         <div style={{ ...s.checkResult, background: allPassed ? '#f0fdf4' : '#fffbeb', borderColor: allPassed ? '#bbf7d0' : '#fde68a' }}>
-
           {checkResults.length === 1 ? (
             checkResults[0].passed
               ? <span>✅ <strong>Check passes</strong> — students will see the completion banner.</span>
@@ -158,6 +158,33 @@ export default function BuilderOutputPanel({
                   ? '✅ All checks pass — students will see the completion banner.'
                   : '⚠️ Not all checks pass — students will not see the completion banner.'}
               </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Incorrect check verification — shown when completion check failed */}
+      {!isCollapsed && incorrectCheckResults !== null && (
+        <div style={{ ...s.checkResult, background: '#f0f4ff', borderColor: '#c7d2fe' }}>
+          <div style={{ fontWeight: 700, marginBottom: incorrectCheckResults.length > 0 ? 6 : 0 }}>
+            Incorrect checks:
+          </div>
+          {incorrectCheckResults.length === 0 ? (
+            <span style={{ color: '#6b7280' }}>No incorrect checks configured.</span>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {incorrectCheckResults.map((r, i) => (
+                <div key={i}>
+                  {r.passed
+                    ? <span>🎯 <strong>Incorrect check {i + 1} matched</strong>{r.hint ? <> — hint: <em>"{r.hint}"</em></> : ' — no hint set'}</span>
+                    : <span style={{ color: '#6b7280' }}>— Incorrect check {i + 1} did not match {checkHint(r)}</span>}
+                </div>
+              ))}
+              {!incorrectCheckResults.some(r => r.passed) && (
+                <div style={{ marginTop: 4, color: '#6b7280', fontSize: '0.85em' }}>
+                  No incorrect check matched — the completion check hint (if any) will be shown instead.
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -4,13 +4,14 @@ import { useSession, decodeFileKey } from '../hooks/useSession'
 import { useIdentity } from '../hooks/useIdentity'
 import { initPyodide, runPython, stopPython, provideInput, isPyodideReady } from '../../shared/pyodide'
 import { buildIframeSrc, waitForIframeText } from '../../shared/iframe'
-import { evaluateCheck, evaluateCheckWithCode, getFirstFailedCheckHint } from '../../shared/checks'
-import { flattenTasks } from '../../shared/taskUtils'
+import { evaluateCheck, evaluateCheckWithCode, getFirstFailedCheckHint, getIncorrectCheckHint } from '../../shared/checks'
+import { flattenTasks, findGroupForTask, findTaskById } from '../../shared/taskUtils'
 import TopBar from '../components/TopBar'
 import NameEntry from '../components/NameEntry'
 import WaitingRoom from '../components/WaitingRoom'
 import TaskProgressDots from '../components/TaskProgressDots'
 import ExplainerPanel from '../components/ExplainerPanel'
+import InformationTask from '../components/InformationTask'
 import PythonEditor from '../components/PythonEditor'
 import HtmlEditor from '../components/HtmlEditor'
 import OutputPanel from '../components/OutputPanel'
@@ -447,7 +448,7 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
   useEffect(() => {
     if (!myStudentData?.remoteResetPushedAt || (phase !== 'lesson' && phase !== 'solo')) return
     const action = myStudentData.remoteResetAction
-    const task = lesson?.tasks.find(t => t.id === currentTaskId)
+    const task = findTaskById(lesson?.tasks, currentTaskId)
     if (!task || !action) return
 
     if (lesson.type === 'python') {
@@ -480,6 +481,16 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.students?.[identity?.anonymousId]?.displayName])
 
+  function canCarryFrom(carryFromId, currentTaskId) {
+    if (!carryFromId) return false
+    const sourceTask = flattenTasks(lesson.tasks).find(t => t.id === carryFromId)
+    if (!sourceTask) return false
+    if (sourceTask.taskType === 'quiz' || sourceTask.taskType === 'information') return false
+    const sourceGroup = findGroupForTask(lesson.tasks, carryFromId)
+    const currentGroup = findGroupForTask(lesson.tasks, currentTaskId)
+    return sourceGroup?.id === currentGroup?.id
+  }
+
   function loadTaskContent(taskId) {
     const activeIdentity = effectiveIdentity
     if (!lesson || !activeIdentity) return
@@ -501,7 +512,7 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
       }
       // Carry-through > starterCode > empty
       let initial = task.starterCode ?? ''
-      if (task.carryCodeFrom) {
+      if (canCarryFrom(task.carryCodeFrom, taskId)) {
         const saved = loadSavedCode(lessonId, task.carryCodeFrom, activeIdentity.anonymousId)
         if (saved?.code) initial = saved.code
       }
@@ -517,7 +528,7 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
           if (ownSaved != null) return { ...f, content: ownSaved }
         }
         let content = f.content
-        if (task.carryCodeFrom) {
+        if (canCarryFrom(task.carryCodeFrom, taskId)) {
           const saved = loadSavedFile(lessonId, task.carryCodeFrom, f.name, activeIdentity.anonymousId)
           if (saved != null) content = saved
         }
@@ -615,7 +626,7 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
       return
     }
     if (!identity) return
-    const currentTask = lesson?.tasks.find(t => t.id === currentTaskId)
+    const currentTask = findTaskById(lesson?.tasks, currentTaskId)
     if (phase === 'solo' && taskId > currentTaskId) {
       const canAdvance = !currentTask?.check || currentTask?.taskType === 'information' || checkPassed
       if (!canAdvance || taskId > currentTaskId + 1) return
@@ -640,7 +651,7 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
 
   function handleShowCompleteCode() {
     if (!identity) return
-    const task = lesson?.tasks.find(t => t.id === currentTaskId)
+    const task = findTaskById(lesson?.tasks, currentTaskId)
     if (!task) return
 
     if (lesson.type === 'python') {
@@ -669,7 +680,7 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
   async function handleRun() {
     const actor = effectiveIdentity
     if (!actor || running) return
-    const task = lesson?.tasks.find(t => t.id === currentTaskId)
+    const task = findTaskById(lesson?.tasks, currentTaskId)
     const isWatched = session?.activeStudentView === actor.anonymousId
 
     setRunning(true)
@@ -700,8 +711,10 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
       const status = result.status
       setRunStatus(status)
 
-      const passed = evaluateCheck(task?.check, accumulated, { status, code })
-      const suggestion = task?.check ? getFirstFailedCheckHint(task.check, accumulated, { status, code }) : ''
+      const checkContext = { status, code, variables: result.variables ?? {} }
+      const passed = evaluateCheck(task?.check, accumulated, checkContext)
+      const incorrectHint = (!passed && task?.incorrectChecks) ? getIncorrectCheckHint(task.incorrectChecks, accumulated, checkContext) : ''
+      const suggestion = task?.check ? (incorrectHint || getFirstFailedCheckHint(task.check, accumulated, checkContext)) : ''
       if (task?.check) applyCheckFeedback(passed, suggestion)
 
       if (canPublishTeacherLive()) {
@@ -731,7 +744,8 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
       const codeStr = files.map(f => f.content).join('\n')
       const iframeDoc = iframeRef.current?.contentDocument ?? null
       const passed = evaluateCheck(task?.check, text, { code: codeStr, iframeDoc })
-      const suggestion = task?.check ? getFirstFailedCheckHint(task.check, text, { code: codeStr, iframeDoc }) : ''
+      const incorrectHint = (!passed && task?.incorrectChecks) ? getIncorrectCheckHint(task.incorrectChecks, text, { code: codeStr, iframeDoc }) : ''
+      const suggestion = task?.check ? (incorrectHint || getFirstFailedCheckHint(task.check, text, { code: codeStr, iframeDoc })) : ''
       if (task?.check) applyCheckFeedback(passed, suggestion)
       if (canPublishTeacherLive()) {
         publishTeacherLive({ runStatus: 'success', checkPassed: passed, checkAttempted: !!task?.check, checkSuggestion: suggestion, files: Object.fromEntries(files.map(f => [f.name, f.content])) })
@@ -803,7 +817,7 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
   }
 
   function handleScratchCheck(passed, snapshot) {
-    const task = lesson?.tasks.find(t => t.id === currentTaskId)
+    const task = findTaskById(lesson?.tasks, currentTaskId)
     const checks = Array.isArray(task?.check) ? task.check : task?.check ? [task.check] : []
     const suggestion = passed ? '' : String(checks.find(c => c?.hint)?.hint ?? '').trim()
     if (task?.check) applyCheckFeedback(passed, suggestion)
@@ -821,7 +835,7 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
 
   function handleResetCode() {
     if (!window.confirm('Reset your code to the starter code? Your current work will be lost.')) return
-    const task = lesson?.tasks.find(t => t.id === currentTaskId)
+    const task = findTaskById(lesson?.tasks, currentTaskId)
     if (lesson.type === 'python') {
       setCode(task?.starterCode ?? '')
       if (canPublishTeacherLive()) publishTeacherLive({ code: task?.starterCode ?? '', output: '', runStatus: null, checkPassed: false, checkAttempted: false })
@@ -844,11 +858,12 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
   async function handleSubmit() {
     const actor = effectiveIdentity
     if (!actor) return
-    const task = lesson?.tasks.find(t => t.id === currentTaskId)
+    const task = findTaskById(lesson?.tasks, currentTaskId)
     const isHtml = lesson?.type === 'html'
     const codeForCheck = isHtml ? files.map(f => f.content).join('\n') : code
     const passed = task?.check ? evaluateCheckWithCode(task.check, codeForCheck) : false
-    const suggestion = task?.check ? getFirstFailedCheckHint(task.check, '', { code: codeForCheck }) : ''
+    const incorrectHint = (!passed && task?.incorrectChecks) ? getIncorrectCheckHint(task.incorrectChecks, '', { code: codeForCheck }) : ''
+    const suggestion = task?.check ? (incorrectHint || getFirstFailedCheckHint(task.check, '', { code: codeForCheck })) : ''
     if (task?.check) applyCheckFeedback(passed, suggestion)
     setRunStatus('submitted')
     if (canPublishTeacherLive()) {
@@ -883,7 +898,7 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
       return
     }
 
-    const task = lesson?.tasks.find(t => t.id === currentTaskId)
+    const task = findTaskById(lesson?.tasks, currentTaskId)
     const passed =
       typeof passedOverride === 'boolean'
         ? passedOverride
@@ -1114,11 +1129,7 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
         </div>
       )}
 
-      {!isSandbox && task?.title && (
-        <div style={styles.taskTitleHeader}>
-          {task.title}
-        </div>
-      )}
+
 
       {isViewingPrev && (
         <div style={styles.prevBanner}>
@@ -1152,7 +1163,7 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
             />
           )}
           {isInformationTask ? (
-            <ExplainerPanel title={task.title} content={task.explainer ?? ''} collapsible={false} fill />
+            <InformationTask task={task} lesson={lesson} fill />
           ) : task?.taskType === 'quiz' ? (
             <QuizTask
               task={task}

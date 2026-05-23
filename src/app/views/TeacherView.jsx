@@ -8,6 +8,7 @@ import PythonEditor from '../components/PythonEditor'
 import HtmlEditor from '../components/HtmlEditor'
 import ScratchWorkspace from '../components/ScratchWorkspace'
 import ExplainerPanel from '../components/ExplainerPanel'
+import InformationTask from '../components/InformationTask'
 import StudentGrid from '../components/StudentGrid'
 import QuizTask from '../components/QuizTask'
 
@@ -452,9 +453,7 @@ export default function TeacherView({ lessonId }) {
         }
       />
 
-      {!isInSandbox && task?.title && (
-        <div style={s.taskTitleHeader}>{task.title}</div>
-      )}
+
 
       <div style={{ ...s.body, gridTemplateColumns: `${leftCollapsed ? '40px' : '220px'} 1fr ${rightCollapsed ? '40px' : '280px'}` }}>
         {/* Left — Task Navigator */}
@@ -518,37 +517,20 @@ export default function TeacherView({ lessonId }) {
             </div>
           )}
 
-          {!isInSandbox && task?.taskType !== 'quiz' && !isInformationTask && (lesson.type === 'python' || lesson.type === 'html') && (
-            <div style={s.codeTabStrip} className="ui-tabs ui-tabs--editor" role="tablist" aria-label="Teacher code workspace">
-              <button
-                type="button"
-                className="ui-tab"
-                role="tab"
-                aria-selected={teacherCodeTab === 'starter'}
-                style={{ ...s.codeTabBtn, ...(teacherCodeTab === 'starter' ? s.codeTabBtnActive : {}) }}
-                onClick={() => setTeacherCodeTab('starter')}
-              >
-                Starter code
-              </button>
-              <button
-                type="button"
-                className="ui-tab"
-                role="tab"
-                aria-selected={teacherCodeTab === 'complete'}
-                style={{ ...s.codeTabBtn, ...(teacherCodeTab === 'complete' ? s.codeTabBtnActive : {}) }}
-                onClick={() => { setTeacherCodeTab('complete'); setActiveCompleteFile(task?.completeFiles?.[0]?.name ?? '') }}
-              >
-                Complete code
-              </button>
-            </div>
-          )}
-
           {!isInSandbox && isInformationTask ? (
-            <ExplainerPanel title={task.title} content={task.explainer ?? ''} collapsible={false} fill />
+            <InformationTask task={task} lesson={lesson} fill />
           ) : !isInSandbox && task?.taskType === 'quiz' ? (
             <QuizTask task={task} showQuestion disabled />
           ) : lesson.type === 'python' ? (
-            <>
+            <div style={!isInSandbox ? s.codeWorkspaceStack : undefined}>
+              {!isInSandbox && (
+                <TeacherCodeTabs
+                  s={s}
+                  activeTab={teacherCodeTab}
+                  onStarter={() => setTeacherCodeTab('starter')}
+                  onComplete={() => { setTeacherCodeTab('complete'); setActiveCompleteFile(task?.completeFiles?.[0]?.name ?? '') }}
+                />
+              )}
               <PythonEditor
                 code={showingComplete ? (task?.completeCode ?? '') : code}
                 onChange={showingComplete || !isInSandbox ? undefined : value => {
@@ -557,8 +539,9 @@ export default function TeacherView({ lessonId }) {
                 }}
                 readOnly={showingComplete || !isInSandbox}
                 pyodideStatus="idle"
+                editorStyle={isInSandbox ? undefined : s.attachedCodeEditor}
               />
-            </>
+            </div>
           ) : lesson.type === 'scratch' ? (
             <div style={s.scratchWrap}>
               <ScratchWorkspace
@@ -577,22 +560,33 @@ export default function TeacherView({ lessonId }) {
               />
             </div>
           ) : (
-            <div style={s.htmlLeft}>
-              <HtmlEditor
-                files={showingComplete ? (task?.completeFiles ?? []) : files}
-                activeFile={showingComplete ? activeCompleteFile : activeFile}
-                onTabChange={showingComplete ? setActiveCompleteFile : setActiveFile}
-                onFileChange={showingComplete || !isInSandbox ? undefined : (name, content) =>
-                  setFiles(prev => {
-                    const next = prev.map(f => f.name === name ? { ...f, content } : f)
-                    if (isInSandbox) sandboxDraftRef.current.files = cloneFiles(next)
-                    return next
-                  })
-                }
-                readOnly={showingComplete || !isInSandbox}
-                assetsPath={resolveAssetsPath(lesson.assetsPath) || undefined}
-                assets={lesson.assets}
-              />
+            <div style={!isInSandbox ? s.codeWorkspaceStack : s.htmlLeft}>
+              {!isInSandbox && (
+                <TeacherCodeTabs
+                  s={s}
+                  activeTab={teacherCodeTab}
+                  onStarter={() => setTeacherCodeTab('starter')}
+                  onComplete={() => { setTeacherCodeTab('complete'); setActiveCompleteFile(task?.completeFiles?.[0]?.name ?? '') }}
+                />
+              )}
+              <div style={s.htmlLeft}>
+                <HtmlEditor
+                  files={showingComplete ? (task?.completeFiles ?? []) : files}
+                  activeFile={showingComplete ? activeCompleteFile : activeFile}
+                  onTabChange={showingComplete ? setActiveCompleteFile : setActiveFile}
+                  onFileChange={showingComplete || !isInSandbox ? undefined : (name, content) =>
+                    setFiles(prev => {
+                      const next = prev.map(f => f.name === name ? { ...f, content } : f)
+                      if (isInSandbox) sandboxDraftRef.current.files = cloneFiles(next)
+                      return next
+                    })
+                  }
+                  readOnly={showingComplete || !isInSandbox}
+                  assetsPath={resolveAssetsPath(lesson.assetsPath) || undefined}
+                  assets={lesson.assets}
+                  attachedTop={!isInSandbox}
+                />
+              </div>
             </div>
           )}
         </main>
@@ -649,6 +643,33 @@ export default function TeacherView({ lessonId }) {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function TeacherCodeTabs({ s, activeTab, onStarter, onComplete }) {
+  return (
+    <div style={s.codeTabStrip} className="ui-tabs ui-tabs--editor" role="tablist" aria-label="Teacher code workspace">
+      <button
+        type="button"
+        className="ui-tab"
+        role="tab"
+        aria-selected={activeTab === 'starter'}
+        style={{ ...s.codeTabBtn, ...(activeTab === 'starter' ? s.codeTabBtnActive : {}) }}
+        onClick={onStarter}
+      >
+        Starter code
+      </button>
+      <button
+        type="button"
+        className="ui-tab"
+        role="tab"
+        aria-selected={activeTab === 'complete'}
+        style={{ ...s.codeTabBtn, ...(activeTab === 'complete' ? s.codeTabBtnActive : {}) }}
+        onClick={onComplete}
+      >
+        Complete code
+      </button>
     </div>
   )
 }
@@ -763,19 +784,28 @@ const s = {
     minHeight: 0,
     display: 'flex',
   },
+  codeWorkspaceStack: {
+    display: 'flex',
+    flexDirection: 'column',
+    flex: 1,
+    minHeight: 0,
+    gap: 0,
+  },
   codeTabStrip: {
-    display: 'inline-flex',
+    display: 'flex',
     gap: 4,
     border: '1px solid #e5e7eb',
-    borderRadius: 8,
-    padding: 4,
-    background: '#fff',
+    borderBottom: 0,
+    borderRadius: '8px 8px 0 0',
+    padding: '4px 4px 0',
+    background: '#e5e7eb',
     flexShrink: 0,
-    alignSelf: 'flex-start',
+    alignSelf: 'stretch',
+    width: '100%',
   },
   codeTabBtn: {
     border: 0,
-    borderRadius: 6,
+    borderRadius: '6px 6px 0 0',
     background: 'transparent',
     color: '#4b5563',
     padding: '7px 14px',
@@ -785,8 +815,11 @@ const s = {
     cursor: 'pointer',
   },
   codeTabBtnActive: {
-    background: 'var(--colour-primary)',
-    color: '#fff',
+    background: '#fafafa',
+    color: 'var(--colour-primary)',
+  },
+  attachedCodeEditor: {
+    borderRadius: '0 0 8px 8px',
   },
   codeTabActions: {
     marginLeft: 'auto',

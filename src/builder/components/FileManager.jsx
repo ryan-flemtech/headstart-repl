@@ -61,7 +61,7 @@ const TEMPLATES = [
   },
 ]
 
-export default function FileManager({ files = [], entryFile, onAddFile, onDeleteFile, onRenameFile, onChangeType, onChangeEntryFile, onSetFiles, selectedFile, onSelectFile }) {
+export default function FileManager({ files = [], entryFile, onAddFile, onDeleteFile, onRenameFile, onChangeType, onChangeEntryFile, onSetFiles, selectedFile, onSelectFile, attachedTop = false }) {
   const [generateOpen, setGenerateOpen] = useState(false)
   const generateRef = useRef(null)
 
@@ -96,8 +96,8 @@ export default function FileManager({ files = [], entryFile, onAddFile, onDelete
   }
 
   return (
-    <div style={s.wrap}>
-      <div style={s.header}>
+    <div style={{ ...s.wrap, ...(attachedTop ? s.wrapAttachedTop : {}) }}>
+      <div style={{ ...s.header, ...(attachedTop ? s.headerAttachedTop : {}) }}>
         <span style={s.label}>Files</span>
         <div style={s.headerBtns}>
           <div ref={generateRef} style={s.generateWrap}>
@@ -173,6 +173,10 @@ const s = {
     border: '1px solid #e5e7eb',
     borderRadius: 8,
   },
+  wrapAttachedTop: {
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+  },
   header: {
     background: '#f0f0f0',
     padding: '6px 10px',
@@ -181,6 +185,10 @@ const s = {
     alignItems: 'center',
     borderBottom: '1px solid #e5e7eb',
     borderRadius: '7px 7px 0 0',
+  },
+  headerAttachedTop: {
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
   },
   label: {
     fontFamily: 'var(--font-body)',

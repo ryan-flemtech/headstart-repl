@@ -278,12 +278,13 @@ Supported combinations:
 
 ## Information Tasks
 
-Information tasks work in every lesson type. They show the explainer only.
+Information tasks work in every lesson type. They can render as a standard explainer, a recap slide, or an introduction slide.
 
 ```json
 {
   "id": 2,
   "taskType": "information",
+  "informationType": "standard",
   "title": "How loops work",
   "explainer": "A loop repeats code while a condition is true.",
   "hints": ["Read the example carefully before moving on."]
@@ -293,9 +294,12 @@ Information tasks work in every lesson type. They show the explainer only.
 | Field | Required | Type | Notes |
 |---|---:|---|---|
 | `taskType` | Yes | string | Must be `information`. |
+| `informationType` | No | string | `standard`, `recap`, or `introduction`. Defaults to `standard`. |
 | `title` | Yes | string | Shown in progress UI. |
-| `explainer` | Yes | string | Full-height Markdown content. |
+| `explainer` | Yes* | string | Markdown content. Required for `standard` and `recap`; optional for `introduction`, which renders lesson metadata. |
 | `hints` | No | string array | Optional, although information tasks normally do not need hints. |
+
+`standard` renders the explainer as before. `recap` renders two panes: a purple "Recap!" pane and a Markdown pane using `explainer`. `introduction` renders the lesson title, level, lesson type, and description from the lesson metadata on a purple background.
 
 Do not include code fields, carry fields, `interactionMode`, `options`, or `check`.
 
@@ -613,7 +617,7 @@ For Scratch toolbox XML, use fenced `xml` code blocks only when documenting the 
 
 - Lesson ID, title, and at least one task are required.
 - Every task needs a title.
-- Information tasks need an explainer.
+- Information tasks need an explainer unless `informationType` is `introduction`.
 - Quiz tasks need at least two non-empty options and an `answer_equals` check.
 - HTML code tasks should have files, unique filenames, and an HTML entry file.
 - `carryCodeFrom` and `carryBlocksFrom` must reference an existing task ID.

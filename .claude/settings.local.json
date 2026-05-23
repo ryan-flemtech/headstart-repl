@@ -52,7 +52,9 @@
       "Bash(node -e \"const p = require\\('./node_modules/scratch-vm/package.json'\\); console.log\\(JSON.stringify\\(Object.keys\\(p.dependencies\\).filter\\(d => d.includes\\('react'\\)\\)\\)\\)\")",
       "Bash(git -C \"C:\\\\Users\\\\rflem\\\\Documents\\\\hsc repl\" diff --stat HEAD)",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\rflem\\\\Documents\\\\hsc repl\\\\src\\\\app\" -Recurse -Type f)",
-      "Bash(cd /mnt/c/Users/rflem/Documents && ls -la \"hsc repl/src/\" 2>/dev/null | head -20)"
+      "Bash(cd /mnt/c/Users/rflem/Documents && ls -la \"hsc repl/src/\" 2>/dev/null | head -20)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\rflem\\\\Documents\\\\hsc repl\" -Recurse -Directory)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\rflem\\\\Documents\\\\hsc repl\\\\src\\\\app\" -Recurse -Directory)"
     ]
   }
 }

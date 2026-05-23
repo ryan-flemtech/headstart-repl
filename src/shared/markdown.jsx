@@ -272,6 +272,7 @@ function InlineHighlightedCode({ lang, code }) {
 // ── Markdown components ───────────────────────────────────────────────────────
 
 const BlockCodeContext = React.createContext(false)
+const MarkdownScaleContext = React.createContext(1)
 
 function splitTableRow(line) {
   const trimmed = line.trim()
@@ -477,16 +478,20 @@ function removeCalloutMarker(children) {
 
 const components = {
   h1({ children }) {
-    return <h1 style={{ ...headingBase, fontSize: '1.45rem', margin: '4px 0 10px' }}>{children}</h1>
+    const scale = React.useContext(MarkdownScaleContext)
+    return <h1 style={{ ...headingBase, fontSize: `${1.45 * scale}rem`, margin: '4px 0 10px' }}>{children}</h1>
   },
   h2({ children }) {
-    return <h2 style={{ ...headingBase, fontSize: '1.22rem', margin: '4px 0 8px' }}>{children}</h2>
+    const scale = React.useContext(MarkdownScaleContext)
+    return <h2 style={{ ...headingBase, fontSize: `${1.22 * scale}rem`, margin: '4px 0 8px' }}>{children}</h2>
   },
   h3({ children }) {
-    return <h3 style={{ ...headingBase, fontSize: '1.05rem', margin: '8px 0 6px' }}>{children}</h3>
+    const scale = React.useContext(MarkdownScaleContext)
+    return <h3 style={{ ...headingBase, fontSize: `${1.05 * scale}rem`, margin: '8px 0 6px' }}>{children}</h3>
   },
   h4({ children }) {
-    return <h4 style={{ ...headingBase, fontSize: '0.95rem', margin: '8px 0 4px' }}>{children}</h4>
+    const scale = React.useContext(MarkdownScaleContext)
+    return <h4 style={{ ...headingBase, fontSize: `${0.95 * scale}rem`, margin: '8px 0 4px' }}>{children}</h4>
   },
   code({ node, className, children, ...props }) {
     const isInBlock = React.useContext(BlockCodeContext)
@@ -496,12 +501,12 @@ const components = {
       if (text.startsWith('scratch:')) {
         return <InlineScratchBlock text={text.slice('scratch:'.length).trim()} />
       }
-      if (categorize(text)) {
-        return <InlineScratchBlock text={text.trim()} />
-      }
       const langMatch = text.match(/^(python|html|css|js):(.*)$/s)
       if (langMatch) {
         return <InlineHighlightedCode lang={langMatch[1]} code={langMatch[2]} />
+      }
+      if (categorize(text)) {
+        return <InlineScratchBlock text={text.trim()} />
       }
       return (
         <code
@@ -529,6 +534,7 @@ const components = {
     )
   },
   pre({ children }) {
+    const scale = React.useContext(MarkdownScaleContext)
     // Pass through without pre styling when the child is a scratch block
     const child = React.Children.toArray(children)[0]
     if (child?.props?.className?.includes('language-scratch')) {
@@ -550,7 +556,7 @@ const components = {
           padding: '12px 14px',
           overflowX: 'auto',
           ...CODE_FONT_STYLE,
-          fontSize: '14px',
+          fontSize: `${14 * scale}px`,
           margin: '10px 0',
           lineHeight: 1.6,
         }}
@@ -601,45 +607,47 @@ const components = {
     )
   },
   strong({ children }) {
-    return <strong style={{ fontWeight: 700 }}>{children}</strong>
+    return <strong style={{ fontWeight: 700, color: 'var(--colour-primary)' }}>{children}</strong>
   },
   em({ children }) {
     return <em>{children}</em>
   },
 }
 
-export function MarkdownRenderer({ content, title, style }) {
+export function MarkdownRenderer({ content, title, style, textScale = 1 }) {
   const blocks = parseMarkdownTables(content)
   const heading = String(title ?? '').trim()
 
   return (
-    <div
-      style={{
-        fontFamily: "'Quicksand', sans-serif",
-        color: 'var(--colour-text)',
-        fontSize: '15px',
-        lineHeight: 1.65,
-        ...style,
-      }}
-    >
-      {blocks.map((block, i) => block.type === 'table'
-        ? <MarkdownTable key={i} headers={block.headers} align={block.align} rows={block.rows} />
-        : (
-          <ReactMarkdown
-            key={i}
-            remarkPlugins={[remarkBreaks]}
-            rehypePlugins={[rehypeHighlight]}
-            components={components}
-            allowedElements={[
-              'h1', 'h2', 'h3', 'h4',
-              'p', 'strong', 'em', 'code', 'pre', 'br', 'span',
-              'ul', 'ol', 'li', 'blockquote',
-            ]}
-            unwrapDisallowed
-          >
-            {block.content}
-          </ReactMarkdown>
-          ))}
-    </div>
+    <MarkdownScaleContext.Provider value={textScale}>
+      <div
+        style={{
+          fontFamily: "'Quicksand', sans-serif",
+          color: 'var(--colour-text)',
+          fontSize: `${15 * textScale}px`,
+          lineHeight: 1.65,
+          ...style,
+        }}
+      >
+        {blocks.map((block, i) => block.type === 'table'
+          ? <MarkdownTable key={i} headers={block.headers} align={block.align} rows={block.rows} />
+          : (
+            <ReactMarkdown
+              key={i}
+              remarkPlugins={[remarkBreaks]}
+              rehypePlugins={[rehypeHighlight]}
+              components={components}
+              allowedElements={[
+                'h1', 'h2', 'h3', 'h4',
+                'p', 'strong', 'em', 'code', 'pre', 'br', 'span',
+                'ul', 'ol', 'li', 'blockquote',
+              ]}
+              unwrapDisallowed
+            >
+              {block.content}
+            </ReactMarkdown>
+            ))}
+      </div>
+    </MarkdownScaleContext.Provider>
   )
 }

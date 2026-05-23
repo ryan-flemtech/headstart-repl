@@ -21,6 +21,17 @@ export const CHECK_TYPES = {
     'element_value_not_contains',
     'element_value_not_equals',
     'element_value_matches_regex',
+    'element_attribute',
+    'element_style_property',
+    'variable_exists',
+    'variable_type',
+    'variable_equals',
+    'variable_dict_contains',
+    'variable_dict_equals',
+    'variable_dict_key_value',
+    'variable_array_contains',
+    'variable_array_equals',
+    'variable_array_nth_item',
   ],
   SUBMIT_ALLOWED: [
     'code_contains',
@@ -61,18 +72,44 @@ export function evaluateSingleCheck(check, output, context = {}) {
     try { return context.iframeDoc.querySelectorAll(check.selector).length > 0 } catch { return false }
   }
 
+  if (check.type === 'variable_exists') {
+    return getVariableEntry(context.variables, check.name)?.exists === true
+  }
+
+  if (check.type === 'element_attribute') {
+    if (!context.iframeDoc || !check.selector || !check.attribute) return false
+    try {
+      const el = context.iframeDoc.querySelector(check.selector)
+      if (!el || !el.hasAttribute(check.attribute)) return false
+      if (check.value == null || check.value === '') return true
+      return wildcardEquals(normalizeOutput(el.getAttribute(check.attribute) ?? ''), normalizeOutput(check.value))
+    } catch { return false }
+  }
+
+  if (check.type === 'element_style_property') {
+    if (!context.iframeDoc || !check.selector || !check.property) return false
+    try {
+      const el = context.iframeDoc.querySelector(check.selector)
+      if (!el) return false
+      const style = context.iframeDoc.defaultView?.getComputedStyle(el)
+      const raw = style?.getPropertyValue(check.property) || el.style?.getPropertyValue(check.property) || ''
+      if (check.value == null || check.value === '') return String(raw).trim().length > 0
+      return wildcardEquals(normalizeOutput(raw), normalizeOutput(check.value))
+    } catch { return false }
+  }
+
   if (check.value == null) return false
 
   if (check.type === 'answer_equals') {
-    return normalizeExactOutput(context.answer ?? output) === normalizeExactOutput(check.value)
+    return wildcardEquals(normalizeExactOutput(context.answer ?? output), normalizeExactOutput(check.value))
   }
 
   if (check.type === 'answer_contains') {
-    return normalizeOutput(context.answer ?? output).includes(normalizeOutput(check.value))
+    return wildcardContains(normalizeOutput(context.answer ?? output), normalizeOutput(check.value))
   }
 
   if (check.type === 'answer_not_contains') {
-    return !normalizeOutput(context.answer ?? output).includes(normalizeOutput(check.value))
+    return !wildcardContains(normalizeOutput(context.answer ?? output), normalizeOutput(check.value))
   }
 
   if (check.type === 'answer_matches_regex') {
@@ -80,15 +117,15 @@ export function evaluateSingleCheck(check, output, context = {}) {
   }
 
   if (check.type === 'output_equals') {
-    return normalizeExactOutput(output) === normalizeExactOutput(check.value)
+    return wildcardEquals(normalizeExactOutput(output), normalizeExactOutput(check.value))
   }
 
   if (check.type === 'output_not_equals') {
-    return normalizeExactOutput(output) !== normalizeExactOutput(check.value)
+    return !wildcardEquals(normalizeExactOutput(output), normalizeExactOutput(check.value))
   }
 
   if (check.type === 'output_not_contains') {
-    return !normalizeOutput(output).includes(normalizeOutput(check.value))
+    return !wildcardContains(normalizeOutput(output), normalizeOutput(check.value))
   }
 
   if (check.type === 'output_matches_regex') {
@@ -100,19 +137,19 @@ export function evaluateSingleCheck(check, output, context = {}) {
   }
 
   if (check.type === 'code_contains') {
-    return normalizeOutput(context.code ?? '').includes(normalizeOutput(check.value))
+    return wildcardContains(normalizeOutput(context.code ?? ''), normalizeOutput(check.value))
   }
 
   if (check.type === 'code_does_not_contain') {
-    return !normalizeOutput(context.code ?? '').includes(normalizeOutput(check.value))
+    return !wildcardContains(normalizeOutput(context.code ?? ''), normalizeOutput(check.value))
   }
 
   if (check.type === 'code_equals') {
-    return normalizeExactOutput(context.code ?? '') === normalizeExactOutput(check.value)
+    return wildcardEquals(normalizeExactOutput(context.code ?? ''), normalizeExactOutput(check.value))
   }
 
   if (check.type === 'code_not_equals') {
-    return normalizeExactOutput(context.code ?? '') !== normalizeExactOutput(check.value)
+    return !wildcardEquals(normalizeExactOutput(context.code ?? ''), normalizeExactOutput(check.value))
   }
 
   if (check.type === 'code_matches_regex') {
@@ -130,7 +167,7 @@ export function evaluateSingleCheck(check, output, context = {}) {
       const el = context.iframeDoc.querySelector(check.selector)
       if (!el) return false
       const raw = getElementText(el)
-      return normalizeOutput(raw).includes(normalizeOutput(check.value))
+      return wildcardContains(normalizeOutput(raw), normalizeOutput(check.value))
     } catch { return false }
   }
 
@@ -139,7 +176,7 @@ export function evaluateSingleCheck(check, output, context = {}) {
     try {
       const el = context.iframeDoc.querySelector(check.selector)
       if (!el) return false
-      return normalizeOutput(getElementText(el)) === normalizeOutput(check.value)
+      return wildcardEquals(normalizeOutput(getElementText(el)), normalizeOutput(check.value))
     } catch { return false }
   }
 
@@ -148,7 +185,7 @@ export function evaluateSingleCheck(check, output, context = {}) {
     try {
       const el = context.iframeDoc.querySelector(check.selector)
       if (!el) return false
-      return !normalizeOutput(getElementText(el)).includes(normalizeOutput(check.value))
+      return !wildcardContains(normalizeOutput(getElementText(el)), normalizeOutput(check.value))
     } catch { return false }
   }
 
@@ -157,7 +194,7 @@ export function evaluateSingleCheck(check, output, context = {}) {
     try {
       const el = context.iframeDoc.querySelector(check.selector)
       if (!el) return false
-      return normalizeOutput(getElementText(el)) !== normalizeOutput(check.value)
+      return !wildcardEquals(normalizeOutput(getElementText(el)), normalizeOutput(check.value))
     } catch { return false }
   }
 
@@ -170,9 +207,57 @@ export function evaluateSingleCheck(check, output, context = {}) {
     } catch { return false }
   }
 
+  if (check.type === 'variable_type') {
+    const variable = getVariableEntry(context.variables, check.name)
+    return variable.exists && normalizeTypeName(variable.type) === normalizeTypeName(check.value)
+  }
+
+  if (check.type === 'variable_equals') {
+    const variable = getVariableEntry(context.variables, check.name)
+    return variable.exists && valueEquals(variable.value, parseCheckValue(check.value))
+  }
+
+  if (check.type === 'variable_dict_contains') {
+    const variable = getVariableEntry(context.variables, check.name)
+    if (!variable.exists || !isPlainObject(variable.value)) return false
+    const expected = parseCheckValue(check.value)
+    return Object.values(variable.value).some(value => valueEquals(value, expected))
+  }
+
+  if (check.type === 'variable_dict_equals') {
+    const variable = getVariableEntry(context.variables, check.name)
+    return variable.exists && isPlainObject(variable.value) && valueEquals(variable.value, parseCheckValue(check.value))
+  }
+
+  if (check.type === 'variable_dict_key_value') {
+    const variable = getVariableEntry(context.variables, check.name)
+    if (!variable.exists || !isPlainObject(variable.value) || check.key == null) return false
+    return valueEquals(variable.value[String(check.key)], parseCheckValue(check.value))
+  }
+
+  if (check.type === 'variable_array_contains') {
+    const variable = getVariableEntry(context.variables, check.name)
+    if (!variable.exists || !Array.isArray(variable.value)) return false
+    const expected = parseCheckValue(check.value)
+    return variable.value.some(item => valueEquals(item, expected))
+  }
+
+  if (check.type === 'variable_array_equals') {
+    const variable = getVariableEntry(context.variables, check.name)
+    return variable.exists && Array.isArray(variable.value) && valueEquals(variable.value, parseCheckValue(check.value))
+  }
+
+  if (check.type === 'variable_array_nth_item') {
+    const variable = getVariableEntry(context.variables, check.name)
+    if (!variable.exists || !Array.isArray(variable.value)) return false
+    const index = Number(check.index)
+    if (!Number.isInteger(index) || index < 0 || index >= variable.value.length) return false
+    return valueEquals(variable.value[index], parseCheckValue(check.value))
+  }
+
   const actual = normalizeOutput(output)
   const expected = normalizeOutput(check.value)
-  return actual.includes(expected)
+  return wildcardContains(actual, expected)
 }
 
 export function evaluateCheck(check, output, context = {}) {
@@ -194,6 +279,14 @@ export function getFirstFailedCheckHint(check, output, context = {}) {
   return failed ? String(failed.hint).trim() : ''
 }
 
+// Returns the hint from the first incorrect check that passes (i.e. detects a specific mistake).
+// Call this when the completion check has failed to get a targeted hint.
+export function getIncorrectCheckHint(incorrectChecks, output, context = {}) {
+  const checks = normalizeChecks(incorrectChecks)
+  const matched = checks.find(c => evaluateSingleCheck(c, output, context) && String(c.hint ?? '').trim())
+  return matched ? String(matched.hint).trim() : ''
+}
+
 // Evaluates only code-based checks (no run required). Safe to call without executing the code.
 export function evaluateCheckWithCode(check, code) {
   const checks = normalizeChecks(check)
@@ -205,6 +298,89 @@ export function evaluateCheckWithCode(check, code) {
 function getElementText(el) {
   const INPUT_TAGS = ['INPUT', 'TEXTAREA', 'SELECT']
   return INPUT_TAGS.includes(el.tagName) ? el.value : (el.textContent ?? '')
+}
+
+function getVariableEntry(variables, name) {
+  if (!variables || !name || !Object.prototype.hasOwnProperty.call(variables, name)) {
+    return { exists: false, value: undefined, type: '' }
+  }
+  const entry = variables[name]
+  return {
+    exists: true,
+    value: parseVariableJson(entry?.json, entry?.repr),
+    type: entry?.type ?? '',
+  }
+}
+
+function parseVariableJson(json, fallback) {
+  if (json == null) return fallback
+  try { return JSON.parse(json) } catch { return fallback }
+}
+
+function parseCheckValue(value) {
+  if (typeof value !== 'string') return value
+  const trimmed = value.trim()
+  if (!trimmed) return ''
+  try { return JSON.parse(trimmed) } catch {}
+  if (/^-?\d+(\.\d+)?$/.test(trimmed)) return Number(trimmed)
+  if (trimmed === 'True' || trimmed === 'False') return trimmed === 'True'
+  if (trimmed === 'None') return null
+  return value
+}
+
+function valueEquals(actual, expected) {
+  if (Array.isArray(actual) || Array.isArray(expected) || isPlainObject(actual) || isPlainObject(expected)) return deepEqual(actual, expected)
+  return String(actual) === String(expected)
+}
+
+function isPlainObject(value) {
+  return value != null && typeof value === 'object' && !Array.isArray(value)
+}
+
+function deepEqual(a, b) {
+  if (Array.isArray(a) || Array.isArray(b)) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false
+    return a.every((item, index) => deepEqual(item, b[index]))
+  }
+  if (isPlainObject(a) || isPlainObject(b)) {
+    if (!isPlainObject(a) || !isPlainObject(b)) return false
+    const aKeys = Object.keys(a)
+    const bKeys = Object.keys(b)
+    if (aKeys.length !== bKeys.length) return false
+    return aKeys.every(key => Object.prototype.hasOwnProperty.call(b, key) && deepEqual(a[key], b[key]))
+  }
+  return String(a) === String(b)
+}
+
+function normalizeTypeName(type) {
+  const raw = normalizeOutput(type)
+  const aliases = {
+    str: 'string',
+    string: 'string',
+    int: 'number',
+    float: 'number',
+    number: 'number',
+    bool: 'boolean',
+    boolean: 'boolean',
+    list: 'array',
+    tuple: 'array',
+    array: 'array',
+    dict: 'dictionary',
+    dictionary: 'dictionary',
+  }
+  return aliases[raw] ?? raw
+}
+
+function wildcardContains(text, pattern) {
+  if (!pattern.includes('*')) return text.includes(pattern)
+  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[\\s\\S]*')
+  return new RegExp(escaped).test(text)
+}
+
+function wildcardEquals(text, pattern) {
+  if (!pattern.includes('*')) return text === pattern
+  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[\\s\\S]*')
+  return new RegExp(`^${escaped}$`).test(text)
 }
 
 function normalizeOutput(value) {

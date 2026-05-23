@@ -122,7 +122,7 @@ export default function StudentModal({ student, lesson, session, isLive, isLiveF
                 →
               </button>
             </div>
-            {onRemoteReset && !isInformation && (
+            {onRemoteReset && !isInformation && !isQuiz && (
               <>
                 <button
                   style={s.teacherActionBtn}
@@ -141,7 +141,7 @@ export default function StudentModal({ student, lesson, session, isLive, isLiveF
                 </button>
               </>
             )}
-            {!isInformation && (
+            {!isInformation && !isQuiz && (
               isLive ? (
                 <button
                   className="btn-danger"

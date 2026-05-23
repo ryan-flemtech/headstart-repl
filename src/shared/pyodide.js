@@ -76,7 +76,7 @@ function handleWorkerMessage({ data }) {
       break
 
     case 'done':
-      _runResolve?.({ status: _stopped ? 'stopped' : data.status })
+      _runResolve?.({ status: _stopped ? 'stopped' : data.status, variables: data.variables ?? {} })
       _runResolve = null
       break
   }

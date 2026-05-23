@@ -3,25 +3,21 @@ import { MarkdownRenderer } from '../../shared/markdown'
 
 export default function CheckFeedbackBanner({
   passed,
-  failureMessage = 'Check again, something is not right.',
+  failureMessage = 'Not quite, try again!',
   successMessage = 'Correct!',
   suggestion,
   onShowCompleteCode,
 }) {
+  const hint = String(suggestion ?? '').trim()
+
   return (
     <div style={{ ...s.banner, ...(passed ? s.pass : s.fail) }} role="status">
       <span style={{ ...s.icon, background: passed ? '#166534' : '#92400e' }}>{passed ? '✓' : '!'}</span>
       <div style={s.text}>
         {passed ? successMessage : (
-          <>
-            <div>{failureMessage}</div>
-            {suggestion && (
-              <div style={s.suggestion}>
-                <strong>Suggestion:</strong>
-                <MarkdownRenderer content={suggestion} style={{ color: 'inherit', fontSize: 'inherit', marginTop: 4 }} />
-              </div>
-            )}
-          </>
+          hint
+            ? <MarkdownRenderer content={hint} style={{ color: 'inherit', fontSize: 'inherit' }} />
+            : <div>{failureMessage}</div>
         )}
       </div>
       {!passed && onShowCompleteCode && (

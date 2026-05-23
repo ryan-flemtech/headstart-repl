@@ -24,6 +24,14 @@ export default function StudentCard({ student, lesson, lessonId, session, onRena
     student.lastRunStatus === 'submitted' ? '#3b82f6' : '#9ca3af'
 
   const hasCheck = currentTask?.check != null
+  const checkAttempted = student.lastRunStatus != null
+  const checkPassed = hasCheck && student.checkPassed === true
+  const checkFailed = hasCheck && checkAttempted && !checkPassed
+  const checkCardStyle = checkPassed
+    ? s.cardCheckPassed
+    : checkFailed
+    ? s.cardCheckFailed
+    : null
   const isWaiting = session?.state === 'waiting'
   const presenceClass = isWaiting
     ? 'presence-badge presence-badge--waiting'
@@ -31,48 +39,61 @@ export default function StudentCard({ student, lesson, lessonId, session, onRena
   const presenceLabel = isWaiting ? 'Waiting' : student.online ? 'Online' : 'Offline'
 
   return (
-    <div style={s.card} className="card">
+    <div style={{ ...s.card, ...checkCardStyle }} className="card">
       {/* Header row */}
       <div style={s.header}>
-        <span style={{ ...s.statusDot, background: statusColour }} />
-        {editing ? (
-          <form onSubmit={handleRename} style={s.nameForm}>
-            <input
-              style={s.nameInput}
-              value={nameValue}
-              autoFocus
-              onChange={e => setNameValue(e.target.value)}
-              onBlur={handleRename}
-            />
-          </form>
-        ) : (
-          <span style={s.name} title={student.displayName}>{student.displayName}</span>
-        )}
-        <button
-          style={s.pencil}
-          onClick={() => setEditing(e => !e)}
-          title="Rename student"
-        >
-          ✏️
-        </button>
-        <span className={presenceClass} title={student.online ? 'Student is connected now' : 'Student is offline'}>
-          <span className="presence-badge__dot" />
-          {presenceLabel}
-        </span>
-        {hasCheck && student.checkPassed && (
-          <span style={s.checkBadge} title="Check passed">✅</span>
-        )}
-        <button
-          style={s.removeBtn}
-          onClick={() => {
-            if (window.confirm(`Remove ${student.displayName} from the session?`)) {
-              onRemove?.(student.anonymousId)
-            }
-          }}
-          title="Remove student"
-        >
-          ✕
-        </button>
+        <div style={s.nameRow}>
+          <span style={{ ...s.statusDot, background: statusColour }} />
+          {editing ? (
+            <form onSubmit={handleRename} style={s.nameForm}>
+              <input
+                style={s.nameInput}
+                value={nameValue}
+                autoFocus
+                onChange={e => setNameValue(e.target.value)}
+                onBlur={handleRename}
+              />
+            </form>
+          ) : (
+            <span style={s.name} title={student.displayName}>{student.displayName}</span>
+          )}
+          <button
+            style={s.pencil}
+            onClick={() => setEditing(e => !e)}
+            title="Rename student"
+          >
+            ✏️
+          </button>
+          <button
+            style={s.removeBtn}
+            onClick={() => {
+              if (window.confirm(`Remove ${student.displayName} from the session?`)) {
+                onRemove?.(student.anonymousId)
+              }
+            }}
+            title="Remove student"
+          >
+            ✕
+          </button>
+        </div>
+        <div style={s.badgeRow}>
+          <span className={presenceClass} title={student.online ? 'Student is connected now' : 'Student is offline'}>
+            <span className="presence-badge__dot" />
+            {presenceLabel}
+          </span>
+          {checkPassed && (
+            <span style={{ ...s.checkBadge, ...s.checkBadgePassed }} title="Completion check passed">
+              <span style={s.checkBadgeIcon}>✓</span>
+              Passed
+            </span>
+          )}
+          {checkFailed && (
+            <span style={{ ...s.checkBadge, ...s.checkBadgeFailed }} title="Completion check failed">
+              <span style={s.checkBadgeIcon}>✕</span>
+              Failed
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Output / preview snippet */}
@@ -111,14 +132,16 @@ export default function StudentCard({ student, lesson, lessonId, session, onRena
         </div>
       )}
 
-      {/* Expand button */}
-      <button
-        className="btn-secondary"
-        style={s.expandBtn}
-        onClick={() => onExpand?.(student)}
-      >
-        Expand
-      </button>
+      {/* Expand button — not shown for information tasks */}
+      {!isInformation && (
+        <button
+          className="btn-secondary"
+          style={s.expandBtn}
+          onClick={() => onExpand?.(student)}
+        >
+          Expand
+        </button>
+      )}
     </div>
   )
 }
@@ -131,11 +154,36 @@ const s = {
     padding: 10,
     minWidth: 0,
   },
+  cardCheckPassed: {
+    border: '3px solid #22c55e',
+    background: '#f0fdf4',
+    boxShadow: '0 0 0 3px rgba(34, 197, 94, 0.16), 0 8px 18px rgba(22, 101, 52, 0.14)',
+  },
+  cardCheckFailed: {
+    border: '3px solid #ef4444',
+    background: '#fef2f2',
+    boxShadow: '0 0 0 3px rgba(239, 68, 68, 0.16), 0 8px 18px rgba(127, 29, 29, 0.14)',
+  },
   header: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 7,
+    minWidth: 0,
+  },
+  nameRow: {
     display: 'flex',
     alignItems: 'center',
     gap: 6,
+    width: '100%',
     minWidth: 0,
+  },
+  badgeRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    width: '100%',
+    minWidth: 0,
+    flexWrap: 'wrap',
   },
   statusDot: {
     width: 10,
@@ -163,8 +211,37 @@ const s = {
     borderRadius: 4,
   },
   checkBadge: {
-    fontSize: '0.85rem',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 4,
+    padding: '3px 7px',
+    borderRadius: 999,
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.72rem',
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: '0.03em',
+    lineHeight: 1,
     flexShrink: 0,
+  },
+  checkBadgePassed: {
+    background: '#22c55e',
+    color: '#fff',
+  },
+  checkBadgeFailed: {
+    background: '#ef4444',
+    color: '#fff',
+  },
+  checkBadgeIcon: {
+    width: 16,
+    height: 16,
+    borderRadius: '50%',
+    background: 'rgba(255,255,255,0.22)',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '0.78rem',
+    lineHeight: 1,
   },
   removeBtn: {
     background: 'transparent',

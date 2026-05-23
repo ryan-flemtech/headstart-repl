@@ -47,12 +47,12 @@ export default function StudentGrid({ students = [], lesson, lessonId, session, 
 
   const currentTask = lesson?.tasks?.find(t => t.id === session?.currentTaskId)
   const tasksWithChecks = currentTask?.check != null ? [currentTask] : []
+  const hasCheck = currentTask?.check != null
+  const passedCount = hasCheck ? students.filter(student => student.checkPassed).length : 0
+  const failedCount = hasCheck ? students.filter(student => student.lastRunStatus != null && !student.checkPassed).length : 0
 
   if (collapsed) {
-    const currentTask = lesson?.tasks?.find(t => t.id === session?.currentTaskId)
-    const hasCheck    = currentTask?.check != null
     const runCount    = students.filter(s => s.lastRunStatus != null).length
-    const checkCount  = students.filter(s => s.checkPassed).length
 
     return (
       <div style={s.collapsedWrap}>
@@ -72,8 +72,15 @@ export default function StudentGrid({ students = [], lesson, lessonId, session, 
 
         {students.length > 0 && hasCheck && (
           <div style={s.collapsedStat}>
-            <span style={{ ...s.collapsedBadge, background: '#22c55e' }}>{checkCount}</span>
-            <span style={s.collapsedStatLabel}>done</span>
+            <span style={{ ...s.collapsedBadge, background: '#22c55e' }}>{passedCount}</span>
+            <span style={s.collapsedStatLabel}>passed</span>
+          </div>
+        )}
+
+        {students.length > 0 && hasCheck && (
+          <div style={s.collapsedStat}>
+            <span style={{ ...s.collapsedBadge, background: '#ef4444' }}>{failedCount}</span>
+            <span style={s.collapsedStatLabel}>failed</span>
           </div>
         )}
 
@@ -87,6 +94,12 @@ export default function StudentGrid({ students = [], lesson, lessonId, session, 
       <div style={s.header}>
         <span style={s.label}>Students</span>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          {hasCheck && (
+            <>
+              <span style={{ ...s.checkCountBadge, background: '#22c55e' }} title="Students who passed the completion check">✓ {passedCount}</span>
+              <span style={{ ...s.checkCountBadge, background: '#ef4444' }} title="Students who failed the completion check">✕ {failedCount}</span>
+            </>
+          )}
           <span style={s.count}>{students.length}</span>
           <button style={s.toggleBtn} onClick={onToggle} title="Collapse Students">›</button>
         </div>
@@ -186,6 +199,15 @@ const s = {
     fontSize: '0.8rem',
     fontFamily: 'var(--font-body)',
     fontWeight: 600,
+  },
+  checkCountBadge: {
+    color: '#fff',
+    borderRadius: 999,
+    padding: '2px 8px',
+    fontSize: '0.78rem',
+    fontFamily: 'var(--font-body)',
+    fontWeight: 700,
+    lineHeight: 1.25,
   },
   grid: {
     flex: 1,

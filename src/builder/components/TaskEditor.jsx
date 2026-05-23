@@ -9,8 +9,10 @@ import ExplainerEditor, { MarkdownFieldEditor } from './ExplainerEditor'
 import FileManager from './FileManager'
 import BuilderOutputPanel from './BuilderOutputPanel'
 import IframePreview from '../../app/components/IframePreview'
+import { CollapseTabButton } from '../../app/components/CollapsiblePanelControls'
 import ScratchWorkspace, { SPRITE_TYPES } from '../../app/components/ScratchWorkspace'
 import QuizTask from '../../app/components/QuizTask'
+import InformationTask from '../../app/components/InformationTask'
 import { DEFAULT_SPRITES } from '../../shared/scratch'
 
 const CODE_FONT_STYLE = {
@@ -26,6 +28,13 @@ function resolveAssetsPath(rawPath) {
   return window.location.origin + base + encoded
 }
 
+function getTaskInlineCodeLanguages(lessonType, task) {
+  if (lessonType === 'python') return ['python']
+  if (lessonType === 'scratch') return ['scratch']
+  if (lessonType === 'html') return ['html', 'javascript', 'css']
+  return []
+}
+
 export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
   const [optionsOpen, setOptionsOpen]   = useState(false)
   const [output, setOutput]             = useState('')
@@ -36,6 +45,7 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
   const [iframeSrc, setIframeSrc]       = useState(null)
   const [checkResult, setCheckResult]   = useState(null)  // scratch only
   const [checkResults, setCheckResults] = useState(null)  // python/html: null | [{type,value,passed}]
+  const [incorrectCheckResults, setIncorrectCheckResults] = useState(null) // null | [{type,value,passed,hint}]
   const [htmlPreviewOpen, setHtmlPreviewOpen] = useState(false)
   const iframeRef = React.useRef(null)
   const appendOutputRef = React.useRef(null)
@@ -60,6 +70,10 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
   const activeFiles = isCompleteTab ? (task.completeFiles ?? []) : (task.starterFiles ?? [])
   const activeSelectedFile = isCompleteTab ? selectedCompleteFile : selectedFile
   const activeEntryFile = isCompleteTab ? (task.completeEntryFile ?? task.entryFile ?? 'index.html') : (task.entryFile ?? 'index.html')
+  const activeCodeForChecks = isPython
+    ? activePythonCode
+    : activeFiles.map(file => `--- ${file.name} ---\n${file.content ?? ''}`).join('\n\n')
+  const explainerInlineCodeLanguages = getTaskInlineCodeLanguages(lesson.type, task)
 
   function set(field, value) {
     onUpdate({ ...task, [field]: value })
@@ -78,6 +92,7 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
     setRunStatus(null)
     setCheckResult(null)
     setCheckResults(null)
+    setIncorrectCheckResults(null)
     setIframeSrc(null)
     setHtmlPreviewOpen(false)
 
@@ -123,6 +138,7 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
     setRunStatus(null)
     setCheckResult(null)
     setCheckResults(null)
+    setIncorrectCheckResults(null)
     setIframeSrc(null)
     setQuizSelectedAnswer('')
 
@@ -164,12 +180,13 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
       onUpdate({
         ...rest,
         taskType: 'information',
+        informationType: task.informationType ?? 'standard',
         explainer: task.explainer ?? '',
       })
       return
     }
 
-    const { taskType: _taskType, options: _options, ...rest } = task
+    const { taskType: _taskType, informationType: _informationType, options: _options, ...rest } = task
     const typeFields = lesson.type === 'python'
       ? { starterCode: task.starterCode ?? '', carryCodeFrom: task.carryCodeFrom ?? null }
       : lesson.type === 'scratch'
@@ -249,6 +266,7 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
     setRunStatus(null)
     setCheckResult(null)
     setCheckResults(null)
+    setIncorrectCheckResults(null)
     setIframeSrc(null)
 
     if (isPython) {
@@ -276,8 +294,16 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
 
       const checksToEval = normalizeChecks(task.check)
       if (checksToEval.length > 0) {
-        setCheckResults(checksToEval.map(c => ({ ...c, passed: evaluateSingleCheck(c, accumulated, { status: result.status, code: activePythonCode }) })))
+        const checkContext = { status: result.status, code: activePythonCode, variables: result.variables ?? {} }
+        const results = checksToEval.map(c => ({ ...c, passed: evaluateSingleCheck(c, accumulated, checkContext) }))
+        setCheckResults(results)
         set('_checkTested', true)
+        if (!results.every(r => r.passed)) {
+          const incorrectChecksToEval = normalizeChecks(task.incorrectChecks ?? [])
+          if (incorrectChecksToEval.length > 0) {
+            setIncorrectCheckResults(incorrectChecksToEval.map(c => ({ ...c, passed: evaluateSingleCheck(c, accumulated, checkContext) })))
+          }
+        }
       }
     } else if (!isScratch) {
       setHtmlPreviewOpen(true)
@@ -292,9 +318,17 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
       if (checksToEval.length > 0) {
         const codeStr = activeFiles.map(f => f.content).join('\n')
         waitForIframeText().then(text => {
+          setOutput(text)
           const iframeDoc = iframeRef.current?.contentDocument ?? null
-          setCheckResults(checksToEval.map(c => ({ ...c, passed: evaluateSingleCheck(c, text, { code: codeStr, iframeDoc }) })))
+          const results = checksToEval.map(c => ({ ...c, passed: evaluateSingleCheck(c, text, { code: codeStr, iframeDoc }) }))
+          setCheckResults(results)
           set('_checkTested', true)
+          if (!results.every(r => r.passed)) {
+            const incorrectChecksToEval = normalizeChecks(task.incorrectChecks ?? [])
+            if (incorrectChecksToEval.length > 0) {
+              setIncorrectCheckResults(incorrectChecksToEval.map(c => ({ ...c, passed: evaluateSingleCheck(c, text, { code: codeStr, iframeDoc }) })))
+            }
+          }
         })
       }
     }
@@ -305,11 +339,16 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
     const checksToEval = normalizeChecks(task.check)
     if (checksToEval.length === 0) return
     const codeStr = isPython ? activePythonCode : activeFiles.map(f => f.content).join('\n')
-    setCheckResults(checksToEval.map(c => ({
-      ...c,
-      passed: evaluateSingleCheck(c, '', { code: codeStr }),
-    })))
+    const results = checksToEval.map(c => ({ ...c, passed: evaluateSingleCheck(c, '', { code: codeStr }) }))
+    setCheckResults(results)
+    setIncorrectCheckResults(null)
     set('_checkTested', true)
+    if (!results.every(r => r.passed)) {
+      const incorrectChecksToEval = normalizeChecks(task.incorrectChecks ?? [])
+      if (incorrectChecksToEval.length > 0) {
+        setIncorrectCheckResults(incorrectChecksToEval.map(c => ({ ...c, passed: evaluateSingleCheck(c, '', { code: codeStr }) })))
+      }
+    }
   }
 
   function handleQuizTypeChange(quizType) {
@@ -398,6 +437,31 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
         </div>
       </Field>
 
+      {isInformation && (
+        <Field label="Information type">
+          <div style={s.infoTypeGrid}>
+            {[
+              { value: 'standard', label: 'Standard', hint: 'Markdown explainer' },
+              { value: 'recap', label: 'Recap', hint: 'Recap pane plus markdown' },
+              { value: 'introduction', label: 'Introduction', hint: 'Lesson metadata slide' },
+            ].map(option => {
+              const active = (task.informationType ?? 'standard') === option.value
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  style={{ ...s.infoTypeBtn, ...(active ? s.infoTypeBtnActive : {}) }}
+                  onClick={() => set('informationType', option.value)}
+                >
+                  <span style={s.infoTypeLabel}>{option.label}</span>
+                  <span style={s.infoTypeHint}>{option.hint}</span>
+                </button>
+              )
+            })}
+          </div>
+        </Field>
+      )}
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontFamily: 'var(--font-body)', fontWeight: 600, fontSize: '0.88rem', color: 'var(--colour-text)' }}>
@@ -417,9 +481,22 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
             title={task.title}
             value={task.explainer}
             onChange={v => set('explainer', v)}
+            lessonType={lesson.type}
+            inlineCodeLanguages={explainerInlineCodeLanguages}
           />
         )}
       </div>
+
+      {isInformation && (
+        <div style={s.previewPanel}>
+          <div style={s.previewHeader}>
+            <span style={s.previewTitle}>Student preview</span>
+          </div>
+          <div style={s.infoPreview}>
+            <InformationTask task={task} lesson={lesson} />
+          </div>
+        </div>
+      )}
 
       {!isQuiz && !isInformation && (() => {
         const summaryParts = []
@@ -515,10 +592,33 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                       onChange={checks => set('check', checks)}
                       interactionMode={task.interactionMode ?? 'run'}
                       allowCodeNoError={isPython && task.interactionMode !== 'submit'}
+                      allowVariableChecks={isPython && task.interactionMode !== 'submit'}
                       allowDomChecks={!isPython && !isScratch && task.interactionMode !== 'submit'}
+                      lessonType={lesson.type}
+                      output={output}
+                      code={activeCodeForChecks}
                     />
                   )}
                 </Field>
+
+                {task.check && !isScratch && (
+                  <Field label="Incorrect checks">
+                    <p style={s.optionNote}>
+                      When the completion check fails, these detect specific mistakes and show a targeted hint in the feedback banner. Each check passes when it detects a particular wrong pattern.
+                    </p>
+                    <CheckListEditor
+                      checks={normalizeChecks(task.incorrectChecks ?? [])}
+                      onChange={checks => set('incorrectChecks', checks.length > 0 ? checks : null)}
+                      interactionMode={task.interactionMode ?? 'run'}
+                      allowCodeNoError={false}
+                      allowVariableChecks={isPython && task.interactionMode !== 'submit'}
+                      allowDomChecks={!isPython && task.interactionMode !== 'submit'}
+                      lessonType={lesson.type}
+                      output={output}
+                      code={activeCodeForChecks}
+                    />
+                  </Field>
+                )}
               </div>
             )}
           </div>
@@ -531,13 +631,13 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
         <>
           <QuizTypePicker task={task} onQuizTypeChange={handleQuizTypeChange} />
           {(!task.quizType || task.quizType === 'multiple_choice') ? (
-            <QuizOptionsBuilder task={task} onUpdate={onUpdate} />
+            <QuizOptionsBuilder task={task} onUpdate={onUpdate} lessonType={lesson.type} />
           ) : task.quizType === 'match' ? (
-            <MatchPairsBuilder task={task} onUpdate={onUpdate} />
+            <MatchPairsBuilder task={task} onUpdate={onUpdate} lessonType={lesson.type} />
           ) : task.quizType === 'fill_blank' ? (
-            <FillBlankBuilder task={task} onUpdate={onUpdate} />
+            <FillBlankBuilder task={task} onUpdate={onUpdate} lessonType={lesson.type} />
           ) : task.quizType === 'short_answer' ? (
-            <ShortAnswerBuilder task={task} onUpdate={onUpdate} />
+            <ShortAnswerBuilder task={task} onUpdate={onUpdate} lessonType={lesson.type} />
           ) : null}
           <div style={s.previewPanel}>
             <div style={s.previewHeader}>
@@ -567,14 +667,17 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
         </>
       ) : isPython ? (
         <>
-          <CodeWorkspaceTabs activeTab={codeTab} onChange={handleCodeTabChange} />
+          <div style={s.codeWorkspaceStack}>
+            <CodeWorkspaceTabs activeTab={codeTab} onChange={handleCodeTabChange} />
 
-          <div style={s.pythonEditor}>
-            <CodeEditor
-              value={activePythonCode}
-              language="python"
-              onChange={v => isCompleteTab ? set('completeCode', v) : set('starterCode', v)}
-            />
+            <div style={s.pythonEditor}>
+              <CodeEditor
+                value={activePythonCode}
+                language="python"
+                onChange={v => isCompleteTab ? set('completeCode', v) : set('starterCode', v)}
+                style={s.attachedCodeEditor}
+              />
+            </div>
           </div>
 
           {task.interactionMode === 'submit' ? (
@@ -597,20 +700,23 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
               {checkResults !== null && (() => {
                 const allPassed = checkResults.every(r => r.passed)
                 return (
-                  <div style={{ border: '1px solid', borderRadius: 8, padding: '10px 14px', fontFamily: 'var(--font-body)', fontSize: '0.88rem', lineHeight: 1.6, background: allPassed ? '#f0fdf4' : '#fffbeb', borderColor: allPassed ? '#bbf7d0' : '#fde68a' }}>
-                    {checkResults.length === 1 ? (
-                      checkResults[0].passed
-                        ? 'Check passes — students will see the completion banner.'
-                        : formatCheckFailure(checkResults[0])
-                    ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        {checkResults.map((r, i) => (
-                          <div key={i}>{r.passed ? `Check ${i + 1} passes.` : `Check ${i + 1} does not pass — ${formatCheckFailureDetail(r)}`}</div>
-                        ))}
-                        <div style={{ marginTop: 4, fontWeight: 700 }}>{allPassed ? 'All checks pass — students will see the completion banner.' : 'Not all checks pass.'}</div>
-                      </div>
-                    )}
-                  </div>
+                  <>
+                    <div style={{ border: '1px solid', borderRadius: 8, padding: '10px 14px', fontFamily: 'var(--font-body)', fontSize: '0.88rem', lineHeight: 1.6, background: allPassed ? '#f0fdf4' : '#fffbeb', borderColor: allPassed ? '#bbf7d0' : '#fde68a' }}>
+                      {checkResults.length === 1 ? (
+                        checkResults[0].passed
+                          ? 'Check passes — students will see the completion banner.'
+                          : formatCheckFailure(checkResults[0])
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          {checkResults.map((r, i) => (
+                            <div key={i}>{r.passed ? `Check ${i + 1} passes.` : `Check ${i + 1} does not pass — ${formatCheckFailureDetail(r)}`}</div>
+                          ))}
+                          <div style={{ marginTop: 4, fontWeight: 700 }}>{allPassed ? 'All checks pass — students will see the completion banner.' : 'Not all checks pass.'}</div>
+                        </div>
+                      )}
+                    </div>
+                    {!allPassed && <IncorrectCheckResultsDisplay results={incorrectCheckResults} />}
+                  </>
                 )
               })()}
             </>
@@ -643,6 +749,7 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                 inputPrompt={inputPrompt}
                 onInputSubmit={v => { appendOutputRef.current?.(v + '\n'); setInputPrompt(null); provideInput(v) }}
                 checkResults={checkResults}
+                incorrectCheckResults={incorrectCheckResults}
               />
             </>
           )}
@@ -756,22 +863,24 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
         </>
       ) : (
         <>
-          <CodeWorkspaceTabs
-            activeTab={codeTab}
-            onChange={handleCodeTabChange}
-            rightAction={
-              <button
-                className="btn-primary"
-                onClick={task.interactionMode === 'submit' ? handleTestChecks : handleRun}
-                disabled={task.interactionMode === 'submit' ? !task.check : running}
-                style={{ padding: '7px 18px', fontSize: 13 }}
-              >
-                {task.interactionMode === 'submit' ? 'Test checks' : running ? 'Running...' : 'Run'}
-              </button>
-            }
-          />
+          <div style={s.codeWorkspaceStack}>
+            <CodeWorkspaceTabs
+              activeTab={codeTab}
+              onChange={handleCodeTabChange}
+              rightAction={
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={task.interactionMode === 'submit' ? handleTestChecks : handleRun}
+                  disabled={task.interactionMode === 'submit' ? !task.check : running}
+                  style={{ padding: '7px 18px', fontSize: 13 }}
+                >
+                  {task.interactionMode === 'submit' ? 'Test checks' : running ? 'Running...' : 'Run'}
+                </button>
+              }
+            />
 
-          <div style={s.htmlSplit}>
+            <div style={s.htmlSplit}>
             <SplitPane
               defaultSplit={34}
               style={{ flex: 1, minHeight: 0 }}
@@ -816,6 +925,7 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                       else set('starterFiles', (task.starterFiles ?? []).map(f => f.name === name ? { ...f, type } : f))
                     }}
                     onChangeEntryFile={name => isCompleteTab ? set('completeEntryFile', name) : set('entryFile', name)}
+                    attachedTop
                   />
                 </div>
               }
@@ -826,35 +936,35 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                       src={iframeSrc}
                       iframeRef={iframeRef}
                       fill
-                      rightActions={
-                        <button
-                          type="button"
-                          style={s.previewCollapseBtn}
+                      leadingActions={
+                        <CollapseTabButton
                           onClick={() => setHtmlPreviewOpen(false)}
+                          direction="right"
                           title="Collapse Preview"
-                          aria-label="Collapse Preview"
-                        >
-                          {'>'}
-                        </button>
+                          ariaLabel="Collapse Preview"
+                        />
                       }
                     />
                     {checkResults !== null && (() => {
                       const allPassed = checkResults.every(r => r.passed)
                       return (
-                        <div style={{ border: '1px solid', borderRadius: 8, padding: '10px 14px', fontFamily: 'var(--font-body)', fontSize: '0.88rem', lineHeight: 1.6, background: allPassed ? '#f0fdf4' : '#fffbeb', borderColor: allPassed ? '#bbf7d0' : '#fde68a', flexShrink: 0 }}>
-                          {checkResults.length === 1 ? (
-                            checkResults[0].passed
-                              ? 'Check passes - students will see the completion banner.'
-                              : formatCheckFailure(checkResults[0])
-                          ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                              {checkResults.map((r, i) => (
-                                <div key={i}>{r.passed ? `Check ${i + 1} passes.` : `Check ${i + 1} does not pass - ${formatCheckFailureDetail(r)}`}</div>
-                              ))}
-                              <div style={{ marginTop: 4, fontWeight: 700 }}>{allPassed ? 'All checks pass - students will see the completion banner.' : 'Not all checks pass.'}</div>
-                            </div>
-                          )}
-                        </div>
+                        <>
+                          <div style={{ border: '1px solid', borderRadius: 8, padding: '10px 14px', fontFamily: 'var(--font-body)', fontSize: '0.88rem', lineHeight: 1.6, background: allPassed ? '#f0fdf4' : '#fffbeb', borderColor: allPassed ? '#bbf7d0' : '#fde68a', flexShrink: 0 }}>
+                            {checkResults.length === 1 ? (
+                              checkResults[0].passed
+                                ? 'Check passes - students will see the completion banner.'
+                                : formatCheckFailure(checkResults[0])
+                            ) : (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                {checkResults.map((r, i) => (
+                                  <div key={i}>{r.passed ? `Check ${i + 1} passes.` : `Check ${i + 1} does not pass - ${formatCheckFailureDetail(r)}`}</div>
+                                ))}
+                                <div style={{ marginTop: 4, fontWeight: 700 }}>{allPassed ? 'All checks pass - students will see the completion banner.' : 'Not all checks pass.'}</div>
+                              </div>
+                            )}
+                          </div>
+                          {!allPassed && <IncorrectCheckResultsDisplay results={incorrectCheckResults} />}
+                        </>
                       )
                     })()}
                   </div>
@@ -890,26 +1000,30 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                 )
               }
             />
+            </div>
           </div>
 
           <div style={task.interactionMode === 'submit' ? { marginTop: 8 } : { display: 'none' }}>
             {checkResults !== null && (() => {
               const allPassed = checkResults.every(r => r.passed)
               return (
-                <div style={{ border: '1px solid', borderRadius: 8, padding: '10px 14px', fontFamily: 'var(--font-body)', fontSize: '0.88rem', lineHeight: 1.6, background: allPassed ? '#f0fdf4' : '#fffbeb', borderColor: allPassed ? '#bbf7d0' : '#fde68a' }}>
-                  {checkResults.length === 1 ? (
-                    checkResults[0].passed
-                      ? 'Check passes - students will see the completion banner.'
-                      : formatCheckFailure(checkResults[0])
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      {checkResults.map((r, i) => (
-                        <div key={i}>{r.passed ? `✅ Check ${i + 1} passes.` : `⚠️ Check ${i + 1} does not pass - ${formatCheckFailureDetail(r)}`}</div>
-                      ))}
-                      <div style={{ marginTop: 4, fontWeight: 700 }}>{allPassed ? '✅ All checks pass - students will see the completion banner.' : '⚠️ Not all checks pass.'}</div>
-                    </div>
-                  )}
-                </div>
+                <>
+                  <div style={{ border: '1px solid', borderRadius: 8, padding: '10px 14px', fontFamily: 'var(--font-body)', fontSize: '0.88rem', lineHeight: 1.6, background: allPassed ? '#f0fdf4' : '#fffbeb', borderColor: allPassed ? '#bbf7d0' : '#fde68a' }}>
+                    {checkResults.length === 1 ? (
+                      checkResults[0].passed
+                        ? 'Check passes - students will see the completion banner.'
+                        : formatCheckFailure(checkResults[0])
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {checkResults.map((r, i) => (
+                          <div key={i}>{r.passed ? `✅ Check ${i + 1} passes.` : `⚠️ Check ${i + 1} does not pass - ${formatCheckFailureDetail(r)}`}</div>
+                        ))}
+                        <div style={{ marginTop: 4, fontWeight: 700 }}>{allPassed ? '✅ All checks pass - students will see the completion banner.' : '⚠️ Not all checks pass.'}</div>
+                      </div>
+                    )}
+                  </div>
+                  {!allPassed && <IncorrectCheckResultsDisplay results={incorrectCheckResults} />}
+                </>
               )
             })()}
           </div>
@@ -960,7 +1074,7 @@ function QuizTypePicker({ task, onQuizTypeChange }) {
   )
 }
 
-function MatchPairsBuilder({ task, onUpdate }) {
+function MatchPairsBuilder({ task, onUpdate, lessonType = null }) {
   const pairs = task.pairs?.length ? task.pairs : [{ id: 'p1', prompt: '', answer: '' }, { id: 'p2', prompt: '', answer: '' }]
 
   function renumber(nextPairs) {
@@ -989,6 +1103,7 @@ function MatchPairsBuilder({ task, onUpdate }) {
                   value={pair.prompt}
                   onChange={value => updatePair(index, 'prompt', value)}
                   placeholder={`Prompt ${index + 1} in Markdown`}
+                  lessonType={lessonType}
                 />
               </div>
               <span style={s.matchArrow}>-</span>
@@ -1001,6 +1116,7 @@ function MatchPairsBuilder({ task, onUpdate }) {
                   value={pair.answer}
                   onChange={value => updatePair(index, 'answer', value)}
                   placeholder={`Correct answer ${index + 1} in Markdown`}
+                  lessonType={lessonType}
                 />
               </div>
             </div>
@@ -1021,7 +1137,7 @@ function MatchPairsBuilder({ task, onUpdate }) {
   )
 }
 
-function FillBlankBuilder({ task, onUpdate }) {
+function FillBlankBuilder({ task, onUpdate, lessonType = null }) {
   const mode = task.mode ?? 'drag'
   const text = task.text ?? ''
   const blanks = task.blanks ?? []
@@ -1062,6 +1178,7 @@ function FillBlankBuilder({ task, onUpdate }) {
           value={text}
           onChange={handleTextChange}
           placeholder="e.g. Python uses ___ to print output and ___ to get input."
+          lessonType={lessonType}
         />
         <span style={{ fontFamily: 'var(--font-body)', fontSize: '0.82rem', color: '#6b7280' }}>
           {blankCount} blank{blankCount !== 1 ? 's' : ''} detected
@@ -1082,6 +1199,7 @@ function FillBlankBuilder({ task, onUpdate }) {
                   value={blank.answer}
                   onChange={value => updateBlank(index, value)}
                   placeholder={`Answer for blank ${index + 1}`}
+                  lessonType={lessonType}
                 />
                 </div>
               </div>
@@ -1093,7 +1211,7 @@ function FillBlankBuilder({ task, onUpdate }) {
   )
 }
 
-function ShortAnswerBuilder({ task, onUpdate }) {
+function ShortAnswerBuilder({ task, onUpdate, lessonType = null }) {
   const check = task.check ?? { type: 'answer_contains', value: '' }
 
   function updateCheck(updates) {
@@ -1129,6 +1247,7 @@ function ShortAnswerBuilder({ task, onUpdate }) {
           value={check.hint ?? ''}
           onChange={value => updateCheck({ hint: value })}
           placeholder="Suggestion shown when this answer is wrong..."
+          lessonType={lessonType}
         />
         <p style={{ margin: 0, fontFamily: 'var(--font-body)', fontSize: '0.82rem', color: '#6b7280', lineHeight: 1.5 }}>
           Matching is case-insensitive. Test by typing an answer in the student preview below.
@@ -1138,7 +1257,7 @@ function ShortAnswerBuilder({ task, onUpdate }) {
   )
 }
 
-function QuizOptionsBuilder({ task, onUpdate }) {
+function QuizOptionsBuilder({ task, onUpdate, lessonType = null }) {
   const options = task.options?.length ? task.options : [{ id: 'a', text: '' }, { id: 'b', text: '' }]
   const correctAnswer = task.check?.type === 'answer_equals' ? task.check.value : ''
 
@@ -1194,6 +1313,7 @@ function QuizOptionsBuilder({ task, onUpdate }) {
                 value={option.text}
                 onChange={value => updateOptions(options.map((o, i) => i === index ? { ...o, text: value } : o))}
                 placeholder={`Option ${option.id.toUpperCase()} in Markdown`}
+                lessonType={lessonType}
               />
               <MarkdownFieldEditor
                 height={118}
@@ -1202,6 +1322,7 @@ function QuizOptionsBuilder({ task, onUpdate }) {
                 value={option.feedback ?? ''}
                 onChange={value => updateOptions(options.map((o, i) => i === index ? { ...o, feedback: value } : o))}
                 placeholder="Feedback shown if students choose this wrong answer..."
+                lessonType={lessonType}
               />
             </div>
             <button
@@ -1225,6 +1346,66 @@ function QuizOptionsBuilder({ task, onUpdate }) {
         </button>
       </div>
     </Field>
+  )
+}
+
+function CopyButtons({ output, code }) {
+  const [copiedOutput, setCopiedOutput] = React.useState(false)
+  const [copiedCode, setCopiedCode] = React.useState(false)
+
+  function copyText(text, setCopied) {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    })
+  }
+
+  const btnBase = {
+    fontFamily: 'var(--font-body)', fontSize: '0.78rem', padding: '3px 10px',
+    borderRadius: 6, border: '1px solid var(--colour-primary)', background: 'transparent',
+    color: 'var(--colour-primary)', cursor: 'pointer',
+  }
+  const btnDone = { background: '#22c55e', border: '1px solid #22c55e', color: '#fff' }
+
+  return (
+    <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+      {output != null && output !== '' && (
+        <button type="button" style={{ ...btnBase, ...(copiedOutput ? btnDone : {}) }}
+          onClick={() => copyText(output, setCopiedOutput)} title="Copy the current output to clipboard">
+          {copiedOutput ? '✓ Copied' : '📋 Copy output'}
+        </button>
+      )}
+      {code != null && code !== '' && (
+        <button type="button" style={{ ...btnBase, ...(copiedCode ? btnDone : {}) }}
+          onClick={() => copyText(code, setCopiedCode)} title="Copy the current code to clipboard">
+          {copiedCode ? '✓ Copied' : '📋 Copy code'}
+        </button>
+      )}
+    </div>
+  )
+}
+
+function IncorrectCheckResultsDisplay({ results }) {
+  if (!results || results.length === 0) return null
+  const anyMatched = results.some(r => r.passed)
+  return (
+    <div style={{ border: '1px solid #c7d2fe', borderRadius: 8, padding: '10px 14px', fontFamily: 'var(--font-body)', fontSize: '0.88rem', lineHeight: 1.6, background: '#f0f4ff', marginTop: 8 }}>
+      <div style={{ fontWeight: 700, marginBottom: 4 }}>Incorrect checks:</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+        {results.map((r, i) => (
+          <div key={i}>
+            {r.passed
+              ? <span>🎯 <strong>Incorrect check {i + 1} matched</strong>{r.hint ? <> — hint: <em>"{r.hint}"</em></> : ' — no hint set'}</span>
+              : <span style={{ color: '#6b7280' }}>— Incorrect check {i + 1} did not match</span>}
+          </div>
+        ))}
+        {!anyMatched && (
+          <div style={{ marginTop: 4, color: '#6b7280', fontSize: '0.85em' }}>
+            No incorrect check matched — the completion check hint (if any) will be shown instead.
+          </div>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -1261,6 +1442,17 @@ function subjectOpFromType(type) {
     'element_value_not_contains':  { subject: 'element', operator: 'value_not_contains' },
     'element_value_not_equals':    { subject: 'element', operator: 'value_not_equals' },
     'element_value_matches_regex': { subject: 'element', operator: 'value_matches_regex' },
+    'element_attribute':           { subject: 'element', operator: 'attribute_equals' },
+    'element_style_property':      { subject: 'element', operator: 'style_equals' },
+    'variable_exists':             { subject: 'variable', operator: 'exists' },
+    'variable_type':               { subject: 'variable', operator: 'type' },
+    'variable_equals':             { subject: 'variable', operator: 'equals' },
+    'variable_dict_contains':      { subject: 'variable', operator: 'dict_contains' },
+    'variable_dict_equals':        { subject: 'variable', operator: 'dict_equals' },
+    'variable_dict_key_value':     { subject: 'variable', operator: 'dict_key_value' },
+    'variable_array_contains':     { subject: 'variable', operator: 'array_contains' },
+    'variable_array_equals':       { subject: 'variable', operator: 'array_equals' },
+    'variable_array_nth_item':     { subject: 'variable', operator: 'array_nth_item' },
   }
   return map[type] ?? { subject: 'output', operator: 'contains' }
 }
@@ -1292,6 +1484,19 @@ function typeFromSubjectOp(subject, operator) {
       value_not_contains:  'element_value_not_contains',
       value_not_equals:    'element_value_not_equals',
       value_matches_regex: 'element_value_matches_regex',
+      attribute_equals:    'element_attribute',
+      style_equals:        'element_style_property',
+    },
+    variable: {
+      exists:          'variable_exists',
+      type:            'variable_type',
+      equals:          'variable_equals',
+      dict_contains:   'variable_dict_contains',
+      dict_equals:     'variable_dict_equals',
+      dict_key_value:  'variable_dict_key_value',
+      array_contains:  'variable_array_contains',
+      array_equals:    'variable_array_equals',
+      array_nth_item:  'variable_array_nth_item',
     },
   }
   return maps[subject]?.[operator] ?? 'output_contains'
@@ -1323,6 +1528,19 @@ function getOperatorOptions(subject, { allowCodeNoError }) {
     { value: 'value_not_contains',  label: 'value does not contain' },
     { value: 'value_not_equals',    label: 'value does not equal' },
     { value: 'value_matches_regex', label: 'value matches regex' },
+    { value: 'attribute_equals',    label: 'attribute equals' },
+    { value: 'style_equals',        label: 'style property equals' },
+  ]
+  if (subject === 'variable') return [
+    { value: 'exists',          label: 'exists' },
+    { value: 'type',            label: 'type is' },
+    { value: 'equals',          label: 'equals' },
+    { value: 'dict_contains',   label: 'dictionary contains' },
+    { value: 'dict_equals',     label: 'dictionary equals' },
+    { value: 'dict_key_value',  label: 'dictionary key value equals' },
+    { value: 'array_contains',  label: 'array contains' },
+    { value: 'array_equals',    label: 'array equals' },
+    { value: 'array_nth_item',  label: 'array N-th item equals' },
   ]
   return []
 }
@@ -1330,15 +1548,21 @@ function getOperatorOptions(subject, { allowCodeNoError }) {
 function makeCheckSkeleton(type, prev = {}) {
   const hint = prev.hint ? { hint: prev.hint } : {}
   if (type === 'code_no_error' || type === 'output_not_empty') return { type, ...hint }
+  if (type === 'variable_exists') return { type, name: prev.name ?? '', ...hint }
+  if (type === 'variable_dict_key_value') return { type, name: prev.name ?? '', key: prev.key ?? '', value: prev.value ?? '', ...hint }
+  if (type === 'variable_array_nth_item') return { type, name: prev.name ?? '', index: prev.index ?? '0', value: prev.value ?? '', ...hint }
+  if (type.startsWith('variable_')) return { type, name: prev.name ?? '', value: prev.value ?? '', ...hint }
   if (type === 'element_exists') return { type, selector: prev.selector ?? '', ...hint }
   if (type === 'element_count') return { type, selector: prev.selector ?? '', value: prev.value ?? '1', ...hint }
+  if (type === 'element_attribute') return { type, selector: prev.selector ?? '', attribute: prev.attribute ?? '', value: prev.value ?? '', ...hint }
+  if (type === 'element_style_property') return { type, selector: prev.selector ?? '', property: prev.property ?? '', value: prev.value ?? '', ...hint }
   if (type === 'element_value' || type === 'element_value_equals' || type === 'element_value_not_contains' || type === 'element_value_not_equals' || type === 'element_value_matches_regex') {
     return { type, selector: prev.selector ?? '', value: prev.value ?? '', ...hint }
   }
   return { type, value: prev.value ?? '', ...hint }
 }
 
-function CheckValueEditor({ check, subject, operator, onChange }) {
+function CheckValueEditor({ check, subject, operator, onChange, output = '', code = '' }) {
   if (check.type === 'code_no_error') {
     return <div style={s.checkHelp}>Passes when Python runs without an error.</div>
   }
@@ -1358,6 +1582,38 @@ function CheckValueEditor({ check, subject, operator, onChange }) {
         {operator === 'exists' && (
           <div style={s.checkHelp}>Passes when at least one matching element exists in the page.</div>
         )}
+        {operator === 'attribute_equals' && (
+          <>
+            <input
+              style={s.input}
+              value={check.attribute ?? ''}
+              onChange={e => onChange({ ...check, attribute: e.target.value })}
+              placeholder="Attribute name, e.g. href, src, alt, class"
+            />
+            <input
+              style={s.input}
+              value={check.value ?? ''}
+              onChange={e => onChange({ ...check, value: e.target.value })}
+              placeholder="Optional expected attribute value..."
+            />
+          </>
+        )}
+        {operator === 'style_equals' && (
+          <>
+            <input
+              style={s.input}
+              value={check.property ?? ''}
+              onChange={e => onChange({ ...check, property: e.target.value })}
+              placeholder="CSS property, e.g. color, background-color, font-size"
+            />
+            <input
+              style={s.input}
+              value={check.value ?? ''}
+              onChange={e => onChange({ ...check, value: e.target.value })}
+              placeholder="Optional expected computed value, e.g. rgb(255, 0, 0) or 16px"
+            />
+          </>
+        )}
         {operator === 'count' && (
           <input
             style={{ ...s.input, width: 160 }}
@@ -1368,7 +1624,7 @@ function CheckValueEditor({ check, subject, operator, onChange }) {
             placeholder="Expected count"
           />
         )}
-        {operator !== 'exists' && operator !== 'count' && (
+        {operator !== 'exists' && operator !== 'count' && operator !== 'attribute_equals' && operator !== 'style_equals' && (
           <input
             style={s.input}
             value={check.value ?? ''}
@@ -1379,6 +1635,53 @@ function CheckValueEditor({ check, subject, operator, onChange }) {
               : operator === 'value_not_contains'  ? 'Text that must NOT be present...'
               : operator === 'value_not_equals'    ? 'Value it must NOT equal...'
               :                                      'Text that value must contain...'
+            }
+          />
+        )}
+      </div>
+    )
+  }
+
+  if (subject === 'variable') {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <input
+          style={{ ...s.input, fontFamily: "'JetBrains Mono', monospace", fontSize: '0.88rem' }}
+          value={check.name ?? ''}
+          onChange={e => onChange({ ...check, name: e.target.value })}
+          placeholder="Variable name, e.g. score"
+        />
+        {operator === 'exists' && (
+          <div style={s.checkHelp}>Passes when the variable exists after the Python code runs.</div>
+        )}
+        {operator === 'dict_key_value' && (
+          <input
+            style={s.input}
+            value={check.key ?? ''}
+            onChange={e => onChange({ ...check, key: e.target.value })}
+            placeholder="Dictionary key, e.g. name"
+          />
+        )}
+        {operator === 'array_nth_item' && (
+          <input
+            style={{ ...s.input, width: 180 }}
+            type="number"
+            min="0"
+            value={check.index ?? '0'}
+            onChange={e => onChange({ ...check, index: e.target.value })}
+            placeholder="Zero-based item index"
+          />
+        )}
+        {operator !== 'exists' && (
+          <textarea
+            style={s.checkValue}
+            value={check.value ?? ''}
+            onChange={e => onChange({ ...check, value: e.target.value })}
+            placeholder={
+              operator === 'type' ? 'Expected type, e.g. string, number, boolean, array, dictionary'
+              : operator === 'dict_equals' ? 'Expected dictionary as JSON, e.g. {"name":"Ada","age":12}'
+              : operator === 'array_equals' ? 'Expected array as JSON, e.g. ["red", "blue"]'
+              : 'Expected value, e.g. hello, 5, true, or JSON'
             }
           />
         )}
@@ -1399,23 +1702,31 @@ function CheckValueEditor({ check, subject, operator, onChange }) {
     )
   }
 
+  const showOutputCopy = subject === 'output' && output !== ''
+  const showCodeCopy   = subject === 'code'   && code !== ''
+
   return (
-    <textarea
-      style={s.checkValue}
-      value={check.value ?? ''}
-      onChange={e => onChange({ ...check, value: e.target.value })}
-      placeholder={
-        operator === 'matches_regex' ? 'Regular expression, e.g. ^\\d+$  (matched against lowercased output)'
-        : operator === 'equals'       ? 'Exact expected value...'
-        : operator === 'not_equals'   ? 'Value it must NOT equal...'
-        : operator === 'not_contains' ? 'String that must NOT be present...'
-        :                               'String that must be present...'
-      }
-    />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      {(showOutputCopy || showCodeCopy) && (
+        <CopyButtons output={showOutputCopy ? output : ''} code={showCodeCopy ? code : ''} />
+      )}
+      <textarea
+        style={s.checkValue}
+        value={check.value ?? ''}
+        onChange={e => onChange({ ...check, value: e.target.value })}
+        placeholder={
+          operator === 'matches_regex' ? 'Regular expression, e.g. ^\\d+$  (matched against lowercased output)'
+          : operator === 'equals'       ? 'Exact expected value...'
+          : operator === 'not_equals'   ? 'Value it must NOT equal...'
+          : operator === 'not_contains' ? 'String that must NOT be present...'
+          :                               'String that must be present...'
+        }
+      />
+    </div>
   )
 }
 
-function CheckListEditor({ checks, onChange, interactionMode = 'run', allowCodeNoError = false, allowDomChecks = false }) {
+function CheckListEditor({ checks, onChange, interactionMode = 'run', allowCodeNoError = false, allowVariableChecks = false, allowDomChecks = false, lessonType = null, output = '', code = '' }) {
   const submitMode = interactionMode === 'submit'
 
   function updateCheck(index, updated) {
@@ -1432,6 +1743,7 @@ function CheckListEditor({ checks, onChange, interactionMode = 'run', allowCodeN
     const current = checks[index]
     const defaultOp = newSubject === 'output' ? (allowCodeNoError ? 'no_error' : 'contains')
       : newSubject === 'code' ? 'contains'
+      : newSubject === 'variable' ? 'exists'
       : 'exists'
     updateCheck(index, makeCheckSkeleton(typeFromSubjectOp(newSubject, defaultOp), current))
   }
@@ -1458,6 +1770,7 @@ function CheckListEditor({ checks, onChange, interactionMode = 'run', allowCodeN
               >
                 {!submitMode && <option value="output">Output</option>}
                 <option value="code">Code</option>
+                {allowVariableChecks && <option value="variable">Variable</option>}
                 {allowDomChecks && <option value="element">Element</option>}
               </select>
               <select
@@ -1474,6 +1787,8 @@ function CheckListEditor({ checks, onChange, interactionMode = 'run', allowCodeN
                 subject={subject}
                 operator={operator}
                 onChange={updated => updateCheck(index, updated)}
+                output={output}
+                code={code}
               />
               <div style={{ gridColumn: '1 / -1' }}>
                 <MarkdownFieldEditor
@@ -1483,6 +1798,7 @@ function CheckListEditor({ checks, onChange, interactionMode = 'run', allowCodeN
                   value={check.hint ?? ''}
                   onChange={value => updateCheck(index, { ...check, hint: value })}
                   placeholder="Suggestion shown in the completion banner when this check fails..."
+                  lessonType={lessonType}
                 />
               </div>
             </div>
@@ -1871,6 +2187,7 @@ function ScratchCheckEditor({ check, onChange, sprites = [{ id: 'sprite1', name:
         value={check.hint ?? ''}
         onChange={value => onChange({ ...check, hint: value })}
         placeholder="Suggestion shown in the completion banner when this check fails..."
+        lessonType="scratch"
       />
     </div>
   )
@@ -2996,18 +3313,20 @@ const s = {
     margin: '4px 0',
   },
   workspaceTabs: {
-    display: 'inline-grid',
+    display: 'flex',
     gridTemplateColumns: '1fr 1fr',
     gap: 4,
-    alignSelf: 'flex-start',
+    alignSelf: 'stretch',
+    width: '100%',
     border: '1px solid #e5e7eb',
-    borderRadius: 8,
-    padding: 4,
-    background: '#fff',
+    borderBottom: 0,
+    borderRadius: '8px 8px 0 0',
+    padding: '4px 4px 0',
+    background: '#e5e7eb',
   },
   workspaceTab: {
     border: 0,
-    borderRadius: 6,
+    borderRadius: '6px 6px 0 0',
     background: 'transparent',
     color: '#4b5563',
     padding: '8px 12px',
@@ -3017,8 +3336,8 @@ const s = {
     cursor: 'pointer',
   },
   workspaceTabActive: {
-    background: 'var(--colour-primary)',
-    color: '#fff',
+    background: '#fafafa',
+    color: 'var(--colour-primary)',
   },
   workspaceTabActions: {
     marginLeft: 'auto',
@@ -3026,11 +3345,20 @@ const s = {
     alignItems: 'center',
     paddingLeft: 8,
   },
+  codeWorkspaceStack: {
+    display: 'flex',
+    flexDirection: 'column',
+    width: '100%',
+    gap: 0,
+  },
   pythonEditor: {
     height: 300,
     border: '1px solid #e5e7eb',
-    borderRadius: 8,
+    borderRadius: '0 0 8px 8px',
     overflow: 'hidden',
+  },
+  attachedCodeEditor: {
+    borderRadius: '0 0 8px 8px',
   },
   runRow: {
     display: 'flex',
@@ -3081,7 +3409,7 @@ const s = {
     display: 'flex',
     flexDirection: 'column',
     height: 430,
-    gap: 6,
+    gap: 0,
     width: '100%',
     minWidth: 0,
   },
@@ -3127,6 +3455,7 @@ const s = {
     width: '100%',
     minWidth: 0,
     flex: '1 1 auto',
+    borderRadius: '0 0 8px 8px',
   },
   builderPreviewPane: {
     display: 'flex',
@@ -3164,21 +3493,6 @@ const s = {
     fontSize: '0.74rem',
     letterSpacing: '0.08em',
     textTransform: 'uppercase',
-  },
-  previewCollapseBtn: {
-    width: 28,
-    height: 28,
-    border: '1px solid rgba(255,255,255,0.45)',
-    borderRadius: 6,
-    background: 'rgba(255,255,255,0.12)',
-    color: '#fff',
-    cursor: 'pointer',
-    fontSize: 20,
-    lineHeight: '20px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 0,
   },
   noFile: {
     flex: 1,
@@ -3458,6 +3772,48 @@ const s = {
   taskFormatGrid: {
     display: 'flex',
     gap: 10,
+  },
+  infoTypeGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+    gap: 10,
+  },
+  infoTypeBtn: {
+    border: '1px solid #e5e7eb',
+    borderRadius: 8,
+    background: '#fff',
+    color: 'var(--colour-text)',
+    padding: '10px 12px',
+    textAlign: 'left',
+    cursor: 'pointer',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 4,
+    minWidth: 0,
+  },
+  infoTypeBtnActive: {
+    borderColor: 'var(--colour-primary)',
+    background: '#f7f2ff',
+    color: 'var(--colour-primary)',
+  },
+  infoTypeLabel: {
+    fontFamily: 'var(--font-body)',
+    fontWeight: 700,
+    fontSize: '0.9rem',
+  },
+  infoTypeHint: {
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.78rem',
+    color: '#6b7280',
+    lineHeight: 1.3,
+  },
+  infoPreview: {
+    minHeight: 340,
+    maxHeight: 520,
+    display: 'flex',
+    overflow: 'hidden',
+    padding: 12,
+    background: '#f5f5f5',
   },
   taskFormatBtn: {
     flex: 1,
