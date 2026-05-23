@@ -30,6 +30,15 @@ function darkenColor(hex) {
   return `rgb(${r},${g},${b})`
 }
 
+function contrastTextColor(hex) {
+  const num = parseInt(hex.replace('#', ''), 16)
+  const r = num >> 16
+  const g = (num >> 8) & 0xff
+  const b = num & 0xff
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+  return luminance > 0.58 ? '#1f2937' : '#ffffff'
+}
+
 function categorize(text) {
   const t = text.trim().toLowerCase()
   const unwrapped = t.replace(/^<+\s*/, '').replace(/\s*>+$/, '').trim()
@@ -113,6 +122,7 @@ function renderBlockText(text) {
           key={i}
           style={{
             background,
+            color: isCondition || isAnswer ? '#fff' : '#1f2937',
             borderRadius: '999px',
             padding: isCondition ? '1px 8px' : '0 5px',
             margin: '0 1px',
@@ -130,6 +140,7 @@ function renderBlockText(text) {
 function InlineScratchBlock({ text }) {
   const info = categorize(text) ?? { color: '#7c7c7c' }
   const shadow = darkenColor(info.color)
+  const textColor = contrastTextColor(info.color)
   return (
     <span
       style={{
@@ -139,7 +150,7 @@ function InlineScratchBlock({ text }) {
         background: info.color,
         borderRadius: info.hat ? '10px 10px 2px 2px' : '3px',
         padding: '1px 8px',
-        color: 'white',
+        color: textColor,
         fontFamily: "'Quicksand', sans-serif",
         fontWeight: 700,
         fontSize: '0.82em',
@@ -247,6 +258,7 @@ function InlineHighlightedCode({ lang, code }) {
         ...CODE_FONT_STYLE,
         fontSize: '0.88em',
         background: '#fafafa',
+        color: '#1f2937',
         border: '1px solid #e5e7eb',
         padding: '2px 6px',
         borderRadius: '4px',
@@ -328,7 +340,7 @@ function parseMarkdownTables(content) {
   return blocks
 }
 
-function InlineMarkdown({ content }) {
+export function InlineMarkdown({ content }) {
   return (
     <ReactMarkdown
       remarkPlugins={[remarkBreaks]}

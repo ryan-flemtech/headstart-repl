@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { getQuizOptionText } from './QuizTask'
+import { InlineMarkdown } from '../../shared/markdown'
 
 export default function StudentCard({ student, lesson, lessonId, session, onRename, onRemove, onExpand }) {
   const [editing, setEditing] = useState(false)
@@ -85,7 +86,9 @@ export default function StudentCard({ student, lesson, lessonId, session, onRena
             ? (
               <>
                 <span style={s.quizAnswerId}>{student.currentAnswer}</span>
-                <span style={s.quizAnswerText}>{quizAnswerText || 'Selected answer'}</span>
+                <span style={s.quizAnswerText}>
+                  {quizAnswerText ? <InlineMarkdown content={quizAnswerText} /> : 'Selected answer'}
+                </span>
               </>
             )
             : <span style={{ color: '#9ca3af', fontSize: 12 }}>No answer yet</span>}

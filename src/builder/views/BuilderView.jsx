@@ -5,6 +5,9 @@ import TaskEditor from '../components/TaskEditor'
 import PreviewView from './PreviewView'
 import { checkAllowedForSubmit, normalizeChecks } from '../../shared/checks'
 import { HTML_ONLY } from '../components/FileManager'
+import { flattenTasks, findGroupForTask, updateTaskInTasks } from '../../shared/taskUtils'
+
+// ─── Validation ───────────────────────────────────────────────────────────────
 
 function validateLesson(lesson) {
   const errors = []
@@ -16,7 +19,18 @@ function validateLesson(lesson) {
   if (!title) errors.push('Lesson title is required')
   if (!tasks || tasks.length === 0) errors.push('Lesson must have at least one task')
 
-  tasks.forEach((task, i) => {
+  // Group structure checks
+  tasks.forEach((item, i) => {
+    if (item.type === 'group') {
+      if (!item.title) errors.push(`Group ${i + 1} is missing a title`)
+      if (!item.subtasks || item.subtasks.length === 0)
+        errors.push(`Group "${item.title || (i + 1)}" has no subtasks — add at least one subtask`)
+    }
+  })
+
+  // Task content checks (flat)
+  const flat = flattenTasks(tasks)
+  flat.forEach((task, i) => {
     const n = i + 1
     if (!task.title)    errors.push(`Task ${n} is missing a title`)
     if (task.taskType === 'information' && !task.explainer?.trim()) {
@@ -26,14 +40,38 @@ function validateLesson(lesson) {
     if (task.taskType === 'information') {
       // Information tasks only render explainer markdown.
     } else if (task.taskType === 'quiz') {
-      if (!task.options || task.options.length < 2) {
-        errors.push(`Task ${n} is a quiz but has fewer than 2 options.`)
-      }
-      if (task.options?.some(option => !option.text?.trim())) {
-        errors.push(`Task ${n} is a quiz but has an empty option text field.`)
-      }
-      if (task.check?.type !== 'answer_equals' || !task.check.value) {
-        errors.push(`Task ${n} is a quiz but no correct answer has been selected.`)
+      const quizType = task.quizType ?? 'multiple_choice'
+      if (quizType === 'multiple_choice') {
+        if (!task.options || task.options.length < 2) {
+          errors.push(`Task ${n} is a quiz but has fewer than 2 options.`)
+        }
+        if (task.options?.some(option => !option.text?.trim())) {
+          errors.push(`Task ${n} is a quiz but has an empty option text field.`)
+        }
+        if (task.check?.type !== 'answer_equals' || !task.check.value) {
+          errors.push(`Task ${n} is a quiz but no correct answer has been selected.`)
+        }
+      } else if (quizType === 'match') {
+        if (!task.pairs || task.pairs.length < 2) {
+          errors.push(`Task ${n} is a match quiz but has fewer than 2 pairs.`)
+        }
+        if (task.pairs?.some(pair => !pair.prompt?.trim() || !pair.answer?.trim())) {
+          errors.push(`Task ${n} is a match quiz but has an empty prompt or answer.`)
+        }
+      } else if (quizType === 'fill_blank') {
+        if (!task.text?.includes('___')) {
+          errors.push(`Task ${n} is a fill-in-the-blank quiz but has no blanks in the text.`)
+        }
+        if (!task.blanks || task.blanks.length === 0) {
+          errors.push(`Task ${n} is a fill-in-the-blank quiz but has no blank answers.`)
+        }
+        if (task.blanks?.some(blank => !blank.answer?.trim())) {
+          errors.push(`Task ${n} is a fill-in-the-blank quiz but has an empty answer.`)
+        }
+      } else if (quizType === 'short_answer') {
+        if (!task.check?.type?.startsWith('answer_') || !task.check.value?.trim()) {
+          errors.push(`Task ${n} is a short-answer quiz but has no completion check value.`)
+        }
       }
     } else if (type === 'html') {
       if (!task.starterFiles || task.starterFiles.length === 0) errors.push(`Task ${n} has no files`)
@@ -46,9 +84,9 @@ function validateLesson(lesson) {
     }
 
     if (task.taskType === 'information') {
-      // Information tasks have no checks.
+      // No checks.
     } else if (task.taskType === 'quiz') {
-      // Quiz checks are validated above.
+      // Validated above.
     } else if (type === 'scratch') {
       if (task.toolbox) {
         try {
@@ -58,13 +96,11 @@ function validateLesson(lesson) {
           errors.push(`Task ${n} has invalid toolbox XML`)
         }
       }
-
       if (task.check?.type === 'sprite_property') {
         if (!task.check.property) errors.push(`Task ${n} sprite check is missing a property`)
         if (!task.check.operator) errors.push(`Task ${n} sprite check is missing an operator`)
         if (task.check.value == null || task.check.value === '') errors.push(`Task ${n} sprite check is missing a value`)
       }
-
       if (task.check?.type === 'block_used' && !task.check.opcode) {
         errors.push(`Task ${n} block-used check is missing a block opcode`)
       }
@@ -83,7 +119,7 @@ function validateLesson(lesson) {
 
     const carryFrom = task.taskType === 'quiz' || task.taskType === 'information' ? null : type === 'scratch' ? task.carryBlocksFrom : task.carryCodeFrom
     if (carryFrom != null) {
-      const exists = tasks.some(t => t.id === carryFrom)
+      const exists = flat.some(t => t.id === carryFrom)
       if (!exists) errors.push(`Task ${n} references task ${carryFrom} for carry-through but that task does not exist`)
     }
 
@@ -91,7 +127,7 @@ function validateLesson(lesson) {
     const hasStarter = task.taskType === 'information'
       ? true
       : task.taskType === 'quiz'
-      ? task.options?.some(option => option.text?.trim())
+      ? quizHasStarter(task)
       : type === 'python'
       ? !!task.starterCode
       : type === 'scratch'
@@ -101,7 +137,7 @@ function validateLesson(lesson) {
     const checkHasValue = task.taskType === 'information'
       ? false
       : task.taskType === 'quiz'
-      ? !!task.check?.value
+      ? quizHasCheckValue(task)
       : type === 'scratch'
       ? !!task.check
       : normalizeChecks(task.check).some(c => c.type === 'code_no_error' || c.type === 'output_not_empty' || c.type === 'element_exists' || c.value)
@@ -112,32 +148,200 @@ function validateLesson(lesson) {
   return { errors, warnings }
 }
 
-function normalizeTaskForExport(task, index) {
-  const hints = Array.isArray(task.hints) ? task.hints.map(h => String(h ?? '').trim()).filter(Boolean) : []
-
-  if (task.taskType !== 'information') {
-    const { hints: _hints, ...rest } = task
-    return hints.length > 0 ? { ...rest, id: index + 1, hints } : { ...rest, id: index + 1 }
-  }
-
-  const exported = {
-    id: index + 1,
-    taskType: 'information',
-    title: task.title,
-    explainer: task.explainer ?? '',
-  }
-  if (hints.length > 0) exported.hints = hints
-  return exported
+function quizHasStarter(task) {
+  const quizType = task.quizType ?? 'multiple_choice'
+  if (quizType === 'multiple_choice') return task.options?.some(option => option.text?.trim())
+  if (quizType === 'match') return task.pairs?.some(pair => pair.prompt?.trim() || pair.answer?.trim())
+  if (quizType === 'fill_blank') return !!task.text?.trim() || task.blanks?.some(blank => blank.answer?.trim())
+  if (quizType === 'short_answer') return !!task.explainer?.trim()
+  return false
 }
 
+function quizHasCheckValue(task) {
+  const quizType = task.quizType ?? 'multiple_choice'
+  if (quizType === 'match') return task.pairs?.length > 0 && task.pairs.every(pair => pair.prompt?.trim() && pair.answer?.trim())
+  if (quizType === 'fill_blank') return task.blanks?.length > 0 && task.blanks.every(blank => blank.answer?.trim())
+  return !!task.check?.value
+}
+
+// ─── Export normalisation ─────────────────────────────────────────────────────
+
+function normalizeTasksForExport(tasks) {
+  // Build ID remap table — assign sequential IDs across all tasks (incl. inside groups)
+  let counter = 0
+  const idMap = {}
+  function assignIds(items) {
+    for (const item of items) {
+      if (item.type === 'group') assignIds(item.subtasks ?? [])
+      else idMap[item.id] = ++counter
+    }
+  }
+  assignIds(tasks)
+
+  function normalizeTask(task) {
+    if (task.taskType === 'information') {
+      const exported = { id: idMap[task.id], taskType: 'information', title: task.title, explainer: task.explainer ?? '' }
+      return exported
+    }
+
+    const { _checkTested, hints: _hints, ...rest } = task
+    const exported = { ...rest, id: idMap[task.id] }
+
+    if (exported.carryCodeFrom != null) exported.carryCodeFrom = idMap[exported.carryCodeFrom] ?? exported.carryCodeFrom
+    if (exported.carryBlocksFrom != null) exported.carryBlocksFrom = idMap[exported.carryBlocksFrom] ?? exported.carryBlocksFrom
+
+    if (Array.isArray(exported.check)) {
+      exported.check = exported.check.map(normalizeCheckForExport)
+    } else if (exported.check) {
+      exported.check = normalizeCheckForExport(exported.check)
+    }
+    if (Array.isArray(exported.options)) {
+      exported.options = exported.options.map(option => {
+        const next = { ...option }
+        if (next.feedback != null) {
+          const feedback = String(next.feedback).trim()
+          if (feedback) next.feedback = feedback
+          else delete next.feedback
+        }
+        return next
+      })
+    }
+    return exported
+  }
+
+  function normalizeCheckForExport(check) {
+    const next = { ...check }
+    if (next.hint != null) {
+      const hint = String(next.hint).trim()
+      if (hint) next.hint = hint
+      else delete next.hint
+    }
+    return next
+  }
+
+  function normalizeItem(item) {
+    if (item.type === 'group') {
+      return {
+        id: item.id,
+        type: 'group',
+        title: item.title,
+        subtasks: (item.subtasks ?? []).map(normalizeTask),
+      }
+    }
+    return normalizeTask(item)
+  }
+
+  return tasks.map(normalizeItem)
+}
+
+// ─── Group editor panel ───────────────────────────────────────────────────────
+
+function GroupEditor({ group, onUpdate }) {
+  return (
+    <div style={ge.wrap}>
+      <div style={ge.field}>
+        <span style={ge.label}>Group title</span>
+        <input
+          style={ge.input}
+          value={group.title}
+          onChange={e => onUpdate({ ...group, title: e.target.value })}
+          placeholder="e.g. Functions"
+          autoFocus
+        />
+      </div>
+      <p style={ge.hint}>
+        This group contains {group.subtasks?.length ?? 0} subtask{(group.subtasks?.length ?? 0) !== 1 ? 's' : ''}.
+        Subtasks are shown as a single step in the student progress indicator.
+        Use the task list to add, reorder, or delete subtasks.
+      </p>
+    </div>
+  )
+}
+
+const ge = {
+  wrap: { display: 'flex', flexDirection: 'column', gap: 16, padding: 4 },
+  field: { display: 'flex', flexDirection: 'column', gap: 6 },
+  label: {
+    fontFamily: 'var(--font-body)',
+    fontWeight: 600,
+    fontSize: '0.88rem',
+    color: 'var(--colour-text)',
+  },
+  input: {
+    border: '1px solid #d1d5db',
+    borderRadius: 6,
+    padding: '8px 10px',
+    fontSize: '0.95rem',
+    fontFamily: 'var(--font-body)',
+    color: 'var(--colour-text)',
+    outline: 'none',
+  },
+  hint: {
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.86rem',
+    color: '#6b7280',
+    lineHeight: 1.6,
+    margin: 0,
+  },
+}
+
+// ─── BuilderView ──────────────────────────────────────────────────────────────
+
 export default function BuilderView({ lesson, dirty, onUpdate, onNew, onMarkSaved }) {
-  const [selectedTaskId, setSelectedTaskId] = useState(lesson.tasks[0]?.id ?? null)
+  const [selectedTaskId, setSelectedTaskId] = useState(() => {
+    const first = lesson.tasks[0]
+    if (!first) return null
+    if (first.type === 'group') return first.subtasks?.[0]?.id ?? null
+    return first.id
+  })
+  const [selectedGroupId, setSelectedGroupId] = useState(null)
   const [previewing, setPreviewing] = useState(false)
   const [metaOpen, setMetaOpen] = useState(false)
+
+  function selectTask(id) {
+    setSelectedTaskId(id)
+    setSelectedGroupId(null)
+  }
+
+  function selectGroup(id) {
+    setSelectedGroupId(id)
+    setSelectedTaskId(null)
+  }
 
   if (previewing) {
     return <PreviewView lesson={lesson} onClose={() => setPreviewing(false)} />
   }
+
+  // ── Default type fields for a new task ──────────────────────────────────────
+
+  function defaultTypeFields(prevTask = null) {
+    if (lesson.type === 'python') {
+      return {
+        starterCode: prevTask ? (prevTask.completeCode ?? prevTask.starterCode ?? '') : '',
+        carryCodeFrom: prevTask?.id ?? null,
+      }
+    }
+    if (lesson.type === 'scratch') {
+      return {
+        toolbox: '',
+        starterBlocks: prevTask ? (prevTask.completeBlocks ?? prevTask.starterBlocks ?? null) : null,
+        carryBlocksFrom: prevTask?.id ?? null,
+      }
+    }
+    return {
+      starterFiles: prevTask
+        ? (prevTask.completeFiles ?? prevTask.starterFiles ?? []).map(f => ({ ...f }))
+        : [{ name: 'index.html', type: 'html', content: HTML_ONLY }],
+      entryFile: prevTask ? (prevTask.completeEntryFile ?? prevTask.entryFile ?? 'index.html') : 'index.html',
+      carryCodeFrom: prevTask?.id ?? null,
+    }
+  }
+
+  function nextId() {
+    return flattenTasks(lesson.tasks).reduce((m, t) => Math.max(m, t.id), 0) + 1
+  }
+
+  // ── Handlers ────────────────────────────────────────────────────────────────
 
   function handleDownload() {
     const { errors, warnings } = validateLesson(lesson)
@@ -150,10 +354,9 @@ export default function BuilderView({ lesson, dirty, onUpdate, onNew, onMarkSave
       if (!ok) return
     }
 
-    // Renumber task IDs sequentially
     const exported = {
       ...lesson,
-      tasks: lesson.tasks.map(normalizeTaskForExport),
+      tasks: normalizeTasksForExport(lesson.tasks),
     }
     const blob = new Blob([JSON.stringify(exported, null, 2)], { type: 'application/json' })
     const url  = URL.createObjectURL(blob)
@@ -179,7 +382,8 @@ export default function BuilderView({ lesson, dirty, onUpdate, onNew, onMarkSave
           const parsed = JSON.parse(ev.target.result)
           if (!parsed.id || !parsed.tasks) throw new Error('Unrecognised format')
           onUpdate(parsed)
-          setSelectedTaskId(parsed.tasks[0]?.id ?? null)
+          const firstFlat = flattenTasks(parsed.tasks)
+          selectTask(firstFlat[0]?.id ?? null)
         } catch (err) {
           alert('Could not load file: ' + err.message)
         }
@@ -190,43 +394,151 @@ export default function BuilderView({ lesson, dirty, onUpdate, onNew, onMarkSave
   }
 
   function handleAddTask() {
-    const maxId = lesson.tasks.reduce((m, t) => Math.max(m, t.id), 0)
-    const newId = maxId + 1
-    const prevTask = lesson.tasks[lesson.tasks.length - 1] ?? null
-
-    let typeFields
-    if (lesson.type === 'python') {
-      typeFields = {
-        starterCode: prevTask ? (prevTask.completeCode ?? prevTask.starterCode ?? '') : '',
-        carryCodeFrom: prevTask?.id ?? null,
-      }
-    } else if (lesson.type === 'scratch') {
-      typeFields = {
-        toolbox: '',
-        starterBlocks: prevTask ? (prevTask.completeBlocks ?? prevTask.starterBlocks ?? null) : null,
-        carryBlocksFrom: prevTask?.id ?? null,
-      }
-    } else {
-      typeFields = {
-        starterFiles: prevTask
-          ? (prevTask.completeFiles ?? prevTask.starterFiles ?? []).map(f => ({ ...f }))
-          : [{ name: 'index.html', type: 'html', content: HTML_ONLY }],
-        entryFile: prevTask ? (prevTask.completeEntryFile ?? prevTask.entryFile ?? 'index.html') : 'index.html',
-        carryCodeFrom: prevTask?.id ?? null,
-      }
-    }
-
-    const newTask = { id: newId, title: '', explainer: '', ...typeFields }
+    const flat = flattenTasks(lesson.tasks)
+    const prevTask = flat[flat.length - 1] ?? null
+    const newId = (prevTask?.id ?? 0) + 1
+    const newTask = { id: newId, title: '', explainer: '', ...defaultTypeFields(prevTask) }
     onUpdate(prev => ({ ...prev, tasks: [...prev.tasks, newTask] }))
-    setSelectedTaskId(newId)
+    selectTask(newId)
   }
 
+  function handleAddGroup() {
+    const flat = flattenTasks(lesson.tasks)
+    const prevTask = flat[flat.length - 1] ?? null
+    const newId = (prevTask?.id ?? 0) + 1
+    const groupId = `g-${Date.now()}`
+    const firstSubtask = {
+      id: newId,
+      title: 'New Group - 1',
+      explainer: '',
+      ...defaultTypeFields(prevTask),
+    }
+    const newGroup = {
+      id: groupId,
+      type: 'group',
+      title: 'New Group',
+      subtasks: [firstSubtask],
+    }
+    onUpdate(prev => ({ ...prev, tasks: [...prev.tasks, newGroup] }))
+    selectGroup(groupId)
+  }
+
+  function handleAddSubtask(groupId) {
+    const group = lesson.tasks.find(t => t.type === 'group' && t.id === groupId)
+    if (!group) return
+    const flat = flattenTasks(lesson.tasks)
+    const newId = flat.reduce((m, t) => Math.max(m, t.id), 0) + 1
+    const prevSubtask = group.subtasks?.[group.subtasks.length - 1] ?? null
+    const newSubtask = {
+      id: newId,
+      title: `${group.title} - ${(group.subtasks?.length ?? 0) + 1}`,
+      explainer: '',
+      ...defaultTypeFields(prevSubtask),
+    }
+    onUpdate(prev => ({
+      ...prev,
+      tasks: prev.tasks.map(t =>
+        t.type === 'group' && t.id === groupId
+          ? { ...t, subtasks: [...(t.subtasks ?? []), newSubtask] }
+          : t
+      ),
+    }))
+    selectTask(newId)
+  }
+
+  function handleDuplicate(task, groupId = null) {
+    const newId = flattenTasks(lesson.tasks).reduce((m, t) => Math.max(m, t.id), 0) + 1
+
+    if (groupId) {
+      const group = lesson.tasks.find(t => t.type === 'group' && t.id === groupId)
+      const newTitle = group ? `${group.title} - ${(group.subtasks?.length ?? 0) + 1}` : task.title
+      const dup = { ...task, id: newId, title: newTitle }
+      onUpdate(prev => ({
+        ...prev,
+        tasks: prev.tasks.map(t =>
+          t.type === 'group' && t.id === groupId
+            ? { ...t, subtasks: [...(t.subtasks ?? []), dup] }
+            : t
+        ),
+      }))
+    } else {
+      const dup = { ...task, id: newId, title: task.title + ' (copy)' }
+      onUpdate(prev => ({ ...prev, tasks: [...prev.tasks, dup] }))
+      selectTask(dup.id)
+      return
+    }
+    selectTask(newId)
+  }
+
+  function handleDelete(taskId) {
+    if (!confirm('Delete this task?')) return
+    const group = findGroupForTask(lesson.tasks, taskId)
+
+    if (group) {
+      const newSubtasks = (group.subtasks ?? []).filter(t => t.id !== taskId)
+      if (newSubtasks.length === 0) {
+        // Remove the now-empty group too
+        onUpdate(prev => ({ ...prev, tasks: prev.tasks.filter(t => t.id !== group.id) }))
+        const remaining = flattenTasks(lesson.tasks.filter(t => t.id !== group.id))
+        selectTask(remaining[0]?.id ?? null)
+      } else {
+        onUpdate(prev => ({
+          ...prev,
+          tasks: prev.tasks.map(t =>
+            t.type === 'group' && t.id === group.id ? { ...t, subtasks: newSubtasks } : t
+          ),
+        }))
+        selectTask(newSubtasks[0]?.id ?? null)
+      }
+    } else {
+      onUpdate(prev => ({ ...prev, tasks: prev.tasks.filter(t => t.id !== taskId) }))
+      const remaining = flattenTasks(lesson.tasks.filter(t => !(t.type !== 'group' && t.id === taskId)))
+      selectTask(remaining[0]?.id ?? null)
+    }
+  }
+
+  function handleDeleteGroup(groupId) {
+    if (!confirm('Delete this group and all its subtasks?')) return
+    onUpdate(prev => ({ ...prev, tasks: prev.tasks.filter(t => !(t.type === 'group' && t.id === groupId)) }))
+    const remaining = flattenTasks(lesson.tasks.filter(t => !(t.type === 'group' && t.id === groupId)))
+    selectTask(remaining[0]?.id ?? null)
+  }
+
+  function handleReorder(reorderedTasks) {
+    onUpdate(prev => ({ ...prev, tasks: reorderedTasks }))
+  }
+
+  function handleReorderSubtask(groupId, reorderedSubtasks) {
+    const updated = lesson.tasks.map(item => {
+      if (item.type === 'group') {
+        const subtasks = item.id === groupId ? reorderedSubtasks : (item.subtasks ?? [])
+        return {
+          ...item,
+          subtasks,
+        }
+      }
+      return item
+    })
+    onUpdate(prev => ({ ...prev, tasks: updated }))
+  }
+
+  // ── Derived state ────────────────────────────────────────────────────────────
+
   const { errors, warnings } = validateLesson(lesson)
-  const selectedTask = lesson.tasks.find(t => t.id === selectedTaskId)
+  const flatTasks = flattenTasks(lesson.tasks)
+  const selectedTask = selectedTaskId != null ? flatTasks.find(t => t.id === selectedTaskId) : null
+  const selectedGroup = selectedGroupId != null
+    ? lesson.tasks.find(t => t.type === 'group' && t.id === selectedGroupId)
+    : null
+
+  // Pass a flat-tasks version of lesson to TaskEditor so its internal pickers work correctly
+  const lessonForEditor = selectedTask ? { ...lesson, tasks: flatTasks } : lesson
+  const selectedTaskGroup = selectedTask
+    ? (lesson.tasks.find(t => t.type === 'group' && (t.subtasks ?? []).some(s => s.id === selectedTask.id)) ?? null)
+    : null
 
   return (
     <div style={s.page}>
-      {/* Top bar */}
       <header style={s.topBar}>
         <span style={s.logo}>Headstart Coding - LaunchPad | Lesson Builder</span>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -259,12 +571,7 @@ export default function BuilderView({ lesson, dirty, onUpdate, onNew, onMarkSave
             <LessonMetaPanel lesson={lesson} onUpdate={onUpdate} onCollapse={() => setMetaOpen(false)} />
           ) : (
             <div style={s.collapsedMetaStrip}>
-              <button
-                type="button"
-                style={s.expandMetaBtn}
-                onClick={() => setMetaOpen(true)}
-                title="Expand lesson details"
-              >
+              <button type="button" style={s.expandMetaBtn} onClick={() => setMetaOpen(true)} title="Expand lesson details">
                 ›
               </button>
             </div>
@@ -275,38 +582,51 @@ export default function BuilderView({ lesson, dirty, onUpdate, onNew, onMarkSave
           <TaskList
             tasks={lesson.tasks}
             selectedTaskId={selectedTaskId}
-            onSelect={setSelectedTaskId}
+            selectedGroupId={selectedGroupId}
+            onSelect={selectTask}
+            onSelectGroup={selectGroup}
             onAdd={handleAddTask}
-            onDuplicate={task => {
-              const maxId = lesson.tasks.reduce((m, t) => Math.max(m, t.id), 0)
-              const dup = { ...task, id: maxId + 1, title: task.title + ' (copy)' }
-              onUpdate(prev => ({ ...prev, tasks: [...prev.tasks, dup] }))
-              setSelectedTaskId(dup.id)
-            }}
-            onDelete={taskId => {
-              if (!confirm('Delete this task?')) return
-              onUpdate(prev => ({ ...prev, tasks: prev.tasks.filter(t => t.id !== taskId) }))
-              const remaining = lesson.tasks.filter(t => t.id !== taskId)
-              setSelectedTaskId(remaining[0]?.id ?? null)
-            }}
-            onReorder={reorderedTasks => {
-              const renumbered = reorderedTasks.map((t, i) => ({ ...t, id: i + 1 }))
-              onUpdate(prev => ({ ...prev, tasks: renumbered }))
-            }}
+            onAddGroup={handleAddGroup}
+            onAddSubtask={handleAddSubtask}
+            onDuplicate={handleDuplicate}
+            onDelete={handleDelete}
+            onDeleteGroup={handleDeleteGroup}
+            onReorder={handleReorder}
+            onReorderSubtask={handleReorderSubtask}
           />
           <ValidationPanel errors={errors} warnings={warnings} />
         </aside>
 
         <main style={s.main}>
-          {selectedTask ? (
+          {selectedGroup && !selectedTask ? (
+            <GroupEditor
+              group={selectedGroup}
+              onUpdate={updatedGroup => {
+                const retitled = {
+                  ...updatedGroup,
+                  subtasks: (updatedGroup.subtasks ?? []).map((t, i) => ({
+                    ...t,
+                    title: updatedGroup.title ? `${updatedGroup.title} - ${i + 1}` : t.title,
+                  })),
+                }
+                onUpdate(prev => ({
+                  ...prev,
+                  tasks: prev.tasks.map(t =>
+                    t.type === 'group' && t.id === retitled.id ? retitled : t
+                  ),
+                }))
+              }}
+            />
+          ) : selectedTask ? (
             <TaskEditor
               key={selectedTask.id}
               task={selectedTask}
-              lesson={lesson}
+              lesson={lessonForEditor}
+              parentGroup={selectedTaskGroup}
               onUpdate={updated => {
                 onUpdate(prev => ({
                   ...prev,
-                  tasks: prev.tasks.map(t => t.id === updated.id ? updated : t),
+                  tasks: updateTaskInTasks(prev.tasks, updated),
                 }))
               }}
             />
@@ -321,11 +641,12 @@ export default function BuilderView({ lesson, dirty, onUpdate, onNew, onMarkSave
   )
 }
 
+// ─── Validation panel ─────────────────────────────────────────────────────────
+
 function ValidationPanel({ errors, warnings }) {
-  const [open, setOpen] = useState(errors.length > 0)
+  const [open, setOpen] = useState(false)
   const [activeTab, setActiveTab] = useState(errors.length ? 'errors' : 'warnings')
 
-  const total = errors.length + warnings.length
   const summaryParts = []
   if (errors.length) summaryParts.push(`${errors.length} error${errors.length !== 1 ? 's' : ''}`)
   if (warnings.length) summaryParts.push(`${warnings.length} warning${warnings.length !== 1 ? 's' : ''}`)
@@ -454,22 +775,6 @@ const s = {
     justifyContent: 'center',
     lineHeight: 1,
     padding: 0,
-  },
-  collapsedErrorDot: {
-    width: 10,
-    height: 10,
-    borderRadius: '50%',
-    background: '#ef4444',
-    display: 'block',
-    flexShrink: 0,
-  },
-  collapsedWarningDot: {
-    width: 10,
-    height: 10,
-    borderRadius: '50%',
-    background: '#f59e0b',
-    display: 'block',
-    flexShrink: 0,
   },
   taskPane: {
     background: '#fff',

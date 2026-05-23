@@ -51,7 +51,7 @@ export function useSession(lessonId) {
       currentTaskId:         1,
       createdAt:             Date.now(),
       activeStudentView:     null,
-      visibleHint:           null,
+      teacherLive:           null,
       isPaused:              false,
       sandboxCode:           null,
       sandboxCodePushedAt:   null,
@@ -73,7 +73,7 @@ export function useSession(lessonId) {
     await update(ref(db, `sessions/${lessonId}`), {
       state:                 'ended',
       activeStudentView:     null,
-      visibleHint:           null,
+      teacherLive:           null,
       sandboxCode:           null,
       sandboxCodePushedAt:   null,
       sandboxFiles:          null,
@@ -86,7 +86,7 @@ export function useSession(lessonId) {
   }
 
   async function setTaskId(taskId) {
-    const updates = { currentTaskId: taskId, visibleHint: null }
+    const updates = { currentTaskId: taskId }
     for (const anonymousId of Object.keys(session?.students ?? {})) {
       updates[`students/${anonymousId}/checkPassed`]    = false
       updates[`students/${anonymousId}/lastRunStatus`]  = null
@@ -99,7 +99,7 @@ export function useSession(lessonId) {
   }
 
   async function enterSandbox({ code = null, files = null } = {}) {
-    const updates = { state: 'sandbox', visibleHint: null }
+    const updates = { state: 'sandbox' }
     if (code != null) {
       updates.sandboxCode        = code
       updates.sandboxCodePushedAt = Date.now()
@@ -115,7 +115,6 @@ export function useSession(lessonId) {
   async function exitSandbox() {
     await update(ref(db, `sessions/${lessonId}`), {
       state:                 'active',
-      visibleHint:           null,
       sandboxCode:           null,
       sandboxCodePushedAt:   null,
       sandboxFiles:          null,
@@ -151,8 +150,25 @@ export function useSession(lessonId) {
     }
   }
 
-  async function setVisibleHint(hint) {
-    await set(ref(db, `sessions/${lessonId}/visibleHint`), hint || null)
+  async function setTeacherLive(payload) {
+    const r2 = ref(db, `sessions/${lessonId}/teacherLive`)
+    if (!payload) {
+      await set(r2, null)
+      return
+    }
+    await set(r2, {
+      active: true,
+      updatedAt: Date.now(),
+      ...payload,
+    })
+    onDisconnect(r2).set(null)
+  }
+
+  async function updateTeacherLive(payload) {
+    await update(ref(db, `sessions/${lessonId}/teacherLive`), {
+      updatedAt: Date.now(),
+      ...payload,
+    })
   }
 
   async function renameStudent(anonymousId, newName) {
@@ -226,7 +242,7 @@ export function useSession(lessonId) {
     // teacher
     createSession, restartSession, startSession, endSession,
     setTaskId, enterSandbox, exitSandbox, pushSandboxCode, pushSandboxFiles,
-    setPaused, setActiveStudentView, setVisibleHint, renameStudent, removeStudent, pushResetToStudent,
+    setPaused, setActiveStudentView, setTeacherLive, updateTeacherLive, renameStudent, removeStudent, pushResetToStudent,
     // student
     registerPresence, joinSession, writeStudentRun, writeStudentCode, writeStudentFiles, writeStudentOutput,
   }

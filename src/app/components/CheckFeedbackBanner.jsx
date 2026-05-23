@@ -4,17 +4,22 @@ export default function CheckFeedbackBanner({
   passed,
   failureMessage = 'Check again, something is not right.',
   successMessage = 'Correct!',
-  onHintsClick,
+  suggestion,
   onShowCompleteCode,
 }) {
   return (
     <div style={{ ...s.banner, ...(passed ? s.pass : s.fail) }} role="status">
       <span style={{ ...s.icon, background: passed ? '#166534' : '#92400e' }}>{passed ? '✓' : '!'}</span>
-      <span style={s.text}>{passed ? successMessage : failureMessage}</span>
-      {!passed && onHintsClick && (
-        <button type="button" style={s.actionLink} onClick={onHintsClick}>
-          Hints
-        </button>
+      <span style={s.text}>
+        {passed ? successMessage : (
+          <>
+            {failureMessage}
+            {suggestion && <span style={s.suggestion}>Suggestion: {suggestion}</span>}
+          </>
+        )}
+      </span>
+      {!passed && onShowCompleteCode && (
+        <span style={s.completePrompt}>Want to see the complete code?</span>
       )}
       {!passed && onShowCompleteCode && (
         <button type="button" style={s.actionLink} onClick={onShowCompleteCode}>
@@ -63,6 +68,20 @@ const s = {
   text: {
     flex: 1,
     minWidth: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 3,
+  },
+  suggestion: {
+    fontWeight: 600,
+    lineHeight: 1.35,
+  },
+  completePrompt: {
+    flexShrink: 1,
+    fontFamily: 'var(--font-body)',
+    fontWeight: 700,
+    fontSize: '0.86rem',
+    color: '#92400e',
   },
   actionLink: {
     flexShrink: 0,

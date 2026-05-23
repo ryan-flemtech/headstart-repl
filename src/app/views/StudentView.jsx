@@ -4,13 +4,13 @@ import { useSession, decodeFileKey } from '../hooks/useSession'
 import { useIdentity } from '../hooks/useIdentity'
 import { initPyodide, runPython, stopPython, provideInput, isPyodideReady } from '../../shared/pyodide'
 import { buildIframeSrc, waitForIframeText } from '../../shared/iframe'
-import { evaluateCheck, evaluateCheckWithCode } from '../../shared/checks'
+import { evaluateCheck, evaluateCheckWithCode, getFirstFailedCheckHint } from '../../shared/checks'
+import { flattenTasks } from '../../shared/taskUtils'
 import TopBar from '../components/TopBar'
 import NameEntry from '../components/NameEntry'
 import WaitingRoom from '../components/WaitingRoom'
 import TaskProgressDots from '../components/TaskProgressDots'
 import ExplainerPanel from '../components/ExplainerPanel'
-import HintPanel from '../components/HintPanel'
 import PythonEditor from '../components/PythonEditor'
 import HtmlEditor from '../components/HtmlEditor'
 import OutputPanel from '../components/OutputPanel'
@@ -96,10 +96,15 @@ function TaskSlideTransition({ transitionKey, children, style }) {
   )
 }
 
-export default function StudentView({ lessonId: lessonIdProp, soloMode = false, lesson: lessonProp = null }) {
+export default function StudentView({ lessonId: lessonIdProp, soloMode = false, lesson: lessonProp = null, teacherPresentation = false }) {
   const lessonId = lessonIdProp ?? lessonProp?.id ?? 'preview'
-  const { session, loading: sessionLoading, registerPresence, joinSession, writeStudentRun, writeStudentCode, writeStudentFiles, writeStudentOutput } = useSession(lessonId)
+  const {
+    session, loading: sessionLoading, registerPresence, joinSession,
+    writeStudentRun, writeStudentCode, writeStudentFiles, writeStudentOutput,
+    setTaskId, setTeacherLive, updateTeacherLive, removeStudent,
+  } = useSession(lessonId)
   const { identity, loaded: identityLoaded, createIdentity, updateTimestamp, updateDisplayName } = useIdentity()
+  const effectiveIdentity = teacherPresentation ? { anonymousId: 'teacher-presenter', displayName: 'Teacher' } : identity
 
   const [lesson, setLesson]             = useState(null)
   const [lessonLoading, setLessonLoading] = useState(true)
@@ -114,15 +119,16 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
   const [running, setRunning]           = useState(false)
   const [pyodideStatus, setPyodideStatus] = useState('idle') // idle | loading | ready
   const [iframeSrc, setIframeSrc]         = useState(null)
+  const [teacherLiveIframeSrc, setTeacherLiveIframeSrc] = useState(null)
   const [htmlPreviewCollapsed, setHtmlPreviewCollapsed] = useState(true)
   const [inputPrompt, setInputPrompt]     = useState(null)
   const [checkPassed, setCheckPassed]     = useState(false)
   const [checkAttempted, setCheckAttempted] = useState(false)
+  const [checkSuggestion, setCheckSuggestion] = useState('')
+  const [repeatedSuggestionCount, setRepeatedSuggestionCount] = useState(0)
   const [selectedAnswer, setSelectedAnswer] = useState('')
   const [scratchSandboxProject, setScratchSandboxProject] = useState(null)
   const [scratchExternalState, setScratchExternalState] = useState(null)
-  const [hintModalOpen, setHintModalOpen] = useState(false)
-  const [viewedHintIndexes, setViewedHintIndexes] = useState([])
   const isMobile = useIsMobile()
   const iframeRef = useRef(null)
   const appendOutputRef = useRef(null)
@@ -146,13 +152,66 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
   const activeStudentViewRef = useRef(session?.activeStudentView)
   activeStudentViewRef.current = session?.activeStudentView
 
+  function currentTeacherLivePayload(extra = {}) {
+    const filesMap = Object.fromEntries(filesRef.current.map(f => [f.name, f.content]))
+    const sourceStudentId = teacherPresentation ? null : identityRef.current?.anonymousId
+    const sourceStudentName = teacherPresentation ? null : identityRef.current?.displayName
+    return {
+      active: true,
+      source: teacherPresentation ? 'teacher' : 'student',
+      sourceStudentId,
+      sourceStudentName,
+      taskId: currentTaskIdRef.current,
+      lessonType: lessonRef.current?.type,
+      code: codeRef.current,
+      files: filesMap,
+      activeFile,
+      output: outputRef.current,
+      runStatus: runStatusRef.current,
+      checkPassed,
+      checkAttempted,
+      checkSuggestion,
+      ...extra,
+    }
+  }
+
+  function resetCheckFeedback() {
+    setCheckPassed(false)
+    setCheckAttempted(false)
+    setCheckSuggestion('')
+    setRepeatedSuggestionCount(0)
+  }
+
+  function applyCheckFeedback(passed, suggestion = '') {
+    const nextSuggestion = passed ? '' : String(suggestion ?? '').trim()
+    setCheckPassed(passed)
+    setCheckAttempted(true)
+    setCheckSuggestion(nextSuggestion)
+    setRepeatedSuggestionCount(prev => {
+      if (passed || !nextSuggestion) return 0
+      return checkSuggestion === nextSuggestion ? prev + 1 : 1
+    })
+    return nextSuggestion
+  }
+
+  function canPublishTeacherLive() {
+    if (!session?.teacherLive?.active) return false
+    if (teacherPresentation) return true
+    return session.teacherLive.sourceStudentId === identityRef.current?.anonymousId
+  }
+
+  function publishTeacherLive(extra = {}) {
+    if (!canPublishTeacherLive()) return
+    updateTeacherLive(currentTeacherLivePayload(extra))
+  }
+
   function saveCurrentWorkSnapshot() {
     const id = identityRef.current
     const currentLesson = lessonRef.current
     const taskId = currentTaskIdRef.current
-    if (!id || !currentLesson) return
+    if (!id || teacherPresentation || !currentLesson) return
 
-    const task = currentLesson.tasks?.find(t => t.id === taskId)
+    const task = flattenTasks(currentLesson.tasks).find(t => t.id === taskId)
     if (task?.taskType === 'quiz' || task?.taskType === 'information') return
 
     if (currentLesson.type === 'python') {
@@ -171,6 +230,7 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
   useEffect(() => {
     if (lessonProp != null) {
       setLesson(lessonProp)
+      setCurrentTaskId(flattenTasks(lessonProp.tasks)[0]?.id ?? 1)
       setLessonLoading(false)
       return
     }
@@ -185,6 +245,25 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
     if (lesson?.type === 'html') setHtmlPreviewCollapsed(true)
   }, [lesson?.type, currentTaskId])
 
+  useEffect(() => {
+    if (teacherPresentation || lesson?.type !== 'html' || !session?.teacherLive?.active || !session.teacherLive.files) {
+      setTeacherLiveIframeSrc(null)
+      return
+    }
+    const liveFiles = Object.entries(session.teacherLive.files).map(([name, content]) => ({
+      name,
+      content,
+      type: name.endsWith('.html') ? 'html' : name.endsWith('.css') ? 'css' : 'javascript',
+    }))
+    const liveTask = flattenTasks(lesson.tasks).find(t => t.id === session.teacherLive.taskId)
+    setHtmlPreviewCollapsed(false)
+    setTeacherLiveIframeSrc(buildIframeSrc(liveFiles, liveTask?.entryFile ?? 'index.html', {
+      assets: lesson.assets ?? [],
+      assetsPath: resolveAssetsPath(lesson.assetsPath),
+    }))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teacherPresentation, lesson?.type, session?.teacherLive?.updatedAt])
+
   // Warm up Pyodide for Python lessons
   useEffect(() => {
     if (!lesson || lesson.type !== 'python' || isPyodideReady()) return
@@ -196,7 +275,25 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
 
   // Determine phase once session + identity are loaded
   useEffect(() => {
-    if ((!soloMode && sessionLoading) || !identityLoaded || lessonLoading) return
+    if ((!soloMode && sessionLoading) || (!teacherPresentation && !identityLoaded) || lessonLoading) return
+
+    if (teacherPresentation) {
+      if (!session) {
+        setPhase('waiting')
+        return
+      }
+      if (session.state === 'ended') {
+        setPhase('ended')
+        return
+      }
+      if (session.state === 'sandbox') {
+        setPhase('sandbox')
+        return
+      }
+      setCurrentTaskId(session.currentTaskId ?? 1)
+      setPhase('lesson')
+      return
+    }
 
     // No session — go straight to solo or waiting depending on URL mode
     if (!session) {
@@ -292,7 +389,7 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
     setCurrentTaskId(session.currentTaskId ?? 1)
     setPhase('lesson')
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionLoading, identityLoaded, lessonLoading, session?.state, session?.createdAt, soloMode])
+  }, [sessionLoading, identityLoaded, lessonLoading, session?.state, session?.createdAt, session?.currentTaskId, soloMode, teacherPresentation])
 
   // React to teacher moving to a new task
   useEffect(() => {
@@ -303,11 +400,8 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
       setViewingTaskId(null)
       setOutput('')
       setRunStatus(null)
-      setCheckPassed(false)
-      setCheckAttempted(false)
+      resetCheckFeedback()
       setSelectedAnswer('')
-      setHintModalOpen(false)
-      setViewedHintIndexes([])
       loadTaskContent(session.currentTaskId)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -361,16 +455,14 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
       setCode(target)
       setOutput('')
       setRunStatus(null)
-      setCheckPassed(false)
-      setCheckAttempted(false)
+      resetCheckFeedback()
     } else if (lesson.type === 'html') {
       const targetFiles = action === 'starter' ? (task.starterFiles ?? []) : (task.completeFiles ?? [])
       setFiles(targetFiles.map(f => ({ ...f })))
       setActiveFile(task.entryFile ?? targetFiles[0]?.name ?? '')
       setIframeSrc(null)
       setRunStatus(null)
-      setCheckPassed(false)
-      setCheckAttempted(false)
+      resetCheckFeedback()
     } else if (lesson.type === 'scratch') {
       const targetBlocks = action === 'starter' ? (task.starterBlocks ?? null) : (task.completeBlocks ?? null)
       setScratchExternalState(targetBlocks)
@@ -389,27 +481,28 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
   }, [session?.students?.[identity?.anonymousId]?.displayName])
 
   function loadTaskContent(taskId) {
-    if (!lesson || !identity) return
-    const task = lesson.tasks.find(t => t.id === taskId)
+    const activeIdentity = effectiveIdentity
+    if (!lesson || !activeIdentity) return
+    const task = flattenTasks(lesson.tasks).find(t => t.id === taskId)
     if (!task) return
     if (task.taskType === 'quiz' || task.taskType === 'information') {
       setCode('')
       setFiles([])
       setActiveFile('')
       setSelectedAnswer('')
-      setCheckAttempted(false)
+      resetCheckFeedback()
       return
     }
     if (lesson.type === 'python') {
       // In solo mode, restore own saved work if available
       if (phase === 'solo') {
-        const ownSaved = loadSavedCode(lessonId, taskId, identity.anonymousId)
+        const ownSaved = loadSavedCode(lessonId, taskId, activeIdentity.anonymousId)
         if (ownSaved != null) { setCode(ownSaved.code ?? ''); return }
       }
       // Carry-through > starterCode > empty
       let initial = task.starterCode ?? ''
       if (task.carryCodeFrom) {
-        const saved = loadSavedCode(lessonId, task.carryCodeFrom, identity.anonymousId)
+        const saved = loadSavedCode(lessonId, task.carryCodeFrom, activeIdentity.anonymousId)
         if (saved?.code) initial = saved.code
       }
       setCode(initial)
@@ -420,12 +513,12 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
       const taskFiles = (task.starterFiles ?? []).map(f => {
         // In solo mode, prefer own saved file for this task
         if (phase === 'solo') {
-          const ownSaved = loadSavedFile(lessonId, taskId, f.name, identity.anonymousId)
+          const ownSaved = loadSavedFile(lessonId, taskId, f.name, activeIdentity.anonymousId)
           if (ownSaved != null) return { ...f, content: ownSaved }
         }
         let content = f.content
         if (task.carryCodeFrom) {
-          const saved = loadSavedFile(lessonId, task.carryCodeFrom, f.name, identity.anonymousId)
+          const saved = loadSavedFile(lessonId, task.carryCodeFrom, f.name, activeIdentity.anonymousId)
           if (saved != null) content = saved
         }
         return { ...f, content }
@@ -436,23 +529,39 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
   }
 
   useEffect(() => {
-    if ((phase === 'lesson' || phase === 'solo') && identity && lesson) {
+    if ((phase === 'lesson' || phase === 'solo') && effectiveIdentity && lesson) {
       loadTaskContent(currentTaskId)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, currentTaskId, lesson, identity])
+  }, [phase, currentTaskId, lesson, effectiveIdentity?.anonymousId])
+
+  useEffect(() => {
+    if (!canPublishTeacherLive()) return
+    updateTeacherLive(currentTeacherLivePayload())
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teacherPresentation, session?.teacherLive?.active, session?.teacherLive?.sourceStudentId, identity?.anonymousId, currentTaskId, code, files, activeFile, output, runStatus, checkPassed, checkAttempted])
 
   // Register Firebase presence so the teacher sees who is connected live
   useEffect(() => {
+    if (teacherPresentation) return
     if ((phase === 'lesson' || phase === 'sandbox') && identity?.anonymousId) {
       registerPresence(identity.anonymousId)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, identity?.anonymousId])
+  }, [phase, identity?.anonymousId, teacherPresentation])
+
+  // Presentation windows must not appear as students, including when the
+  // teacher browser already has a previous student identity in localStorage.
+  useEffect(() => {
+    if (!teacherPresentation || !identity?.anonymousId || !session?.students?.[identity.anonymousId]) return
+    removeStudent(identity.anonymousId)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teacherPresentation, identity?.anonymousId, session?.students])
 
   // When the teacher starts live-viewing this student, publish the current
   // in-memory editor state immediately so the modal is not blank until typing.
   useEffect(() => {
+    if (teacherPresentation) return
     if (!identity?.anonymousId || session?.activeStudentView !== identity.anonymousId) return
     if (phase !== 'lesson' && phase !== 'sandbox') return
     if (!lesson || viewingTaskId !== null) return
@@ -491,6 +600,20 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
   }
 
   function handleSoloNavigate(taskId) {
+    if (teacherPresentation) {
+      const availableTasks = flattenTasks(lesson?.tasks ?? [])
+      if (!availableTasks.some(t => t.id === taskId)) return
+      setTaskId(taskId)
+      setCurrentTaskId(taskId)
+      setViewingTaskId(null)
+      setOutput('')
+      setRunStatus(null)
+      resetCheckFeedback()
+      setSelectedAnswer('')
+      setIframeSrc(null)
+      updateTeacherLive({ taskId, output: '', runStatus: null, checkPassed: false, checkAttempted: false })
+      return
+    }
     if (!identity) return
     const currentTask = lesson?.tasks.find(t => t.id === currentTaskId)
     if (phase === 'solo' && taskId > currentTaskId) {
@@ -509,11 +632,8 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
     setViewingTaskId(null)
     setOutput('')
     setRunStatus(null)
-    setCheckPassed(false)
-    setCheckAttempted(false)
+    resetCheckFeedback()
     setSelectedAnswer('')
-    setHintModalOpen(false)
-    setViewedHintIndexes([])
     setIframeSrc(null)
     setCurrentTaskId(taskId)
   }
@@ -528,8 +648,7 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
       setCode(completeCode)
       setOutput('')
       setRunStatus(null)
-      setCheckPassed(true)
-      setCheckAttempted(false)
+      applyCheckFeedback(true)
       saveCode(lessonId, currentTaskId, identity.anonymousId, { code: completeCode, output: '', runStatus: null })
     } else if (lesson.type === 'html') {
       const completeFiles = (task.completeFiles ?? []).map(f => ({ ...f }))
@@ -537,36 +656,34 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
       setActiveFile(task.completeEntryFile ?? task.entryFile ?? completeFiles[0]?.name ?? '')
       setIframeSrc(null)
       setRunStatus(null)
-      setCheckPassed(true)
-      setCheckAttempted(false)
+      applyCheckFeedback(true)
       completeFiles.forEach(f => saveFile(lessonId, currentTaskId, f.name, identity.anonymousId, f.content))
     } else if (lesson.type === 'scratch') {
       const completeBlocks = task.completeBlocks ?? null
       setScratchExternalState(completeBlocks)
-      setCheckPassed(true)
-      setCheckAttempted(false)
+      applyCheckFeedback(true)
       if (completeBlocks) saveCode(lessonId, currentTaskId, identity.anonymousId, { state: completeBlocks })
     }
   }
 
   async function handleRun() {
-    if (!identity || running) return
+    const actor = effectiveIdentity
+    if (!actor || running) return
     const task = lesson?.tasks.find(t => t.id === currentTaskId)
-    const isWatched = session?.activeStudentView === identity.anonymousId
+    const isWatched = session?.activeStudentView === actor.anonymousId
 
     setRunning(true)
     setOutput('')
     setRunStatus(null)
-    setCheckPassed(false)
-    setHintModalOpen(false)
-    setCheckAttempted(false)
+    resetCheckFeedback()
 
     if (lesson.type === 'python') {
       let accumulated = ''
       const echoOutput = (text) => {
         accumulated += text
         setOutput(accumulated)
-        if (isWatched) writeStudentOutput(identity.anonymousId, accumulated)
+        if (canPublishTeacherLive()) updateTeacherLive(currentTeacherLivePayload({ output: accumulated }))
+        if (isWatched) writeStudentOutput(actor.anonymousId, accumulated)
       }
       appendOutputRef.current = echoOutput
       const result = await runPython(code, {
@@ -584,12 +701,17 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
       setRunStatus(status)
 
       const passed = evaluateCheck(task?.check, accumulated, { status, code })
-      setCheckPassed(passed)
-      setCheckAttempted(!!task?.check)
+      const suggestion = task?.check ? getFirstFailedCheckHint(task.check, accumulated, { status, code }) : ''
+      if (task?.check) applyCheckFeedback(passed, suggestion)
 
-      saveCode(lessonId, currentTaskId, identity.anonymousId, { code, output: accumulated, runStatus: status })
-      if (phase === 'lesson' || phase === 'sandbox' || isWatched) {
-        await writeStudentRun(identity.anonymousId, { code, output: accumulated, status, checkPassed: passed })
+      if (canPublishTeacherLive()) {
+        publishTeacherLive({ output: accumulated, runStatus: status, checkPassed: passed, checkAttempted: !!task?.check, checkSuggestion: suggestion })
+      }
+      if (!teacherPresentation) {
+        saveCode(lessonId, currentTaskId, actor.anonymousId, { code, output: accumulated, runStatus: status })
+      }
+      if (!teacherPresentation && (phase === 'lesson' || phase === 'sandbox' || isWatched)) {
+        await writeStudentRun(actor.anonymousId, { code, output: accumulated, status, checkPassed: passed })
       }
       setRunning(false)
       return
@@ -609,13 +731,16 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
       const codeStr = files.map(f => f.content).join('\n')
       const iframeDoc = iframeRef.current?.contentDocument ?? null
       const passed = evaluateCheck(task?.check, text, { code: codeStr, iframeDoc })
-      setCheckPassed(passed)
-      setCheckAttempted(!!task?.check)
-      if (phase === 'lesson' || phase === 'sandbox' || isWatched) {
-        const filesMap = Object.fromEntries(files.map(f => [f.name, f.content]))
-        writeStudentRun(identity.anonymousId, { files: filesMap, status: 'success', checkPassed: passed })
+      const suggestion = task?.check ? getFirstFailedCheckHint(task.check, text, { code: codeStr, iframeDoc }) : ''
+      if (task?.check) applyCheckFeedback(passed, suggestion)
+      if (canPublishTeacherLive()) {
+        publishTeacherLive({ runStatus: 'success', checkPassed: passed, checkAttempted: !!task?.check, checkSuggestion: suggestion, files: Object.fromEntries(files.map(f => [f.name, f.content])) })
       }
-      files.forEach(f => saveFile(lessonId, currentTaskId, f.name, identity.anonymousId, f.content))
+      if (!teacherPresentation && (phase === 'lesson' || phase === 'sandbox' || isWatched)) {
+        const filesMap = Object.fromEntries(files.map(f => [f.name, f.content]))
+        writeStudentRun(actor.anonymousId, { files: filesMap, status: 'success', checkPassed: passed })
+      }
+      if (!teacherPresentation) files.forEach(f => saveFile(lessonId, currentTaskId, f.name, actor.anonymousId, f.content))
     })
     setRunning(false)
   }
@@ -632,6 +757,10 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
 
   function handleCodeChange(newCode) {
     setCode(newCode)
+    if (canPublishTeacherLive()) {
+      publishTeacherLive({ code: newCode })
+    }
+    if (teacherPresentation) return
     if (identity && lesson?.type === 'python') {
       saveCode(lessonId, currentTaskId, identity.anonymousId, { code: newCode, output, runStatus })
     }
@@ -641,7 +770,15 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
   }
 
   function handleFileChange(filename, content) {
-    setFiles(prev => prev.map(f => f.name === filename ? { ...f, content } : f))
+    const nextFiles = files.map(f => f.name === filename ? { ...f, content } : f)
+    setFiles(nextFiles)
+    if (canPublishTeacherLive()) {
+      publishTeacherLive({
+        files: Object.fromEntries(nextFiles.map(f => [f.name, f.content])),
+        activeFile: filename,
+      })
+    }
+    if (teacherPresentation) return
     if (identity && lesson?.type === 'html') {
       saveFile(lessonId, currentTaskId, filename, identity.anonymousId, content)
     }
@@ -654,6 +791,10 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
   }
 
   function handleScratchChange(workspaceStates) {
+    if (canPublishTeacherLive()) {
+      publishTeacherLive({ code: JSON.stringify(workspaceStates) })
+    }
+    if (teacherPresentation) return
     if (!identity) return
     saveCode(lessonId, currentTaskId, identity.anonymousId, { state: workspaceStates })
     if (activeStudentViewRef.current === identity.anonymousId) {
@@ -662,8 +803,10 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
   }
 
   function handleScratchCheck(passed, snapshot) {
-    setCheckPassed(passed)
-    setCheckAttempted(!!lesson?.tasks.find(t => t.id === currentTaskId)?.check)
+    const task = lesson?.tasks.find(t => t.id === currentTaskId)
+    const checks = Array.isArray(task?.check) ? task.check : task?.check ? [task.check] : []
+    const suggestion = passed ? '' : String(checks.find(c => c?.hint)?.hint ?? '').trim()
+    if (task?.check) applyCheckFeedback(passed, suggestion)
     if (!identity || lesson?.type !== 'scratch') return
     if (phase === 'lesson' || phase === 'sandbox' || activeStudentViewRef.current === identity.anonymousId) {
       const states = snapshot?.workspaceStates ?? loadSavedCode(lessonId, currentTaskId, identity.anonymousId)?.state ?? null
@@ -681,63 +824,105 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
     const task = lesson?.tasks.find(t => t.id === currentTaskId)
     if (lesson.type === 'python') {
       setCode(task?.starterCode ?? '')
+      if (canPublishTeacherLive()) publishTeacherLive({ code: task?.starterCode ?? '', output: '', runStatus: null, checkPassed: false, checkAttempted: false })
       setOutput('')
       setRunStatus(null)
-      setCheckPassed(false)
-      setCheckAttempted(false)
+      resetCheckFeedback()
     } else if (lesson.type === 'html') {
       const taskFiles = (task?.starterFiles ?? []).map(f => ({ ...f }))
       setFiles(taskFiles)
+      if (canPublishTeacherLive()) publishTeacherLive({ files: Object.fromEntries(taskFiles.map(f => [f.name, f.content])), output: '', runStatus: null, checkPassed: false, checkAttempted: false })
       setActiveFile(task?.entryFile ?? taskFiles[0]?.name ?? '')
       setIframeSrc(null)
       setRunStatus(null)
-      setCheckPassed(false)
-      setCheckAttempted(false)
+      resetCheckFeedback()
     } else if (lesson.type === 'scratch') {
       setScratchExternalState(task?.starterBlocks ?? null)
     }
   }
 
   async function handleSubmit() {
-    if (!identity) return
+    const actor = effectiveIdentity
+    if (!actor) return
     const task = lesson?.tasks.find(t => t.id === currentTaskId)
     const isHtml = lesson?.type === 'html'
     const codeForCheck = isHtml ? files.map(f => f.content).join('\n') : code
     const passed = task?.check ? evaluateCheckWithCode(task.check, codeForCheck) : false
-    setCheckPassed(passed)
-    setCheckAttempted(!!task?.check)
+    const suggestion = task?.check ? getFirstFailedCheckHint(task.check, '', { code: codeForCheck }) : ''
+    if (task?.check) applyCheckFeedback(passed, suggestion)
     setRunStatus('submitted')
-    if (isHtml) {
-      files.forEach(f => saveFile(lessonId, currentTaskId, f.name, identity.anonymousId, f.content))
-    } else {
-      saveCode(lessonId, currentTaskId, identity.anonymousId, { code, output: '', runStatus: 'submitted' })
+    if (canPublishTeacherLive()) {
+      publishTeacherLive({
+        code: isHtml ? undefined : code,
+        files: isHtml ? Object.fromEntries(files.map(f => [f.name, f.content])) : undefined,
+        output: isHtml ? undefined : '',
+        runStatus: 'submitted',
+        checkPassed: passed,
+        checkAttempted: !!task?.check,
+        checkSuggestion: suggestion,
+      })
     }
-    if (phase === 'lesson' || phase === 'sandbox') {
+    if (!teacherPresentation && isHtml) {
+      files.forEach(f => saveFile(lessonId, currentTaskId, f.name, actor.anonymousId, f.content))
+    } else if (!teacherPresentation) {
+      saveCode(lessonId, currentTaskId, actor.anonymousId, { code, output: '', runStatus: 'submitted' })
+    }
+    if (!teacherPresentation && (phase === 'lesson' || phase === 'sandbox')) {
       const filesMap = isHtml ? Object.fromEntries(files.map(f => [f.name, f.content])) : undefined
-      await writeStudentRun(identity.anonymousId, { code: isHtml ? undefined : code, files: filesMap, output: isHtml ? undefined : '', status: 'submitted', checkPassed: passed })
+      await writeStudentRun(actor.anonymousId, { code: isHtml ? undefined : code, files: filesMap, output: isHtml ? undefined : '', status: 'submitted', checkPassed: passed })
     }
   }
 
-  async function handleQuizSelect(answer) {
-    if (!identity || !answer) return
+  async function handleQuizSelect(answer, passedOverride) {
+    const actor = effectiveIdentity
+    if (!actor) return
+
+    // Intermediate state update (match/fill_blank tile placement in progress)
+    if (passedOverride === null) {
+      setSelectedAnswer(answer)
+      return
+    }
+
     const task = lesson?.tasks.find(t => t.id === currentTaskId)
-    const passed = task?.check ? evaluateCheck(task.check, answer, { answer }) : false
+    const passed =
+      typeof passedOverride === 'boolean'
+        ? passedOverride
+        : task?.check
+          ? evaluateCheck(task.check, answer, { answer: typeof answer === 'string' ? answer : '' })
+          : false
+    const suggestion = passed ? '' : getQuizSuggestion(task, answer)
+
     setSelectedAnswer(answer)
-    setCheckPassed(passed)
-    setCheckAttempted(!!task?.check)
+    applyCheckFeedback(passed, suggestion)
     setRunStatus('submitted')
-    if (phase === 'lesson' || phase === 'sandbox') {
-      await writeStudentRun(identity.anonymousId, {
-        answer,
+    const serializedAnswer = typeof answer === 'string' ? answer : JSON.stringify(answer)
+    if (canPublishTeacherLive()) {
+      publishTeacherLive({ answer: serializedAnswer, runStatus: 'submitted', checkPassed: passed, checkAttempted: true, checkSuggestion: suggestion })
+    }
+    if (!teacherPresentation && (phase === 'lesson' || phase === 'sandbox')) {
+      await writeStudentRun(actor.anonymousId, {
+        answer: serializedAnswer,
         status: 'submitted',
         checkPassed: passed,
       })
     }
   }
 
+  function getQuizSuggestion(task, answer) {
+    if (!task) return ''
+    if ((task.quizType ?? 'multiple_choice') === 'multiple_choice') {
+      const option = task.options?.find(o => o.id === answer)
+      return String(option?.feedback ?? option?.hint ?? task.feedback ?? task.check?.hint ?? '').trim()
+    }
+    if (task.quizType === 'short_answer' && task.check) {
+      return getFirstFailedCheckHint(task.check, answer, { answer: typeof answer === 'string' ? answer : '' })
+    }
+    return String(task.feedback ?? task.check?.hint ?? '').trim()
+  }
+
   // ─── Render helpers ────────────────────────────────────────────────────────
 
-  if (phase === 'loading' || (!soloMode && sessionLoading) || lessonLoading || !identityLoaded) {
+  if (phase === 'loading' || (!soloMode && sessionLoading) || lessonLoading || (!teacherPresentation && !identityLoaded)) {
     return <LoadingScreen message="Loading…" />
   }
 
@@ -792,23 +977,45 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
     )
   }
 
-  const task = lesson.tasks.find(t => t.id === (viewingTaskId ?? currentTaskId))
+  const forcedTeacherTaskId = session?.teacherLive?.taskId ?? currentTaskId
+  const flatTasks = flattenTasks(lesson.tasks)
+  const isTeacherLiveViewer = !teacherPresentation
+    && (phase === 'lesson' || phase === 'sandbox')
+    && session?.teacherLive?.active
+    && session.teacherLive.sourceStudentId !== identity?.anonymousId
+  const task = flatTasks.find(t => t.id === (isTeacherLiveViewer ? forcedTeacherTaskId : (viewingTaskId ?? currentTaskId)))
   const isViewingPrev = viewingTaskId !== null && viewingTaskId !== currentTaskId
   const isSandbox = phase === 'sandbox'
   const isSolo = phase === 'solo'
+  const isTeacherLiveActive = teacherPresentation && session?.teacherLive?.active
+  const isForcedTeacherLive = isTeacherLiveViewer
+  const teacherLiveFiles = session?.teacherLive?.files
+    ? Object.entries(session.teacherLive.files).map(([name, content]) => ({
+      name,
+      content,
+      type: name.endsWith('.html') ? 'html' : name.endsWith('.css') ? 'css' : 'javascript',
+    }))
+    : []
+  const displayCode = isForcedTeacherLive ? (session.teacherLive.code ?? '') : code
+  const displayFiles = isForcedTeacherLive ? teacherLiveFiles : files
+  const displayActiveFile = isForcedTeacherLive ? (session.teacherLive.activeFile ?? teacherLiveFiles[0]?.name ?? '') : activeFile
+  const displayOutput = isForcedTeacherLive ? (session.teacherLive.output ?? '') : output
+  const displayRunStatus = isForcedTeacherLive ? (session.teacherLive.runStatus ?? null) : runStatus
+  const displayCheckPassed = isForcedTeacherLive ? !!session.teacherLive.checkPassed : checkPassed
+  const displayCheckAttempted = isForcedTeacherLive ? !!session.teacherLive.checkAttempted : checkAttempted
+  const displayCheckSuggestion = isForcedTeacherLive ? (session.teacherLive.checkSuggestion ?? '') : checkSuggestion
   const isQuizTask = task?.taskType === 'quiz'
+  const isAutoEvaluatedQuiz = isQuizTask && (task?.quizType === 'match' || task?.quizType === 'fill_blank')
   const isInformationTask = task?.taskType === 'information'
-  const visibleHint = session?.visibleHint?.taskId === currentTaskId ? session.visibleHint : null
-  const currentTask = lesson.tasks.find(t => t.id === currentTaskId)
-  const canAdvanceSolo = !currentTask?.check || currentTask?.taskType === 'information' || checkPassed
+  const currentTask = flatTasks.find(t => t.id === currentTaskId)
+  const currentTaskIsAutoEvaluated = currentTask?.taskType === 'quiz' && (currentTask?.quizType === 'match' || currentTask?.quizType === 'fill_blank')
+  const canAdvanceSolo = (!currentTask?.check && !currentTaskIsAutoEvaluated) || currentTask?.taskType === 'information' || checkPassed
   const hasCompleteSolution = lesson.type === 'python'
     ? !!task?.completeCode
     : lesson.type === 'scratch'
     ? !!task?.completeBlocks
     : (task?.completeFiles?.length > 0)
-  const taskHints = Array.isArray(task?.hints) ? task.hints.map(h => String(h ?? '').trim()).filter(Boolean) : []
-  const hasHints = taskHints.length > 0
-  const allHintsViewed = taskHints.length === 0 || viewedHintIndexes.length >= taskHints.length
+  const canOfferCompleteSolution = isSolo && hasCompleteSolution && !displayCheckPassed && repeatedSuggestionCount >= 2
   const taskContentStyle = isQuizTask
     ? styles.taskContentQuiz
     : isInformationTask
@@ -826,7 +1033,62 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
       ? styles.editorAreaScroll
       : styles.editorArea
 
-  const isPaused = (phase === 'lesson' || phase === 'sandbox') && session?.isPaused
+  const isPaused = !isForcedTeacherLive && (phase === 'lesson' || phase === 'sandbox') && session?.isPaused
+
+  async function handleToggleTeacherLive() {
+    if (!teacherPresentation) return
+    if (session?.teacherLive?.active) {
+      await setTeacherLive(null)
+      return
+    }
+    await setTeacherLive(currentTeacherLivePayload())
+  }
+
+  const topBarRight = teacherPresentation ? (
+    <div style={styles.presentationControls}>
+      <button
+        className="btn-ghost"
+        style={styles.presentationBtn}
+        disabled={currentTaskId <= 1}
+        onClick={() => handleSoloNavigate(currentTaskId - 1)}
+      >
+        Previous
+      </button>
+      <span style={styles.presentationTaskLabel}>Task {currentTaskId} / {flatTasks.length}</span>
+      <button
+        className="btn-ghost"
+        style={styles.presentationBtn}
+        disabled={currentTaskId >= flatTasks.length}
+        onClick={() => handleSoloNavigate(currentTaskId + 1)}
+      >
+        Next
+      </button>
+      <button
+        className={isTeacherLiveActive ? 'btn-danger' : 'btn-primary'}
+        style={styles.presentationBtn}
+        onClick={handleToggleTeacherLive}
+      >
+        {isTeacherLiveActive ? 'Stop Live to Students' : 'Go Live to Students'}
+      </button>
+    </div>
+  ) : (
+    !isSandbox && (
+      <TaskProgressDots
+        tasks={lesson.tasks}
+        currentTaskId={currentTaskId}
+        viewingTaskId={viewingTaskId}
+        isSolo={isSolo}
+        canSelectTask={id => !isSolo || id <= currentTaskId || (id === currentTaskId + 1 && canAdvanceSolo)}
+        onDotClick={id => {
+          if (isSolo) {
+            if (id !== currentTaskId) handleSoloNavigate(id)
+          } else if (id < currentTaskId) {
+            setViewingTaskId(id === currentTaskId ? null : id)
+          }
+        }}
+      />
+    )
+  )
 
   return (
     <div style={styles.page}>
@@ -840,29 +1102,17 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
       <TopBar
         lessonTitle={lesson.title}
         lessonLevel={lesson.level}
-        displayName={identity?.displayName}
+        displayName={teacherPresentation ? 'Presentation' : identity?.displayName}
         isSandbox={isSandbox}
-        isSolo={isSolo}
-
-        right={
-          !isSandbox && (
-            <TaskProgressDots
-              tasks={lesson.tasks}
-              currentTaskId={currentTaskId}
-              viewingTaskId={viewingTaskId}
-              isSolo={isSolo}
-              canSelectTask={id => !isSolo || id <= currentTaskId || (id === currentTaskId + 1 && canAdvanceSolo)}
-              onDotClick={id => {
-                if (isSolo) {
-                  if (id !== currentTaskId) handleSoloNavigate(id)
-                } else if (id < currentTaskId) {
-                  setViewingTaskId(id === currentTaskId ? null : id)
-                }
-              }}
-            />
-          )
-        }
+        isSolo={teacherPresentation ? undefined : isSolo}
+        right={topBarRight}
       />
+
+      {isForcedTeacherLive && (
+        <div style={styles.teacherLiveBanner}>
+          Teacher live view is active. Your own work is still saved and will return when live view stops.
+        </div>
+      )}
 
       {!isSandbox && task?.title && (
         <div style={styles.taskTitleHeader}>
@@ -891,29 +1141,14 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
           {task?.explainer && !isSandbox && !isQuizTask && !isInformationTask && (
             <ExplainerPanel title={task.title} content={task.explainer} />
           )}
-          {isSolo && !isSandbox && (
-            <HintPanel
-              hints={task?.hints}
-              mode="solo"
-              open={hintModalOpen}
-              viewedHintIndexes={viewedHintIndexes}
-              hasCompleteSolution={hasCompleteSolution}
-              onShowComplete={handleShowCompleteCode}
-              onViewHint={index => setViewedHintIndexes(prev => prev.includes(index) ? prev : [...prev, index])}
-              onClose={() => setHintModalOpen(false)}
-            />
-          )}
-          {!isSandbox && !isSolo && !isViewingPrev && (
-            <HintPanel hints={task?.hints} mode="live" visibleHint={visibleHint} />
-          )}
 
         <div style={editorAreaStyle}>
-          {task?.check && checkAttempted && (
+          {(task?.check || isAutoEvaluatedQuiz) && displayCheckAttempted && (
             <CheckFeedbackBanner
-              passed={checkPassed}
-              failureMessage={isQuizTask ? 'Wrong answer, try again.' : undefined}
-              onHintsClick={isSolo && hasHints && !allHintsViewed ? () => setHintModalOpen(true) : undefined}
-              onShowCompleteCode={isSolo && hasCompleteSolution && allHintsViewed ? handleShowCompleteCode : undefined}
+              passed={displayCheckPassed}
+              failureMessage={isQuizTask ? 'Not quite right, try again.' : undefined}
+              suggestion={displayCheckSuggestion}
+              onShowCompleteCode={canOfferCompleteSolution ? handleShowCompleteCode : undefined}
             />
           )}
           {isInformationTask ? (
@@ -939,7 +1174,7 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
             if (!initialProject) initialProject = task?.starterBlocks ?? null
             return (
               <>
-                {!isViewingPrev && !isSandbox && (
+                {!isViewingPrev && !isSandbox && !isForcedTeacherLive && (
                   <div style={{ display: 'flex', flexShrink: 0, paddingBottom: 4 }}>
                     <button
                       className="btn-ghost-outline"
@@ -954,12 +1189,12 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
                 <ScratchWorkspace
                   key={`scratch-${viewingTaskId ?? currentTaskId}-${isSandbox ? 'sandbox' : 'task'}`}
                   task={task}
-                  readOnly={isViewingPrev}
+                  readOnly={isViewingPrev || isForcedTeacherLive}
                   unrestricted={isSandbox}
                   assetsPath={resolveAssetsPath(lesson.assetsPath) || undefined}
                   initialState={initialProject}
-                  onStateChange={isViewingPrev ? undefined : handleScratchChange}
-                  onCheckResult={isViewingPrev ? undefined : handleScratchCheck}
+                  onStateChange={isViewingPrev || isForcedTeacherLive ? undefined : handleScratchChange}
+                  onCheckResult={isViewingPrev || isForcedTeacherLive ? undefined : handleScratchCheck}
                   externalState={isSandbox ? scratchSandboxProject : scratchExternalState}
                   syncNowKey={session?.activeStudentView === identity?.anonymousId ? session?.activeStudentView : null}
                 />
@@ -968,7 +1203,7 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
           })()
           : lesson.type === 'python' ? (
             <>
-              {!isViewingPrev && (
+              {!isViewingPrev && !isForcedTeacherLive && (
                 <div style={styles.studentEditorHeader} className="ui-tabs ui-tabs--editor">
                   <span style={styles.studentEditorTitle}>Code</span>
                   <div style={styles.studentEditorActions}>
@@ -1003,12 +1238,12 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
                 </div>
               )}
               <PythonEditor
-                code={isViewingPrev ? (loadSavedCode(lessonId, viewingTaskId, identity?.anonymousId)?.code ?? '') : code}
-                readOnly={isViewingPrev}
-                onChange={isViewingPrev ? undefined : handleCodeChange}
+                code={isForcedTeacherLive ? displayCode : isViewingPrev ? (loadSavedCode(lessonId, viewingTaskId, identity?.anonymousId)?.code ?? '') : code}
+                readOnly={isViewingPrev || isForcedTeacherLive}
+                onChange={isViewingPrev || isForcedTeacherLive ? undefined : handleCodeChange}
                 pyodideStatus={pyodideStatus}
               />
-              {!isViewingPrev && (
+              {!isViewingPrev && !isForcedTeacherLive && (
                 task?.interactionMode === 'submit' ? (
                   <>
                     {runStatus === 'submitted' && (
@@ -1031,6 +1266,15 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
                   </>
                 )
               )}
+              {isForcedTeacherLive && (
+                <OutputPanel
+                  output={displayOutput}
+                  runStatus={displayRunStatus}
+                  checkPassed={displayCheckPassed}
+                  hasCheck={!!task?.check}
+                  checkAttempted={displayCheckAttempted}
+                />
+              )}
               {isViewingPrev && (
                 <OutputPanel
                   output={loadSavedCode(lessonId, viewingTaskId, identity?.anonymousId)?.output ?? ''}
@@ -1044,7 +1288,7 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
           ) : isMobile ? (
             <div style={styles.htmlMobile}>
               <div style={styles.htmlLeft}>
-                {!isViewingPrev && (
+                {!isViewingPrev && !isForcedTeacherLive && (
                   <StudentEditorHeader
                     task={task}
                     running={running}
@@ -1054,18 +1298,18 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
                   />
                 )}
                 <HtmlEditor
-                  files={files}
-                  activeFile={activeFile}
-                  onTabChange={setActiveFile}
-                  onFileChange={isViewingPrev ? undefined : handleFileChange}
-                  readOnly={isViewingPrev}
+                  files={displayFiles}
+                  activeFile={displayActiveFile}
+                  onTabChange={isForcedTeacherLive ? undefined : setActiveFile}
+                  onFileChange={isViewingPrev || isForcedTeacherLive ? undefined : handleFileChange}
+                  readOnly={isViewingPrev || isForcedTeacherLive}
                   assetsPath={resolveAssetsPath(lesson.assetsPath) || undefined}
                   assets={lesson.assets}
                 />
               </div>
               <div style={styles.htmlMobilePreview}>
                 <CollapsibleIframePreview
-                  src={iframeSrc}
+                  src={isForcedTeacherLive ? teacherLiveIframeSrc : iframeSrc}
                   iframeRef={iframeRef}
                   fill
                   collapsed={htmlPreviewCollapsed}
@@ -1073,7 +1317,7 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
                   animate
                 />
               </div>
-              {runStatus === 'submitted' && !task?.check && (
+              {displayRunStatus === 'submitted' && !task?.check && (
                 <div style={styles.submitBanner}>Code submitted</div>
               )}
             </div>
@@ -1084,7 +1328,7 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
               rightCollapsed={htmlPreviewCollapsed}
               collapsedRight={
                 <CollapsibleIframePreview
-                  src={iframeSrc}
+                  src={isForcedTeacherLive ? teacherLiveIframeSrc : iframeSrc}
                   iframeRef={iframeRef}
                   collapsed
                   onToggle={() => setHtmlPreviewCollapsed(false)}
@@ -1092,7 +1336,7 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
               }
               left={
                 <div style={styles.htmlLeft}>
-                  {!isViewingPrev && (
+                  {!isViewingPrev && !isForcedTeacherLive && (
                     <StudentEditorHeader
                       task={task}
                       running={running}
@@ -1102,11 +1346,11 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
                     />
                   )}
                   <HtmlEditor
-                    files={files}
-                    activeFile={activeFile}
-                    onTabChange={setActiveFile}
-                    onFileChange={isViewingPrev ? undefined : handleFileChange}
-                    readOnly={isViewingPrev}
+                    files={displayFiles}
+                    activeFile={displayActiveFile}
+                    onTabChange={isForcedTeacherLive ? undefined : setActiveFile}
+                    onFileChange={isViewingPrev || isForcedTeacherLive ? undefined : handleFileChange}
+                    readOnly={isViewingPrev || isForcedTeacherLive}
                     assetsPath={resolveAssetsPath(lesson.assetsPath) || undefined}
                     assets={lesson.assets}
                   />
@@ -1114,7 +1358,7 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
               }
               right={
                 <CollapsibleIframePreview
-                  src={iframeSrc}
+                  src={isForcedTeacherLive ? teacherLiveIframeSrc : iframeSrc}
                   iframeRef={iframeRef}
                   fill
                   collapsed={false}
@@ -1123,7 +1367,7 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
                 />
               }
             />
-            {runStatus === 'submitted' && !task?.check && (
+            {displayRunStatus === 'submitted' && !task?.check && (
               <div style={styles.submitBanner}>Code submitted</div>
             )}
             </>
@@ -1140,12 +1384,12 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
                 ← Previous
               </button>
               <span style={styles.soloNavLabel}>
-                Task {currentTaskId} of {lesson.tasks.length}
+                Task {currentTaskId} of {flatTasks.length}
               </span>
               <button
                 className="btn-secondary"
                 style={styles.soloNavBtn}
-                disabled={currentTaskId >= lesson.tasks.length}
+                disabled={currentTaskId >= flatTasks.length}
                 onClick={() => handleSoloNavigate(currentTaskId + 1)}
               >
                 Next →
@@ -1154,36 +1398,36 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
           )}
         </div>
         </TaskSlideTransition>
-        {isSolo && (
-          <div style={isQuizTask || isInformationTask ? styles.soloNavStatic : styles.soloNav}>
-            <button
-              className="btn-secondary"
-              style={styles.soloNavBtn}
-              disabled={currentTaskId <= 1}
-              onClick={() => handleSoloNavigate(currentTaskId - 1)}
-            >
-              Previous
-            </button>
-            <span style={styles.soloNavLabel}>
-              Task {currentTaskId} of {lesson.tasks.length}
-            </span>
-            <button
-              className={`btn-secondary${checkPassed && currentTaskId < lesson.tasks.length ? ' btn-next-success' : ''}`}
-              style={{
-                ...styles.soloNavBtn,
-                ...(canAdvanceSolo && currentTaskId < lesson.tasks.length
-                  ? { fontSize: 18, padding: '14px 36px' }
-                  : {}),
-              }}
-              disabled={currentTaskId >= lesson.tasks.length || !canAdvanceSolo}
-              onClick={() => handleSoloNavigate(currentTaskId + 1)}
-              title={!canAdvanceSolo ? 'Pass the completion check before moving on' : 'Next task'}
-            >
-              Next
-            </button>
-          </div>
-        )}
       </div>
+      {isSolo && (
+        <div style={styles.soloNav}>
+          <button
+            className="btn-secondary"
+            style={styles.soloNavBtn}
+            disabled={currentTaskId <= 1}
+            onClick={() => handleSoloNavigate(currentTaskId - 1)}
+          >
+            Previous
+          </button>
+          <span style={styles.soloNavLabel}>
+            Task {currentTaskId} of {flatTasks.length}
+          </span>
+          <button
+            className={`btn-secondary${checkPassed && currentTaskId < flatTasks.length ? ' btn-next-success' : ''}`}
+            style={{
+              ...styles.soloNavBtn,
+              ...(canAdvanceSolo && currentTaskId < flatTasks.length
+                ? { fontSize: 18, padding: '14px 36px' }
+                : {}),
+            }}
+            disabled={currentTaskId >= flatTasks.length || !canAdvanceSolo}
+            onClick={() => handleSoloNavigate(currentTaskId + 1)}
+            title={!canAdvanceSolo ? 'Pass the completion check before moving on' : 'Next task'}
+          >
+            Next
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -1238,6 +1482,37 @@ const styles = {
     overflow: 'auto',
     padding: '16px',
     minHeight: 0,
+  },
+  teacherLiveBanner: {
+    background: '#fef3c7',
+    color: '#92400e',
+    borderBottom: '1px solid #fcd34d',
+    fontFamily: 'var(--font-body)',
+    fontWeight: 600,
+    fontSize: '0.9rem',
+    padding: '8px 16px',
+    textAlign: 'center',
+    flexShrink: 0,
+  },
+  presentationControls: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+  },
+  presentationBtn: {
+    fontSize: 13,
+    padding: '5px 12px',
+  },
+  presentationTaskLabel: {
+    fontFamily: 'var(--font-body)',
+    fontWeight: 600,
+    fontSize: 13,
+    color: '#fff',
+    opacity: 0.9,
+    minWidth: 72,
+    textAlign: 'center',
   },
   taskContent: {
     flex: 1,
@@ -1415,24 +1690,11 @@ const styles = {
     fontFamily: 'var(--font-body)',
   },
   soloNav: {
-    position: 'sticky',
-    bottom: 0,
-    zIndex: 20,
     display: 'flex',
     alignItems: 'center',
     gap: 12,
-    padding: '12px 0 0',
+    padding: '12px 16px 16px',
     borderTop: '2px solid #e5e7eb',
-    marginTop: 4,
-    background: '#f5f5f5',
-  },
-  soloNavStatic: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 12,
-    padding: '12px 0 0',
-    borderTop: '2px solid #e5e7eb',
-    marginTop: 4,
     background: '#f5f5f5',
     flexShrink: 0,
   },

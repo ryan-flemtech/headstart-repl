@@ -1,44 +1,50 @@
 import React from 'react'
 import { useIsMobile } from '../../shared/useIsMobile'
+import { getProgressItems } from '../../shared/taskUtils'
 
 export default function TaskProgressDots({ tasks, currentTaskId, viewingTaskId, onDotClick, isSolo, canSelectTask }) {
   const isMobile = useIsMobile()
+  const items = getProgressItems(tasks)
 
   if (isMobile) {
-    const completed = tasks.filter(t => t.id < currentTaskId).length
+    const currentIndex = items.findIndex(item => item.taskIds.includes(currentTaskId))
+    const completed = Math.max(0, currentIndex)
     return (
       <span style={s.counter} title="Task progress">
-        {completed}/{tasks.length}
+        {completed}/{items.length}
       </span>
     )
   }
 
   return (
     <div style={s.row} title="Task progress">
-      {tasks.map(task => {
-        const isCurrent  = task.id === currentTaskId
-        const isViewing  = task.id === viewingTaskId
-        const isPast     = task.id < currentTaskId
-        const isFuture   = task.id > currentTaskId
-        const clickable  = isPast || (isSolo && (canSelectTask ? canSelectTask(task.id) : true))
+      {items.map((item, index) => {
+        const isCurrent = item.taskIds.includes(currentTaskId)
+        const isViewing = viewingTaskId != null && item.taskIds.includes(viewingTaskId)
+        const isPast = item.taskIds.every(id => id < currentTaskId)
+        const isFuture = item.taskIds.every(id => id > currentTaskId)
+        const firstTaskId = item.taskIds[0]
+        const clickable = isPast || (isSolo && (canSelectTask ? canSelectTask(firstTaskId) : true))
+        const isGroup = item.type === 'group'
 
         return (
           <button
-            key={task.id}
+            key={item.id}
             style={{
               ...s.dot,
+              ...(isGroup ? s.dotGroup : {}),
               ...(isCurrent  ? s.dotCurrent  : {}),
               ...(isViewing  ? s.dotViewing  : {}),
               ...(isPast     ? s.dotPast     : {}),
               ...(!isSolo && isFuture ? s.dotFuture : {}),
               cursor: clickable ? 'pointer' : 'default',
             }}
-            onClick={() => clickable && onDotClick?.(task.id)}
-            title={task.title}
-            aria-label={task.title}
+            onClick={() => clickable && onDotClick?.(firstTaskId)}
+            title={item.title}
+            aria-label={item.title}
             disabled={!clickable}
           >
-            {isPast ? '✓' : task.id}
+            {isPast ? '✓' : index + 1}
           </button>
         )
       })}
@@ -74,6 +80,10 @@ const s = {
     alignItems: 'center',
     justifyContent: 'center',
     transition: 'background 0.2s, border-color 0.2s, transform 0.2s',
+  },
+  dotGroup: {
+    borderRadius: 8,
+    width: 36,
   },
   dotCurrent: {
     background: 'var(--colour-secondary)',

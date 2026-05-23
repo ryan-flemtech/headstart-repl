@@ -15,7 +15,7 @@ function formatCheck(check) {
   }).join(' · ')
 }
 
-export default function StudentGrid({ students = [], lesson, lessonId, session, onRename, onRemove, onGoLive, onStopLive, onRemoteReset, collapsed, onToggle }) {
+export default function StudentGrid({ students = [], lesson, lessonId, session, onRename, onRemove, onGoLive, onGoLiveForAll, onStopLive, onRemoteReset, collapsed, onToggle }) {
   const [expandedStudentId, setExpandedStudentId] = useState(null)
   const [checkSectionOpen, setCheckSectionOpen] = useState(false)
 
@@ -142,7 +142,9 @@ export default function StudentGrid({ students = [], lesson, lessonId, session, 
           lesson={lesson}
           session={session}
           isLive={session?.activeStudentView === expandedStudent.anonymousId}
+          isLiveForAll={session?.teacherLive?.sourceStudentId === expandedStudent.anonymousId}
           onGoLive={() => onGoLive?.(expandedStudent.anonymousId)}
+          onGoLiveForAll={() => onGoLiveForAll?.(expandedStudent)}
           onStopLive={() => onStopLive?.()}
           onClose={handleClose}
           hasPrev={expandedIndex > 0}

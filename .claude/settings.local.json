@@ -50,7 +50,9 @@
       "PowerShell(Get-ChildItem \"C:\\\\Users\\\\rflem\\\\Documents\\\\HSC Repl\\\\node_modules\" -Directory | Where-Object { Test-Path \"$\\($_.FullName\\)\\\\node_modules\\\\react\" } | Select-Object -ExpandProperty Name)",
       "PowerShell($pkg = Get-Content \"C:\\\\Users\\\\rflem\\\\Documents\\\\HSC Repl\\\\node_modules\\\\blockly\\\\package.json\" | ConvertFrom-Json; Write-Output \"blockly main: $\\($pkg.main\\)\"; Write-Output \"blockly module: $\\($pkg.module\\)\")",
       "Bash(node -e \"const p = require\\('./node_modules/scratch-vm/package.json'\\); console.log\\(JSON.stringify\\(Object.keys\\(p.dependencies\\).filter\\(d => d.includes\\('react'\\)\\)\\)\\)\")",
-      "Bash(git -C \"C:\\\\Users\\\\rflem\\\\Documents\\\\hsc repl\" diff --stat HEAD)"
+      "Bash(git -C \"C:\\\\Users\\\\rflem\\\\Documents\\\\hsc repl\" diff --stat HEAD)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\rflem\\\\Documents\\\\hsc repl\\\\src\\\\app\" -Recurse -Type f)",
+      "Bash(cd /mnt/c/Users/rflem/Documents && ls -la \"hsc repl/src/\" 2>/dev/null | head -20)"
     ]
   }
 }

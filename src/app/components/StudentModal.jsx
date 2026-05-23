@@ -31,7 +31,7 @@ function parseSpriteState(raw) {
   }
 }
 
-export default function StudentModal({ student, lesson, session, isLive, onGoLive, onStopLive, onClose, hasPrev, hasNext, onPrev, onNext, onRemoteReset }) {
+export default function StudentModal({ student, lesson, session, isLive, isLiveForAll, onGoLive, onGoLiveForAll, onStopLive, onClose, hasPrev, hasNext, onPrev, onNext, onRemoteReset }) {
   const overlayRef = useRef(null)
   const iframeRef  = useRef(null)
 
@@ -100,7 +100,7 @@ export default function StudentModal({ student, lesson, session, isLive, onGoLiv
               <span className="presence-badge__dot" />
               {student.online ? 'Online' : 'Offline'}
             </span>
-            {isLive && <span style={s.liveBadge}>● LIVE</span>}
+            {isLive && <span style={s.liveBadge}>● {isLiveForAll ? 'LIVE FOR ALL' : 'LIVE'}</span>}
             {student.checkPassed && <span style={s.checkBadge}>✅</span>}
           </div>
           <div style={s.headerRight}>
@@ -142,13 +142,32 @@ export default function StudentModal({ student, lesson, session, isLive, onGoLiv
               </>
             )}
             {!isInformation && (
-              <button
-                className={isLive ? 'btn-danger' : 'btn-primary'}
-                style={{ fontSize: 13, padding: '5px 14px' }}
-                onClick={isLive ? onStopLive : onGoLive}
-              >
-                {isLive ? 'Stop Live' : 'Go Live'}
-              </button>
+              isLive ? (
+                <button
+                  className="btn-danger"
+                  style={{ fontSize: 13, padding: '5px 14px' }}
+                  onClick={onStopLive}
+                >
+                  Stop Live
+                </button>
+              ) : (
+                <>
+                  <button
+                    className="btn-primary"
+                    style={{ fontSize: 13, padding: '5px 14px' }}
+                    onClick={onGoLive}
+                  >
+                    Go live for me
+                  </button>
+                  <button
+                    className="btn-primary"
+                    style={{ fontSize: 13, padding: '5px 14px' }}
+                    onClick={onGoLiveForAll}
+                  >
+                    Go live for all
+                  </button>
+                </>
+              )
             )}
             <button
               className="btn-ghost"
