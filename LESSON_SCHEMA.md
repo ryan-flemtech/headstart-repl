@@ -18,6 +18,7 @@ Every lesson can contain code tasks plus `information` and `quiz` tasks.
   "type": "python",
   "title": "Python For Loops",
   "description": "Practise loops in Python.",
+  "sandboxStarter": "# Sandbox — try anything here!\n",
   "assetsPath": "scratch-assets",
   "tasks": []
 }
@@ -29,6 +30,7 @@ Every lesson can contain code tasks plus `information` and `quiz` tasks.
 | `type` | Yes | string | all lessons | One of `python`, `html`, or `scratch`. |
 | `title` | Yes | string | all lessons | Display title. |
 | `description` | Yes | string | all lessons | Short entry screen summary. |
+| `sandboxStarter` | No | string | Python, HTML | Pre-loaded code or file content shown when the teacher puts the session into sandbox mode. Omit to leave the sandbox editor empty. |
 | `assetsPath` | No | string | Scratch mainly | Base folder for Scratch backdrop and costume images. |
 | `tasks` | Yes | array | all lessons | Ordered task list. IDs should be sequential integers starting at `1`. |
 
@@ -411,7 +413,7 @@ Scratch checks can also be a single object or an array. Every check must pass.
 | Field | Required | Notes |
 |---|---:|---|
 | `type` | Yes | Must be `block_used`. |
-| `evaluation` | No | `manual` or `after_run`. Defaults to `manual` in the builder. |
+| `evaluation` | No | `manual`, `after_run`, or `continuous`. Defaults to `manual` in the builder. |
 | `opcode` | Yes | Scratch block opcode, for example `motion_movesteps`. |
 
 ### `sprite_property`
@@ -430,7 +432,7 @@ Scratch checks can also be a single object or an array. Every check must pass.
 | Field | Required | Allowed values / notes |
 |---|---:|---|
 | `type` | Yes | Must be `sprite_property`. |
-| `evaluation` | No | `manual` or `after_run`. |
+| `evaluation` | No | `manual`, `after_run`, or `continuous`. |
 | `spriteName` | Yes | Name of sprite to evaluate. |
 | `property` | Yes | `x`, `y`, `size`, `direction`, or `visible`. |
 | `operator` | Yes | `equals`, `greater_than`, or `less_than`. |

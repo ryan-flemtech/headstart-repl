@@ -1,4 +1,5 @@
 import React from 'react'
+import { MarkdownRenderer } from '../../shared/markdown'
 
 export default function CheckFeedbackBanner({
   passed,
@@ -10,14 +11,19 @@ export default function CheckFeedbackBanner({
   return (
     <div style={{ ...s.banner, ...(passed ? s.pass : s.fail) }} role="status">
       <span style={{ ...s.icon, background: passed ? '#166534' : '#92400e' }}>{passed ? '✓' : '!'}</span>
-      <span style={s.text}>
+      <div style={s.text}>
         {passed ? successMessage : (
           <>
-            {failureMessage}
-            {suggestion && <span style={s.suggestion}>Suggestion: {suggestion}</span>}
+            <div>{failureMessage}</div>
+            {suggestion && (
+              <div style={s.suggestion}>
+                <strong>Suggestion:</strong>
+                <MarkdownRenderer content={suggestion} style={{ color: 'inherit', fontSize: 'inherit', marginTop: 4 }} />
+              </div>
+            )}
           </>
         )}
-      </span>
+      </div>
       {!passed && onShowCompleteCode && (
         <span style={s.completePrompt}>Want to see the complete code?</span>
       )}

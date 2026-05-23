@@ -42,3 +42,28 @@ export function updateTaskInTasks(tasks, updatedTask) {
     return item.id === updatedTask.id ? updatedTask : item
   })
 }
+
+// Ensure the titles of all subtasks in all groups match their group's title and index.
+// e.g. "Group Title - 1", "Group Title - 2", etc.
+export function updateSubtaskTitles(tasks) {
+  if (!tasks) return []
+  return tasks.map(item => {
+    if (item.type === 'group') {
+      const subtasks = (item.subtasks ?? []).map((subtask, index) => {
+        const expectedTitle = item.title ? `${item.title} - ${index + 1}` : subtask.title
+        if (subtask.title !== expectedTitle) {
+          return { ...subtask, title: expectedTitle }
+        }
+        return subtask
+      })
+
+      const subtasksChanged = subtasks.some((s, idx) => s !== (item.subtasks?.[idx]))
+      if (subtasksChanged) {
+        return { ...item, subtasks }
+      }
+      return item
+    }
+    return item
+  })
+}
+

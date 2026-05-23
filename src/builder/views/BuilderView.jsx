@@ -5,7 +5,7 @@ import TaskEditor from '../components/TaskEditor'
 import PreviewView from './PreviewView'
 import { checkAllowedForSubmit, normalizeChecks } from '../../shared/checks'
 import { HTML_ONLY } from '../components/FileManager'
-import { flattenTasks, findGroupForTask, updateTaskInTasks } from '../../shared/taskUtils'
+import { flattenTasks, findGroupForTask, updateTaskInTasks, updateSubtaskTitles } from '../../shared/taskUtils'
 
 // ─── Validation ───────────────────────────────────────────────────────────────
 
@@ -298,6 +298,23 @@ export default function BuilderView({ lesson, dirty, onUpdate, onNew, onMarkSave
   const [previewing, setPreviewing] = useState(false)
   const [metaOpen, setMetaOpen] = useState(false)
 
+  function handleLessonUpdate(updater) {
+    if (typeof updater === 'function') {
+      onUpdate(prev => {
+        const next = updater(prev)
+        return {
+          ...next,
+          tasks: updateSubtaskTitles(next.tasks),
+        }
+      })
+    } else {
+      onUpdate({
+        ...updater,
+        tasks: updateSubtaskTitles(updater.tasks),
+      })
+    }
+  }
+
   function selectTask(id) {
     setSelectedTaskId(id)
     setSelectedGroupId(null)
@@ -381,7 +398,7 @@ export default function BuilderView({ lesson, dirty, onUpdate, onNew, onMarkSave
         try {
           const parsed = JSON.parse(ev.target.result)
           if (!parsed.id || !parsed.tasks) throw new Error('Unrecognised format')
-          onUpdate(parsed)
+          handleLessonUpdate(parsed)
           const firstFlat = flattenTasks(parsed.tasks)
           selectTask(firstFlat[0]?.id ?? null)
         } catch (err) {
@@ -396,16 +413,16 @@ export default function BuilderView({ lesson, dirty, onUpdate, onNew, onMarkSave
   function handleAddTask() {
     const flat = flattenTasks(lesson.tasks)
     const prevTask = flat[flat.length - 1] ?? null
-    const newId = (prevTask?.id ?? 0) + 1
+    const newId = nextId()
     const newTask = { id: newId, title: '', explainer: '', ...defaultTypeFields(prevTask) }
-    onUpdate(prev => ({ ...prev, tasks: [...prev.tasks, newTask] }))
+    handleLessonUpdate(prev => ({ ...prev, tasks: [...prev.tasks, newTask] }))
     selectTask(newId)
   }
 
   function handleAddGroup() {
     const flat = flattenTasks(lesson.tasks)
     const prevTask = flat[flat.length - 1] ?? null
-    const newId = (prevTask?.id ?? 0) + 1
+    const newId = nextId()
     const groupId = `g-${Date.now()}`
     const firstSubtask = {
       id: newId,
@@ -419,15 +436,14 @@ export default function BuilderView({ lesson, dirty, onUpdate, onNew, onMarkSave
       title: 'New Group',
       subtasks: [firstSubtask],
     }
-    onUpdate(prev => ({ ...prev, tasks: [...prev.tasks, newGroup] }))
+    handleLessonUpdate(prev => ({ ...prev, tasks: [...prev.tasks, newGroup] }))
     selectGroup(groupId)
   }
 
   function handleAddSubtask(groupId) {
     const group = lesson.tasks.find(t => t.type === 'group' && t.id === groupId)
     if (!group) return
-    const flat = flattenTasks(lesson.tasks)
-    const newId = flat.reduce((m, t) => Math.max(m, t.id), 0) + 1
+    const newId = nextId()
     const prevSubtask = group.subtasks?.[group.subtasks.length - 1] ?? null
     const newSubtask = {
       id: newId,
@@ -435,7 +451,7 @@ export default function BuilderView({ lesson, dirty, onUpdate, onNew, onMarkSave
       explainer: '',
       ...defaultTypeFields(prevSubtask),
     }
-    onUpdate(prev => ({
+    handleLessonUpdate(prev => ({
       ...prev,
       tasks: prev.tasks.map(t =>
         t.type === 'group' && t.id === groupId
@@ -447,13 +463,13 @@ export default function BuilderView({ lesson, dirty, onUpdate, onNew, onMarkSave
   }
 
   function handleDuplicate(task, groupId = null) {
-    const newId = flattenTasks(lesson.tasks).reduce((m, t) => Math.max(m, t.id), 0) + 1
+    const newId = nextId()
 
     if (groupId) {
       const group = lesson.tasks.find(t => t.type === 'group' && t.id === groupId)
       const newTitle = group ? `${group.title} - ${(group.subtasks?.length ?? 0) + 1}` : task.title
       const dup = { ...task, id: newId, title: newTitle }
-      onUpdate(prev => ({
+      handleLessonUpdate(prev => ({
         ...prev,
         tasks: prev.tasks.map(t =>
           t.type === 'group' && t.id === groupId
@@ -463,7 +479,7 @@ export default function BuilderView({ lesson, dirty, onUpdate, onNew, onMarkSave
       }))
     } else {
       const dup = { ...task, id: newId, title: task.title + ' (copy)' }
-      onUpdate(prev => ({ ...prev, tasks: [...prev.tasks, dup] }))
+      handleLessonUpdate(prev => ({ ...prev, tasks: [...prev.tasks, dup] }))
       selectTask(dup.id)
       return
     }
@@ -478,11 +494,11 @@ export default function BuilderView({ lesson, dirty, onUpdate, onNew, onMarkSave
       const newSubtasks = (group.subtasks ?? []).filter(t => t.id !== taskId)
       if (newSubtasks.length === 0) {
         // Remove the now-empty group too
-        onUpdate(prev => ({ ...prev, tasks: prev.tasks.filter(t => t.id !== group.id) }))
+        handleLessonUpdate(prev => ({ ...prev, tasks: prev.tasks.filter(t => t.id !== group.id) }))
         const remaining = flattenTasks(lesson.tasks.filter(t => t.id !== group.id))
         selectTask(remaining[0]?.id ?? null)
       } else {
-        onUpdate(prev => ({
+        handleLessonUpdate(prev => ({
           ...prev,
           tasks: prev.tasks.map(t =>
             t.type === 'group' && t.id === group.id ? { ...t, subtasks: newSubtasks } : t
@@ -491,7 +507,7 @@ export default function BuilderView({ lesson, dirty, onUpdate, onNew, onMarkSave
         selectTask(newSubtasks[0]?.id ?? null)
       }
     } else {
-      onUpdate(prev => ({ ...prev, tasks: prev.tasks.filter(t => t.id !== taskId) }))
+      handleLessonUpdate(prev => ({ ...prev, tasks: prev.tasks.filter(t => t.id !== taskId) }))
       const remaining = flattenTasks(lesson.tasks.filter(t => !(t.type !== 'group' && t.id === taskId)))
       selectTask(remaining[0]?.id ?? null)
     }
@@ -499,7 +515,7 @@ export default function BuilderView({ lesson, dirty, onUpdate, onNew, onMarkSave
 
   function handleDeleteGroup(groupId) {
     if (!confirm('Delete this group and all its subtasks?')) return
-    onUpdate(prev => ({ ...prev, tasks: prev.tasks.filter(t => !(t.type === 'group' && t.id === groupId)) }))
+    handleLessonUpdate(prev => ({ ...prev, tasks: prev.tasks.filter(t => !(t.type === 'group' && t.id === groupId)) }))
     const remaining = flattenTasks(lesson.tasks.filter(t => !(t.type === 'group' && t.id === groupId)))
     selectTask(remaining[0]?.id ?? null)
   }

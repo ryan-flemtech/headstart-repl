@@ -1122,10 +1122,12 @@ function ShortAnswerBuilder({ task, onUpdate }) {
             : 'Text that the answer must contain…'
           }
         />
-        <textarea
-          style={{ ...s.checkValue, minHeight: 74 }}
+        <MarkdownFieldEditor
+          height={118}
+          minHeight={104}
+          ariaLabel="Short answer check hint Markdown editor views"
           value={check.hint ?? ''}
-          onChange={e => updateCheck({ hint: e.target.value })}
+          onChange={value => updateCheck({ hint: value })}
           placeholder="Suggestion shown when this answer is wrong..."
         />
         <p style={{ margin: 0, fontFamily: 'var(--font-body)', fontSize: '0.82rem', color: '#6b7280', lineHeight: 1.5 }}>
@@ -1193,10 +1195,12 @@ function QuizOptionsBuilder({ task, onUpdate }) {
                 onChange={value => updateOptions(options.map((o, i) => i === index ? { ...o, text: value } : o))}
                 placeholder={`Option ${option.id.toUpperCase()} in Markdown`}
               />
-              <textarea
-                style={{ ...s.checkValue, minHeight: 74 }}
+              <MarkdownFieldEditor
+                height={118}
+                minHeight={104}
+                ariaLabel={`Option ${option.id.toUpperCase()} feedback Markdown editor views`}
                 value={option.feedback ?? ''}
-                onChange={e => updateOptions(options.map((o, i) => i === index ? { ...o, feedback: e.target.value } : o))}
+                onChange={value => updateOptions(options.map((o, i) => i === index ? { ...o, feedback: value } : o))}
                 placeholder="Feedback shown if students choose this wrong answer..."
               />
             </div>
@@ -1471,12 +1475,16 @@ function CheckListEditor({ checks, onChange, interactionMode = 'run', allowCodeN
                 operator={operator}
                 onChange={updated => updateCheck(index, updated)}
               />
-              <textarea
-                style={{ ...s.checkValue, gridColumn: '1 / -1', minHeight: 74 }}
-                value={check.hint ?? ''}
-                onChange={e => updateCheck(index, { ...check, hint: e.target.value })}
-                placeholder="Suggestion shown in the completion banner when this check fails..."
-              />
+              <div style={{ gridColumn: '1 / -1' }}>
+                <MarkdownFieldEditor
+                  height={118}
+                  minHeight={104}
+                  ariaLabel={`Check ${index + 1} hint Markdown editor views`}
+                  value={check.hint ?? ''}
+                  onChange={value => updateCheck(index, { ...check, hint: value })}
+                  placeholder="Suggestion shown in the completion banner when this check fails..."
+                />
+              </div>
             </div>
             {checks.length > 1 && (
               <button type="button" style={s.removeCheckBtn} onClick={() => removeCheck(index)} title="Remove check">×</button>
@@ -1856,10 +1864,12 @@ function ScratchCheckEditor({ check, onChange, sprites = [{ id: 'sprite1', name:
           />
         </>
       )}
-      <textarea
-        style={{ ...s.checkValue, minHeight: 74 }}
+      <MarkdownFieldEditor
+        height={118}
+        minHeight={104}
+        ariaLabel="Scratch check hint Markdown editor views"
         value={check.hint ?? ''}
-        onChange={e => onChange({ ...check, hint: e.target.value })}
+        onChange={value => onChange({ ...check, hint: value })}
         placeholder="Suggestion shown in the completion banner when this check fails..."
       />
     </div>
