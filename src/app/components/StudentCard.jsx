@@ -1,4 +1,6 @@
 import React, { useState } from 'react'
+import { getQuizOptionText } from './QuizTask'
+import { InlineMarkdown } from '../../shared/markdown'
 
 export default function StudentCard({ student, lesson, lessonId, session, onRename, onRemove, onExpand }) {
   const [editing, setEditing] = useState(false)
@@ -10,11 +12,18 @@ export default function StudentCard({ student, lesson, lessonId, session, onRena
     setEditing(false)
   }
 
-  const statusColour =
-    student.lastRunStatus === 'success' ? '#22c55e' :
-    student.lastRunStatus === 'error'   ? '#ef4444' : '#9ca3af'
+  const currentTask = lesson?.tasks?.find(t => t.id === session?.currentTaskId)
+  const isSubmitMode = currentTask?.interactionMode === 'submit'
+  const isQuiz = currentTask?.taskType === 'quiz'
+  const isInformation = currentTask?.taskType === 'information'
+  const quizAnswerText = isQuiz ? getQuizOptionText(currentTask, student.currentAnswer) : ''
 
-  const hasCheck = lesson?.tasks?.find(t => t.id === session?.currentTaskId)?.check != null
+  const statusColour =
+    student.lastRunStatus === 'success'   ? '#22c55e' :
+    student.lastRunStatus === 'error'     ? '#ef4444' :
+    student.lastRunStatus === 'submitted' ? '#3b82f6' : '#9ca3af'
+
+  const hasCheck = currentTask?.check != null
   const isWaiting = session?.state === 'waiting'
   const presenceClass = isWaiting
     ? 'presence-badge presence-badge--waiting'
@@ -67,8 +76,33 @@ export default function StudentCard({ student, lesson, lessonId, session, onRena
       </div>
 
       {/* Output / preview snippet */}
-      {lesson?.type === 'python' ? (
-        <pre style={s.snippet}>{(student.currentOutput ?? '').split('\n').slice(0, 3).join('\n') || <span style={{ color: '#9ca3af' }}>No output yet</span>}</pre>
+      {isInformation ? (
+        <div style={s.iframeThumb}>
+          <span style={{ color: '#6b7280', fontSize: 12 }}>Information task</span>
+        </div>
+      ) : isQuiz ? (
+        <div style={s.quizAnswer}>
+          {student.currentAnswer
+            ? (
+              <>
+                <span style={s.quizAnswerId}>{student.currentAnswer}</span>
+                <span style={s.quizAnswerText}>
+                  {quizAnswerText ? <InlineMarkdown content={quizAnswerText} /> : 'Selected answer'}
+                </span>
+              </>
+            )
+            : <span style={{ color: '#9ca3af', fontSize: 12 }}>No answer yet</span>}
+        </div>
+      ) : lesson?.type === 'python' ? (
+        isSubmitMode ? (
+          <pre style={s.snippet}>
+            {student.lastRunStatus === 'submitted'
+              ? (student.currentCode ?? '').split('\n').slice(0, 3).join('\n') || <span style={{ color: '#9ca3af' }}>No code yet</span>
+              : <span style={{ color: '#9ca3af' }}>Waiting for submission</span>}
+          </pre>
+        ) : (
+          <pre style={s.snippet}>{(student.currentOutput ?? '').split('\n').slice(0, 3).join('\n') || <span style={{ color: '#9ca3af' }}>No output yet</span>}</pre>
+        )
       ) : (
         <div style={s.iframeThumb}>
           {student.currentFiles
@@ -176,6 +210,44 @@ const s = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  quizAnswer: {
+    minHeight: 54,
+    background: '#f5f5f5',
+    borderRadius: 6,
+    padding: '6px 8px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    overflow: 'hidden',
+  },
+  quizAnswerId: {
+    width: 24,
+    height: 24,
+    borderRadius: 5,
+    background: 'var(--colour-primary)',
+    color: '#fff',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    fontFamily: 'var(--font-title)',
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    fontSize: '0.78rem',
+  },
+  quizAnswerText: {
+    minWidth: 0,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    display: '-webkit-box',
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: 'vertical',
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.8rem',
+    lineHeight: 1.3,
+    color: 'var(--colour-text)',
+    fontWeight: 600,
   },
   expandBtn: {
     fontSize: 12,

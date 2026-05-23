@@ -51,6 +51,7 @@ export function useSession(lessonId) {
       currentTaskId:         1,
       createdAt:             Date.now(),
       activeStudentView:     null,
+      teacherLive:           null,
       isPaused:              false,
       sandboxCode:           null,
       sandboxCodePushedAt:   null,
@@ -72,6 +73,7 @@ export function useSession(lessonId) {
     await update(ref(db, `sessions/${lessonId}`), {
       state:                 'ended',
       activeStudentView:     null,
+      teacherLive:           null,
       sandboxCode:           null,
       sandboxCodePushedAt:   null,
       sandboxFiles:          null,
@@ -91,6 +93,7 @@ export function useSession(lessonId) {
       updates[`students/${anonymousId}/currentOutput`]  = ''
       updates[`students/${anonymousId}/currentCode`]    = ''
       updates[`students/${anonymousId}/currentFiles`]   = null
+      updates[`students/${anonymousId}/currentAnswer`]  = null
     }
     await update(ref(db, `sessions/${lessonId}`), updates)
   }
@@ -147,6 +150,27 @@ export function useSession(lessonId) {
     }
   }
 
+  async function setTeacherLive(payload) {
+    const r2 = ref(db, `sessions/${lessonId}/teacherLive`)
+    if (!payload) {
+      await set(r2, null)
+      return
+    }
+    await set(r2, {
+      active: true,
+      updatedAt: Date.now(),
+      ...payload,
+    })
+    onDisconnect(r2).set(null)
+  }
+
+  async function updateTeacherLive(payload) {
+    await update(ref(db, `sessions/${lessonId}/teacherLive`), {
+      updatedAt: Date.now(),
+      ...payload,
+    })
+  }
+
   async function renameStudent(anonymousId, newName) {
     await set(ref(db, `sessions/${lessonId}/students/${anonymousId}/displayName`), newName)
   }
@@ -156,6 +180,13 @@ export function useSession(lessonId) {
       await set(ref(db, `sessions/${lessonId}/activeStudentView`), null)
     }
     await remove(ref(db, `sessions/${lessonId}/students/${anonymousId}`))
+  }
+
+  async function pushResetToStudent(anonymousId, action) {
+    await update(ref(db, `sessions/${lessonId}/students/${anonymousId}`), {
+      remoteResetAction:   action,
+      remoteResetPushedAt: Date.now(),
+    })
   }
 
   // ─── Student helpers ──────────────────────────────────────────────────────
@@ -172,13 +203,14 @@ export function useSession(lessonId) {
       joinedAt:      Date.now(),
       currentCode:   '',
       currentOutput: '',
+      currentAnswer: null,
       lastRunStatus: null,
       checkPassed:   false,
       lastRunAt:     null,
     })
   }
 
-  async function writeStudentRun(anonymousId, { code, files, output, status, checkPassed }) {
+  async function writeStudentRun(anonymousId, { code, files, output, answer, status, checkPassed }) {
     const updates = {
       lastRunStatus: status,
       checkPassed:   checkPassed ?? false,
@@ -187,6 +219,7 @@ export function useSession(lessonId) {
     if (code  != null) updates.currentCode   = code
     if (files != null) updates.currentFiles  = encodeFileKeys(files)
     if (output != null) updates.currentOutput = output
+    if (answer != null) updates.currentAnswer = answer
     await update(ref(db, `sessions/${lessonId}/students/${anonymousId}`), updates)
   }
 
@@ -209,7 +242,7 @@ export function useSession(lessonId) {
     // teacher
     createSession, restartSession, startSession, endSession,
     setTaskId, enterSandbox, exitSandbox, pushSandboxCode, pushSandboxFiles,
-    setPaused, setActiveStudentView, renameStudent, removeStudent,
+    setPaused, setActiveStudentView, setTeacherLive, updateTeacherLive, renameStudent, removeStudent, pushResetToStudent,
     // student
     registerPresence, joinSession, writeStudentRun, writeStudentCode, writeStudentFiles, writeStudentOutput,
   }

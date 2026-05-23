@@ -36,14 +36,16 @@ export default function IframePreview({ src, iframeRef, height = 300, fill = fal
 
   return (
     <div style={wrapStyle}>
-      <div style={s.header}>
+      <div style={s.header} className="ui-tabs">
         <button
+          className={`ui-tab${tab === 'preview' ? ' is-active' : ''}`}
           style={tab === 'preview' ? { ...s.tab, ...s.tabActive } : s.tab}
           onClick={() => setTab('preview')}
         >
           Preview
         </button>
         <button
+          className={`ui-tab${tab === 'console' ? ' is-active' : ''}`}
           style={tab === 'console' ? { ...s.tab, ...s.tabActive } : s.tab}
           onClick={() => setTab('console')}
         >

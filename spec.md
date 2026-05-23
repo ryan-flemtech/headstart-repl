@@ -174,7 +174,31 @@ The `type` field — `"python"` or `"html"` — controls which editor mode, exec
 
 ---
 
-### 5.4 Python Carry-Through Behaviour
+### 5.4 Information Task Object
+
+Information tasks are available in all lesson types. They render only the explainer markdown as a full-height, non-collapsible task view. They do not show an editor, run button, output panel, completion check, or carry-through controls.
+
+```json
+{
+  "id": 2,
+  "taskType": "information",
+  "title": "How Loops Work",
+  "explainer": "Read this before starting the next coding task.\n\n## Key idea\nA loop repeats code while a condition is true."
+}
+```
+
+#### Information Task Field Reference
+
+| Field | Required | Type | Notes |
+|---|---|---|---|
+| `id` | ✅ | integer | Sequential |
+| `taskType` | ✅ | string | Must be `"information"` |
+| `title` | ✅ | string | Short — shown in progress tracker |
+| `explainer` | ✅ | string | Markdown — fills the task view and cannot be minimised |
+
+---
+
+### 5.5 Python Carry-Through Behaviour
 
 ```
 Task loads and carryCodeFrom is set:
@@ -186,7 +210,7 @@ Task loads and carryCodeFrom is set:
 
 ---
 
-### 5.5 HTML/CSS/JS Carry-Through Behaviour
+### 5.6 HTML/CSS/JS Carry-Through Behaviour
 
 Carry-through is per file, matched by filename:
 
@@ -206,7 +230,7 @@ Files in the carried task not present in the new task:
 
 ---
 
-### 5.6 Check Types (v1)
+### 5.7 Check Types (v1)
 
 | Type | Behaviour | Python | HTML |
 |---|---|---|---|
@@ -1072,6 +1096,7 @@ The builder includes full code execution — Python via Pyodide and HTML/CSS/JS 
 
 | Field | Input type | Notes |
 |---|---|---|
+| Task format | Dropdown | `Code`, `Information`, or `Quiz`. Information tasks render explainer markdown full-height with no editor or checks |
 | Task title | Text input | Short — shown in progress tracker |
 | Explainer | Markdown textarea + live preview | Split view — raw Markdown left, rendered preview right |
 | Carry code from | Dropdown | Select from existing task IDs in this lesson. Blank = no carry |

@@ -1,4 +1,5 @@
-import React from 'react'
+import React, { useState } from 'react'
+import { flattenTasks } from '../../shared/taskUtils'
 
 export default function TaskNavigator({
   tasks = [],
@@ -13,6 +14,18 @@ export default function TaskNavigator({
   onToggle,
 }) {
   const total = students.length
+  const flatTasks = flattenTasks(tasks)
+  const currentIndex = flatTasks.findIndex(t => t.id === currentTaskId)
+
+  const [expandedGroups, setExpandedGroups] = useState(() => {
+    const map = {}
+    tasks.forEach(item => { if (item.type === 'group') map[item.id] = true })
+    return map
+  })
+
+  function toggleGroup(groupId) {
+    setExpandedGroups(prev => ({ ...prev, [groupId]: !prev[groupId] }))
+  }
 
   if (collapsed) {
     return (
@@ -36,21 +49,80 @@ export default function TaskNavigator({
       </div>
 
       <div style={s.list}>
-        {tasks.map((task, i) => {
-          const isCurrent   = task.id === currentTaskId
-          const runCount    = students.filter(st => st.lastRunStatus != null && st.lastRunAt).length
-          const checkCount  = students.filter(st => st.checkPassed).length
-          const hasCheck    = task.check != null
+        {tasks.map((item, i) => {
+          if (item.type === 'group') {
+            const subtasks = item.subtasks ?? []
+            const isCurrentGroup = subtasks.some(t => t.id === currentTaskId)
+            const expanded = expandedGroups[item.id] !== false
+
+            return (
+              <div key={item.id}>
+                <button
+                  style={{
+                    ...s.groupHeader,
+                    ...(isCurrentGroup ? s.groupHeaderActive : {}),
+                    ...((isSandbox || sandboxStaging) ? { opacity: 0.45, cursor: 'default' } : {}),
+                  }}
+                  onClick={() => (!isSandbox && !sandboxStaging) && toggleGroup(item.id)}
+                >
+                  <span style={s.groupChevron}>{expanded ? '▾' : '▸'}</span>
+                  <span style={s.groupHeaderTitle}>{item.title || 'Untitled Group'}</span>
+                  <span style={s.groupBadge}>{subtasks.length}</span>
+                </button>
+
+                {expanded && subtasks.map(task => {
+                  const isCurrent = task.id === currentTaskId
+                  const runCount = students.filter(st => st.lastRunStatus != null && st.lastRunAt).length
+                  const checkCount = students.filter(st => st.checkPassed).length
+                  const hasCheck = task.check != null
+
+                  return (
+                    <button
+                      key={task.id}
+                      style={{
+                        ...s.subtaskItem,
+                        ...(isCurrent ? s.subtaskItemActive : {}),
+                        ...((isSandbox || sandboxStaging) ? { opacity: 0.45, cursor: 'default' } : {}),
+                      }}
+                      onClick={() => (!isSandbox && !sandboxStaging) && onTaskSelect?.(task.id)}
+                    >
+                      <span style={s.subtaskDot} />
+                      <div style={s.detail}>
+                        <span style={s.taskTitle}>{task.title}</span>
+                        {isCurrent && total > 0 && (
+                          <span style={s.stat}>
+                            {runCount}/{total} run
+                            {hasCheck ? ` · ${checkCount} ✅` : ''}
+                          </span>
+                        )}
+                      </div>
+                      {isCurrent && <span style={s.arrow}>◀</span>}
+                    </button>
+                  )
+                })}
+              </div>
+            )
+          }
+
+          // Standalone task
+          const isCurrent = item.id === currentTaskId
+          const runCount = students.filter(st => st.lastRunStatus != null && st.lastRunAt).length
+          const checkCount = students.filter(st => st.checkPassed).length
+          const hasCheck = item.check != null
 
           return (
             <button
-              key={task.id}
-              style={{ ...s.item, ...(isCurrent ? s.itemActive : {}), ...((isSandbox || sandboxStaging) ? { opacity: 0.45, cursor: 'default' } : {}) }}
-              onClick={() => (!isSandbox && !sandboxStaging) && onTaskSelect?.(task.id)}
+              key={item.id}
+              style={{
+                ...s.item,
+                ...(isCurrent ? s.itemActive : {}),
+                ...((isSandbox || sandboxStaging) ? { opacity: 0.45, cursor: 'default' } : {}),
+              }}
+              onClick={() => (!isSandbox && !sandboxStaging) && onTaskSelect?.(item.id)}
             >
-              <span style={s.num}>{task.id}</span>
+              <span style={s.num}>{item.id}</span>
               <div style={s.detail}>
-                <span style={s.taskTitle}>{task.title}</span>
+                <span style={s.taskTitle}>{item.title}</span>
                 {isCurrent && total > 0 && (
                   <span style={s.stat}>
                     {runCount}/{total} run
@@ -64,21 +136,27 @@ export default function TaskNavigator({
         })}
       </div>
 
-      {/* Previous / Next */}
+      {/* Previous / Next — uses flat task list */}
       <div style={s.navButtons}>
         <button
           className="btn-secondary"
           style={s.navBtn}
-          disabled={currentTaskId <= 1}
-          onClick={() => onTaskSelect?.(currentTaskId - 1)}
+          disabled={currentIndex <= 0}
+          onClick={() => {
+            const prev = flatTasks[currentIndex - 1]
+            if (prev) onTaskSelect?.(prev.id)
+          }}
         >
           ← Prev
         </button>
         <button
           className="btn-secondary"
           style={s.navBtn}
-          disabled={currentTaskId >= tasks.length}
-          onClick={() => onTaskSelect?.(currentTaskId + 1)}
+          disabled={currentIndex >= flatTasks.length - 1}
+          onClick={() => {
+            const next = flatTasks[currentIndex + 1]
+            if (next) onTaskSelect?.(next.id)
+          }}
         >
           Next →
         </button>
@@ -87,27 +165,15 @@ export default function TaskNavigator({
       {/* Sandbox toggle */}
       <div style={s.sandboxArea}>
         {isSandbox ? (
-          <button
-            className="btn-danger"
-            style={{ width: '100%' }}
-            onClick={onSandbox}
-          >
+          <button className="btn-danger" style={{ width: '100%' }} onClick={onSandbox}>
             Deactivate Sandbox
           </button>
         ) : sandboxStaging ? (
-          <button
-            className="btn-ghost"
-            style={{ width: '100%', color: 'var(--colour-primary)', border: '1px solid var(--colour-primary)' }}
-            onClick={onSandbox}
-          >
+          <button className="btn-ghost" style={{ width: '100%', color: 'var(--colour-primary)', border: '1px solid var(--colour-primary)' }} onClick={onSandbox}>
             Cancel Sandbox
           </button>
         ) : (
-          <button
-            className="btn-ghost"
-            style={{ width: '100%', color: 'var(--colour-primary)', border: '1px solid var(--colour-primary)' }}
-            onClick={onSandbox}
-          >
+          <button className="btn-ghost" style={{ width: '100%', color: 'var(--colour-primary)', border: '1px solid var(--colour-primary)' }} onClick={onSandbox}>
             Sandbox
           </button>
         )}
@@ -150,6 +216,7 @@ const s = {
     overflowY: 'auto',
     padding: '8px 0',
   },
+  // Standalone task
   item: {
     display: 'flex',
     alignItems: 'center',
@@ -180,6 +247,75 @@ const s = {
     fontSize: '0.75rem',
     fontFamily: 'var(--font-body)',
     fontWeight: 700,
+    flexShrink: 0,
+  },
+  // Group header
+  groupHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    width: '100%',
+    padding: '8px 14px',
+    background: '#f8f5ff',
+    border: 'none',
+    borderLeft: '3px solid transparent',
+    borderBottom: '1px solid #f0eafa',
+    textAlign: 'left',
+    cursor: 'pointer',
+    transition: 'background 0.1s',
+  },
+  groupHeaderActive: {
+    background: '#ede8ff',
+    borderLeftColor: 'var(--colour-primary)',
+  },
+  groupChevron: {
+    fontSize: '0.8rem',
+    color: 'var(--colour-primary)',
+    flexShrink: 0,
+    lineHeight: 1,
+  },
+  groupHeaderTitle: {
+    flex: 1,
+    fontFamily: 'var(--font-body)',
+    fontWeight: 700,
+    fontSize: '0.86rem',
+    color: 'var(--colour-primary)',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  groupBadge: {
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.7rem',
+    color: '#6b7280',
+    background: '#e5e7eb',
+    borderRadius: 999,
+    padding: '1px 6px',
+    flexShrink: 0,
+  },
+  // Subtask inside a group
+  subtaskItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    width: '100%',
+    padding: '7px 14px 7px 28px',
+    background: 'transparent',
+    border: 'none',
+    borderLeft: '3px solid #c4b5fd',
+    textAlign: 'left',
+    cursor: 'pointer',
+    transition: 'background 0.1s',
+  },
+  subtaskItemActive: {
+    background: '#f0eafa',
+    borderLeftColor: 'var(--colour-primary)',
+  },
+  subtaskDot: {
+    width: 6,
+    height: 6,
+    borderRadius: '50%',
+    background: '#c4b5fd',
     flexShrink: 0,
   },
   detail: {

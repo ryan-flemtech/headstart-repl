@@ -1,22 +1,26 @@
 import React, { useState } from 'react'
 import { MarkdownRenderer } from '../../shared/markdown'
 
-export default function ExplainerPanel({ title, content }) {
+export default function ExplainerPanel({ title, content, collapsible = true, fill = false }) {
   const [collapsed, setCollapsed] = useState(false)
+  const isCollapsed = collapsible && collapsed
 
   return (
-    <div style={s.panel} className="card">
-      <button
-        style={s.toggle}
-        onClick={() => setCollapsed(c => !c)}
-        aria-expanded={!collapsed}
-      >
-        <span style={s.toggleLabel}>Task</span>
-        <span style={s.toggleIcon}>{collapsed ? '▼' : '▲'}</span>
-      </button>
+    <div style={{ ...s.panel, ...(fill ? s.panelFill : {}) }} className="card ui-collapsible">
+      {collapsible && (
+        <button
+          className="ui-collapsible__header"
+          style={s.toggle}
+          onClick={() => setCollapsed(c => !c)}
+          aria-expanded={!collapsed}
+        >
+          <span style={s.toggleLabel}>Task</span>
+          <span style={s.toggleIcon}>{collapsed ? '▼' : '▲'}</span>
+        </button>
+      )}
 
-      {!collapsed && (
-        <div style={s.content}>
+      {!isCollapsed && (
+        <div style={{ ...s.content, ...(fill ? s.contentFill : {}) }}>
           <MarkdownRenderer title={title} content={content} />
         </div>
       )}
@@ -28,6 +32,12 @@ const s = {
   panel: {
     flexShrink: 0,
     overflow: 'hidden',
+  },
+  panelFill: {
+    flex: 1,
+    minHeight: 0,
+    display: 'flex',
+    flexDirection: 'column',
   },
   toggle: {
     width: '100%',
@@ -51,5 +61,10 @@ const s = {
     padding: '14px 16px',
     maxHeight: 280,
     overflowY: 'auto',
+  },
+  contentFill: {
+    flex: 1,
+    maxHeight: 'none',
+    padding: '24px 28px',
   },
 }

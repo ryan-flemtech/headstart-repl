@@ -3,13 +3,14 @@ import SplitPane from '../../shared/SplitPane'
 import { CodeEditor } from '../../shared/CodeEditor'
 import { initPyodide, runPython, stopPython, provideInput, isPyodideReady } from '../../shared/pyodide'
 import { buildIframeSrc, waitForIframeText } from '../../shared/iframe'
-import { evaluateSingleCheck, normalizeChecks } from '../../shared/checks'
+import { evaluateSingleCheck, filterChecksForInteraction, normalizeChecks } from '../../shared/checks'
 import AssetBrowser from '../../shared/AssetBrowser'
-import ExplainerEditor from './ExplainerEditor'
+import ExplainerEditor, { MarkdownFieldEditor } from './ExplainerEditor'
 import FileManager from './FileManager'
 import BuilderOutputPanel from './BuilderOutputPanel'
 import IframePreview from '../../app/components/IframePreview'
 import ScratchWorkspace, { SPRITE_TYPES } from '../../app/components/ScratchWorkspace'
+import QuizTask from '../../app/components/QuizTask'
 import { DEFAULT_SPRITES } from '../../shared/scratch'
 
 const CODE_FONT_STYLE = {
@@ -25,7 +26,8 @@ function resolveAssetsPath(rawPath) {
   return window.location.origin + base + encoded
 }
 
-export default function TaskEditor({ task, lesson, onUpdate }) {
+export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
+  const [optionsOpen, setOptionsOpen]   = useState(false)
   const [output, setOutput]             = useState('')
   const [runStatus, setRunStatus]       = useState(null)
   const [running, setRunning]           = useState(false)
@@ -40,6 +42,9 @@ export default function TaskEditor({ task, lesson, onUpdate }) {
 
   const isPython  = lesson.type === 'python'
   const isScratch = lesson.type === 'scratch'
+  const isQuiz = task.taskType === 'quiz'
+  const isInformation = task.taskType === 'information'
+  const [quizSelectedAnswer, setQuizSelectedAnswer] = useState('')
   const [selectedFile, setSelectedFile] = useState(task.starterFiles?.[0]?.name ?? '')
   const [codeTab, setCodeTab] = useState('starter')
   const [selectedCompleteFile, setSelectedCompleteFile] = useState('')
@@ -97,6 +102,100 @@ export default function TaskEditor({ task, lesson, onUpdate }) {
 
   function handleStop() {
     stopPython()
+  }
+
+  function makeDefaultQuizOptions() {
+    return [
+      { id: 'a', text: '' },
+      { id: 'b', text: '' },
+    ]
+  }
+
+  function renumberQuizOptions(options) {
+    return options.map((option, index) => ({
+      ...option,
+      id: String.fromCharCode(97 + index),
+    }))
+  }
+
+  function handleTaskTypeChange(taskType) {
+    setOutput('')
+    setRunStatus(null)
+    setCheckResult(null)
+    setCheckResults(null)
+    setIframeSrc(null)
+    setQuizSelectedAnswer('')
+
+    if (taskType === 'quiz') {
+      const quizType = task.taskType === 'quiz' ? (task.quizType ?? 'multiple_choice') : 'multiple_choice'
+      const options = task.options?.length ? renumberQuizOptions(task.options) : makeDefaultQuizOptions()
+      const answer = options.some(option => option.id === task.check?.value) ? task.check.value : ''
+      onUpdate({
+        ...task,
+        taskType: 'quiz',
+        quizType,
+        options,
+        check: answer ? { type: 'answer_equals', value: answer } : null,
+        carryCodeFrom: null,
+        carryBlocksFrom: null,
+      })
+      return
+    }
+
+    if (taskType === 'information') {
+      const {
+        options: _options,
+        check: _check,
+        carryCodeFrom: _carryCodeFrom,
+        carryBlocksFrom: _carryBlocksFrom,
+        starterCode: _starterCode,
+        completeCode: _completeCode,
+        starterFiles: _starterFiles,
+        completeFiles: _completeFiles,
+        entryFile: _entryFile,
+        completeEntryFile: _completeEntryFile,
+        toolbox: _toolbox,
+        starterBlocks: _starterBlocks,
+        completeBlocks: _completeBlocks,
+        interactionMode: _interactionMode,
+        _checkTested,
+        ...rest
+      } = task
+      onUpdate({
+        ...rest,
+        taskType: 'information',
+        explainer: task.explainer ?? '',
+      })
+      return
+    }
+
+    const { taskType: _taskType, options: _options, ...rest } = task
+    const typeFields = lesson.type === 'python'
+      ? { starterCode: task.starterCode ?? '', carryCodeFrom: task.carryCodeFrom ?? null }
+      : lesson.type === 'scratch'
+      ? { toolbox: task.toolbox ?? '', starterBlocks: task.starterBlocks ?? null, carryBlocksFrom: task.carryBlocksFrom ?? null }
+      : {
+          starterFiles: task.starterFiles?.length ? task.starterFiles : [{ name: 'index.html', type: 'html', content: '<!DOCTYPE html>\n<html>\n<body>\n\n</body>\n</html>' }],
+          entryFile: task.entryFile ?? 'index.html',
+          carryCodeFrom: task.carryCodeFrom ?? null,
+        }
+    onUpdate({
+      ...rest,
+      ...typeFields,
+      check: null,
+    })
+  }
+
+  function handleInteractionModeChange(interactionMode) {
+    const nextChecks = filterChecksForInteraction(task.check, interactionMode)
+    onUpdate({
+      ...task,
+      interactionMode,
+      check: task.check ? (nextChecks.length > 0 ? nextChecks : null) : task.check,
+      _checkTested: false,
+    })
+    setCheckResults(null)
+    setRunStatus(null)
   }
 
   useEffect(() => {
@@ -177,7 +276,7 @@ export default function TaskEditor({ task, lesson, onUpdate }) {
 
       const checksToEval = normalizeChecks(task.check)
       if (checksToEval.length > 0) {
-        setCheckResults(checksToEval.map(c => ({ ...c, passed: evaluateSingleCheck(c, accumulated, { status: result.status }) })))
+        setCheckResults(checksToEval.map(c => ({ ...c, passed: evaluateSingleCheck(c, accumulated, { status: result.status, code: activePythonCode }) })))
         set('_checkTested', true)
       }
     } else if (!isScratch) {
@@ -191,8 +290,10 @@ export default function TaskEditor({ task, lesson, onUpdate }) {
 
       const checksToEval = normalizeChecks(task.check)
       if (checksToEval.length > 0) {
+        const codeStr = activeFiles.map(f => f.content).join('\n')
         waitForIframeText().then(text => {
-          setCheckResults(checksToEval.map(c => ({ ...c, passed: evaluateSingleCheck(c, text) })))
+          const iframeDoc = iframeRef.current?.contentDocument ?? null
+          setCheckResults(checksToEval.map(c => ({ ...c, passed: evaluateSingleCheck(c, text, { code: codeStr, iframeDoc }) })))
           set('_checkTested', true)
         })
       }
@@ -200,15 +301,101 @@ export default function TaskEditor({ task, lesson, onUpdate }) {
     setRunning(false)
   }
 
+  function handleTestChecks() {
+    const checksToEval = normalizeChecks(task.check)
+    if (checksToEval.length === 0) return
+    const codeStr = isPython ? activePythonCode : activeFiles.map(f => f.content).join('\n')
+    setCheckResults(checksToEval.map(c => ({
+      ...c,
+      passed: evaluateSingleCheck(c, '', { code: codeStr }),
+    })))
+    set('_checkTested', true)
+  }
+
+  function handleQuizTypeChange(quizType) {
+    setQuizSelectedAnswer('')
+    setCheckResults(null)
+    setRunStatus(null)
+
+    if (quizType === 'multiple_choice') {
+      const options = task.options?.length ? task.options : makeDefaultQuizOptions()
+      const answer = options.some(o => o.id === task.check?.value) ? task.check.value : ''
+      onUpdate({ ...task, quizType: 'multiple_choice', options, check: answer ? { type: 'answer_equals', value: answer } : null })
+      return
+    }
+    if (quizType === 'match') {
+      const defaultPairs = [{ id: 'p1', prompt: '', answer: '' }, { id: 'p2', prompt: '', answer: '' }]
+      onUpdate({ ...task, quizType: 'match', pairs: task.pairs?.length ? task.pairs : defaultPairs, check: null })
+      return
+    }
+    if (quizType === 'fill_blank') {
+      onUpdate({ ...task, quizType: 'fill_blank', mode: task.mode ?? 'drag', text: task.text ?? '', blanks: task.blanks ?? [], check: null })
+      return
+    }
+    if (quizType === 'short_answer') {
+      const existing = task.check?.type?.startsWith('answer_') ? task.check : null
+      onUpdate({ ...task, quizType: 'short_answer', check: existing ?? { type: 'answer_contains', value: '' } })
+    }
+  }
+
+  function handleQuizPreviewSelect(answer, passedOverride) {
+    if (passedOverride === null) {
+      setQuizSelectedAnswer(answer)
+      return
+    }
+    const passed =
+      typeof passedOverride === 'boolean'
+        ? passedOverride
+        : task.check
+          ? evaluateSingleCheck(task.check, answer, { answer: typeof answer === 'string' ? answer : '' })
+          : false
+    setQuizSelectedAnswer(answer)
+    setRunStatus('submitted')
+    setCheckResults([{ type: 'quiz_result', passed }])
+    if (task.check || typeof passedOverride === 'boolean') set('_checkTested', true)
+  }
+
   return (
     <div style={s.wrap}>
-      <Field label="Task title">
-        <input
-          style={s.input}
-          value={task.title}
-          onChange={e => set('title', e.target.value)}
-          placeholder="e.g. Hello World"
-        />
+      {parentGroup ? (
+        <Field label="Task title">
+          <div style={{ ...s.input, background: '#f8f5ff', color: '#6b7280', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ flex: 1 }}>{task.title}</span>
+            <span style={{ fontSize: '0.78rem', color: 'var(--colour-primary)', opacity: 0.7 }}>auto-named from group</span>
+          </div>
+        </Field>
+      ) : (
+        <Field label="Task title">
+          <input
+            style={s.input}
+            value={task.title}
+            onChange={e => set('title', e.target.value)}
+            placeholder="e.g. Hello World"
+          />
+        </Field>
+      )}
+
+      <Field label="Task format">
+        <div style={s.taskFormatGrid}>
+          {[
+            { value: 'code', label: lesson.type === 'scratch' ? 'Scratch' : 'Code', iconType: lesson.type === 'scratch' ? 'scratch' : 'code' },
+            { value: 'information', label: 'Information', iconType: 'information' },
+            { value: 'quiz', label: 'Quiz', iconType: 'quiz' },
+          ].map(({ value, label, iconType }) => {
+            const active = value === (isQuiz ? 'quiz' : isInformation ? 'information' : 'code')
+            return (
+              <button
+                key={value}
+                type="button"
+                style={{ ...s.taskFormatBtn, ...(active ? s.taskFormatBtnActive : {}) }}
+                onClick={() => handleTaskTypeChange(value)}
+              >
+                <TaskFormatIcon type={iconType} />
+                <span style={s.taskFormatLabel}>{label}</span>
+              </button>
+            )
+          })}
+        </div>
       </Field>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -234,95 +421,231 @@ export default function TaskEditor({ task, lesson, onUpdate }) {
         )}
       </div>
 
-      <Field label={isScratch ? 'Carry blocks from task' : 'Carry code from task'}>
-        <select
-          style={s.select}
-          value={(isScratch ? task.carryBlocksFrom : task.carryCodeFrom) ?? ''}
-          onChange={e => set(isScratch ? 'carryBlocksFrom' : 'carryCodeFrom', e.target.value ? parseInt(e.target.value, 10) : null)}
-        >
-          <option value="">None</option>
-          {lesson.tasks.filter(t => t.id !== task.id).map(t => (
-            <option key={t.id} value={t.id}>{t.id}. {t.title || 'Untitled'}</option>
-          ))}
-        </select>
-      </Field>
+      {!isQuiz && !isInformation && (() => {
+        const summaryParts = []
+        if (task.check) summaryParts.push('check enabled')
+        if (task.interactionMode === 'submit') summaryParts.push('submit mode')
+        const summary = summaryParts.join(' · ')
 
-      <Field label="Completion check">
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <label style={s.checkToggle}>
-            <input
-              type="checkbox"
-              checked={!!task.check}
-              onChange={e => set('check', e.target.checked
-                ? (isScratch
-                  ? [{ type: 'block_used', evaluation: 'after_run', opcode: 'motion_movesteps' }]
-                  : isPython
-                    ? [{ type: 'code_no_error' }]
-                    : [{ type: 'output_contains', value: '' }])
-                : null)}
+        return (
+          <div style={s.optionsSection}>
+            <button
+              type="button"
+              style={s.optionsSectionToggle}
+              onClick={() => setOptionsOpen(o => !o)}
+              aria-expanded={optionsOpen}
+            >
+              <span style={s.optionsSectionTitle}>Task options</span>
+              {!optionsOpen && summary && (
+                <span style={s.optionsSummaryText}>{summary}</span>
+              )}
+              <span style={{ ...s.optionsChevron, transform: optionsOpen ? 'rotate(180deg)' : 'none' }}>▾</span>
+            </button>
+
+            {optionsOpen && (
+              <div style={s.optionsBody}>
+                <CarryThroughPicker task={task} lesson={lesson} onUpdate={onUpdate} isScratch={isScratch} isPython={isPython} />
+
+                {!isScratch && (
+                  <Field label="Student interaction">
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div style={s.optionChoiceGrid}>
+                        {[
+                          { value: 'run', label: 'Run', text: 'Students run code and see output.' },
+                          { value: 'submit', label: 'Submit', text: 'Students submit code without running it.' },
+                        ].map(choice => {
+                          const active = choice.value === (task.interactionMode ?? 'run')
+                          return (
+                            <label
+                              key={choice.value}
+                              style={{ ...s.optionChoiceCard, ...(active ? s.optionChoiceCardActive : {}) }}
+                            >
+                              <input
+                                type="radio"
+                                name={`interaction-${task.id}`}
+                                checked={active}
+                                onChange={() => handleInteractionModeChange(choice.value)}
+                                style={s.optionChoiceInput}
+                              />
+                              <span style={s.optionChoiceTitle}>{choice.label}</span>
+                              <span style={{ ...s.optionChoiceText, ...(active ? s.optionChoiceTextActive : {}) }}>{choice.text}</span>
+                            </label>
+                          )
+                        })}
+                      </div>
+                      {task.interactionMode === 'submit' && (
+                        <p style={s.optionNote}>
+                          Submit mode hides the Run button. Only code-based checks can be evaluated on submit.
+                        </p>
+                      )}
+                    </div>
+                  </Field>
+                )}
+
+                <Field label="Completion check">
+                  <label style={{ ...s.optionToggleCard, ...(task.check ? s.optionToggleCardActive : {}) }}>
+                    <input
+                      type="checkbox"
+                      checked={!!task.check}
+                      onChange={e => set('check', e.target.checked
+                        ? (isScratch
+                          ? [{ type: 'block_used', evaluation: 'after_run', opcode: 'motion_movesteps' }]
+                          : task.interactionMode === 'submit'
+                            ? [{ type: 'code_contains', value: '' }]
+                            : isPython
+                            ? [{ type: 'code_no_error' }]
+                            : [{ type: 'output_contains', value: '' }])
+                        : null)}
+                      style={s.optionChoiceInput}
+                    />
+                    <span style={s.optionChoiceTitle}>Enable check</span>
+                    <span style={{ ...s.optionChoiceText, ...(task.check ? s.optionChoiceTextActive : {}) }}>
+                      Add completion criteria students can pass.
+                    </span>
+                  </label>
+                  {task.check && isScratch ? (
+                    <ScratchCheckListEditor
+                      checks={normalizeChecks(task.check)}
+                      onChange={checks => set('check', checks)}
+                      sprites={task.sprites?.length > 0 ? task.sprites : DEFAULT_SPRITES}
+                    />
+                  ) : task.check && (
+                    <CheckListEditor
+                      checks={normalizeChecks(task.check)}
+                      onChange={checks => set('check', checks)}
+                      interactionMode={task.interactionMode ?? 'run'}
+                      allowCodeNoError={isPython && task.interactionMode !== 'submit'}
+                      allowDomChecks={!isPython && !isScratch && task.interactionMode !== 'submit'}
+                    />
+                  )}
+                </Field>
+              </div>
+            )}
+          </div>
+        )
+      })()}
+
+      {!isInformation && <div style={s.divider} />}
+
+      {isInformation ? null : isQuiz ? (
+        <>
+          <QuizTypePicker task={task} onQuizTypeChange={handleQuizTypeChange} />
+          {(!task.quizType || task.quizType === 'multiple_choice') ? (
+            <QuizOptionsBuilder task={task} onUpdate={onUpdate} />
+          ) : task.quizType === 'match' ? (
+            <MatchPairsBuilder task={task} onUpdate={onUpdate} />
+          ) : task.quizType === 'fill_blank' ? (
+            <FillBlankBuilder task={task} onUpdate={onUpdate} />
+          ) : task.quizType === 'short_answer' ? (
+            <ShortAnswerBuilder task={task} onUpdate={onUpdate} />
+          ) : null}
+          <div style={s.previewPanel}>
+            <div style={s.previewHeader}>
+              <span style={s.previewTitle}>Student preview</span>
+            </div>
+            <QuizTask
+              task={task}
+              showQuestion
+              selectedAnswer={quizSelectedAnswer}
+              onSelectAnswer={handleQuizPreviewSelect}
+              submitted={runStatus === 'submitted'}
+              checkPassed={checkResults?.every(r => r.passed) ?? false}
             />
-            Enable check
-          </label>
-        </div>
-        {task.check && isScratch ? (
-          <ScratchCheckListEditor
-            checks={normalizeChecks(task.check)}
-            onChange={checks => set('check', checks)}
-            sprites={task.sprites?.length > 0 ? task.sprites : DEFAULT_SPRITES}
-          />
-        ) : task.check && (
-          <CheckListEditor
-            checks={normalizeChecks(task.check)}
-            onChange={checks => set('check', checks)}
-            allowCodeNoError={isPython}
-          />
-        )}
-      </Field>
-
-      <div style={s.divider} />
-
-      {isPython ? (
+            {checkResults !== null && (() => {
+              const allPassed = checkResults.every(r => r.passed)
+              return (
+                <div style={{ border: '1px solid', borderRadius: 8, padding: '10px 14px', fontFamily: 'var(--font-body)', fontSize: '0.88rem', lineHeight: 1.6, background: allPassed ? '#f0fdf4' : '#fffbeb', borderColor: allPassed ? '#bbf7d0' : '#fde68a' }}>
+                  {allPassed
+                    ? 'Check passes — students will see the completion banner.'
+                    : task.quizType === 'match' || task.quizType === 'fill_blank'
+                      ? 'Check does not pass — try placing the correct answers in the preview.'
+                      : 'Check does not pass — review the answer or check configuration.'}
+                </div>
+              )
+            })()}
+          </div>
+        </>
+      ) : isPython ? (
         <>
           <CodeWorkspaceTabs activeTab={codeTab} onChange={handleCodeTabChange} />
 
-          <Field label={isCompleteTab ? 'Complete code' : 'Starter code'}>
-            <div style={s.pythonEditor}>
-              <CodeEditor
-                value={activePythonCode}
-                language="python"
-                onChange={v => isCompleteTab ? set('completeCode', v) : set('starterCode', v)}
-              />
-            </div>
-          </Field>
-
-          <div style={s.runRow}>
-            <button
-              className="btn-primary"
-              onClick={running ? handleStop : handleRun}
-              disabled={!running && pyodideStatus === 'loading'}
-              style={{
-                padding: '10px 28px',
-                fontSize: 15,
-                ...(running ? { backgroundColor: '#ef4444', borderColor: '#ef4444' } : {}),
-              }}
-            >
-              {running ? 'Stop' : pyodideStatus === 'loading' ? 'Getting Python ready...' : 'Run'}
-            </button>
-            {pyodideStatus === 'loading' && (
-              <span style={{ fontFamily: 'var(--font-body)', fontSize: '0.85rem', color: 'var(--colour-primary)' }}>
-                Getting Python ready...
-              </span>
-            )}
+          <div style={s.pythonEditor}>
+            <CodeEditor
+              value={activePythonCode}
+              language="python"
+              onChange={v => isCompleteTab ? set('completeCode', v) : set('starterCode', v)}
+            />
           </div>
 
-          <BuilderOutputPanel
-            output={output}
-            runStatus={runStatus}
-            running={running}
-            inputPrompt={inputPrompt}
-            onInputSubmit={v => { appendOutputRef.current?.(v + '\n'); setInputPrompt(null); provideInput(v) }}
-            checkResults={checkResults}
-          />
+          {task.interactionMode === 'submit' ? (
+            <>
+              <div style={s.runRow}>
+                <button
+                  className="btn-primary"
+                  onClick={handleTestChecks}
+                  disabled={!task.check}
+                  style={{ padding: '10px 28px', fontSize: 15 }}
+                >
+                  Test checks
+                </button>
+                {!task.check && (
+                  <span style={{ fontFamily: 'var(--font-body)', fontSize: '0.85rem', color: '#9ca3af' }}>
+                    No checks configured — add a check to test.
+                  </span>
+                )}
+              </div>
+              {checkResults !== null && (() => {
+                const allPassed = checkResults.every(r => r.passed)
+                return (
+                  <div style={{ border: '1px solid', borderRadius: 8, padding: '10px 14px', fontFamily: 'var(--font-body)', fontSize: '0.88rem', lineHeight: 1.6, background: allPassed ? '#f0fdf4' : '#fffbeb', borderColor: allPassed ? '#bbf7d0' : '#fde68a' }}>
+                    {checkResults.length === 1 ? (
+                      checkResults[0].passed
+                        ? 'Check passes — students will see the completion banner.'
+                        : formatCheckFailure(checkResults[0])
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {checkResults.map((r, i) => (
+                          <div key={i}>{r.passed ? `Check ${i + 1} passes.` : `Check ${i + 1} does not pass — ${formatCheckFailureDetail(r)}`}</div>
+                        ))}
+                        <div style={{ marginTop: 4, fontWeight: 700 }}>{allPassed ? 'All checks pass — students will see the completion banner.' : 'Not all checks pass.'}</div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
+            </>
+          ) : (
+            <>
+              <div style={s.runRow}>
+                <button
+                  className="btn-primary"
+                  onClick={running ? handleStop : handleRun}
+                  disabled={!running && pyodideStatus === 'loading'}
+                  style={{
+                    padding: '10px 28px',
+                    fontSize: 15,
+                    ...(running ? { backgroundColor: '#ef4444', borderColor: '#ef4444' } : {}),
+                  }}
+                >
+                  {running ? 'Stop' : pyodideStatus === 'loading' ? 'Getting Python ready...' : 'Run'}
+                </button>
+                {pyodideStatus === 'loading' && (
+                  <span style={{ fontFamily: 'var(--font-body)', fontSize: '0.85rem', color: 'var(--colour-primary)' }}>
+                    Getting Python ready...
+                  </span>
+                )}
+              </div>
+
+              <BuilderOutputPanel
+                output={output}
+                runStatus={runStatus}
+                running={running}
+                inputPrompt={inputPrompt}
+                onInputSubmit={v => { appendOutputRef.current?.(v + '\n'); setInputPrompt(null); provideInput(v) }}
+                checkResults={checkResults}
+              />
+            </>
+          )}
         </>
       ) : isScratch ? (
         <>
@@ -433,20 +756,22 @@ export default function TaskEditor({ task, lesson, onUpdate }) {
         </>
       ) : (
         <>
-          <CodeWorkspaceTabs activeTab={codeTab} onChange={handleCodeTabChange} />
-
-          <div style={s.htmlSplit}>
-            <div style={s.htmlSplitHeader}>
-              <span style={s.htmlSplitLabel}>{isCompleteTab ? 'Complete files' : 'Starter files'}</span>
+          <CodeWorkspaceTabs
+            activeTab={codeTab}
+            onChange={handleCodeTabChange}
+            rightAction={
               <button
                 className="btn-primary"
-                onClick={handleRun}
-                disabled={running}
-                style={{ padding: '8px 22px', fontSize: 14 }}
+                onClick={task.interactionMode === 'submit' ? handleTestChecks : handleRun}
+                disabled={task.interactionMode === 'submit' ? !task.check : running}
+                style={{ padding: '7px 18px', fontSize: 13 }}
               >
-                {running ? 'Running...' : 'Run'}
+                {task.interactionMode === 'submit' ? 'Test checks' : running ? 'Running...' : 'Run'}
               </button>
-            </div>
+            }
+          />
+
+          <div style={s.htmlSplit}>
             <SplitPane
               defaultSplit={34}
               style={{ flex: 1, minHeight: 0 }}
@@ -520,11 +845,11 @@ export default function TaskEditor({ task, lesson, onUpdate }) {
                           {checkResults.length === 1 ? (
                             checkResults[0].passed
                               ? 'Check passes - students will see the completion banner.'
-                              : `Check does not pass - review your check value ("${checkResults[0].value ?? ''}")`
+                              : formatCheckFailure(checkResults[0])
                           ) : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                               {checkResults.map((r, i) => (
-                                <div key={i}>{r.passed ? `Check ${i + 1} passes.` : `Check ${i + 1} does not pass - review value ("${r.value ?? ''}")`}</div>
+                                <div key={i}>{r.passed ? `Check ${i + 1} passes.` : `Check ${i + 1} does not pass - ${formatCheckFailureDetail(r)}`}</div>
                               ))}
                               <div style={{ marginTop: 4, fontWeight: 700 }}>{allPassed ? 'All checks pass - students will see the completion banner.' : 'Not all checks pass.'}</div>
                             </div>
@@ -567,7 +892,7 @@ export default function TaskEditor({ task, lesson, onUpdate }) {
             />
           </div>
 
-          <div style={{ display: 'none' }}>
+          <div style={task.interactionMode === 'submit' ? { marginTop: 8 } : { display: 'none' }}>
             {checkResults !== null && (() => {
               const allPassed = checkResults.every(r => r.passed)
               return (
@@ -575,11 +900,11 @@ export default function TaskEditor({ task, lesson, onUpdate }) {
                   {checkResults.length === 1 ? (
                     checkResults[0].passed
                       ? 'Check passes - students will see the completion banner.'
-                      : `Check does not pass - review your check value ("${checkResults[0].value ?? ''}")`
+                      : formatCheckFailure(checkResults[0])
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                       {checkResults.map((r, i) => (
-                        <div key={i}>{r.passed ? `✅ Check ${i + 1} passes.` : `⚠️ Check ${i + 1} does not pass - review value ("${r.value ?? ''}")`}</div>
+                        <div key={i}>{r.passed ? `✅ Check ${i + 1} passes.` : `⚠️ Check ${i + 1} does not pass - ${formatCheckFailureDetail(r)}`}</div>
                       ))}
                       <div style={{ marginTop: 4, fontWeight: 700 }}>{allPassed ? '✅ All checks pass - students will see the completion banner.' : '⚠️ Not all checks pass.'}</div>
                     </div>
@@ -604,14 +929,490 @@ export default function TaskEditor({ task, lesson, onUpdate }) {
   )
 }
 
-function CheckListEditor({ checks, onChange, allowCodeNoError = false }) {
-  function updateCheckType(index, type) {
-    const current = checks[index]
-    const next = type === 'code_no_error' || type === 'output_not_empty'
-      ? { type }
-      : { ...current, type, value: current.value ?? '' }
-    updateCheck(index, next)
+function QuizTypePicker({ task, onQuizTypeChange }) {
+  const quizType = task.quizType ?? 'multiple_choice'
+  const types = [
+    { value: 'multiple_choice', label: 'Multiple Choice', meta: 'Pick one answer', icon: 'choice' },
+    { value: 'match', label: 'Match', meta: 'Pair items', icon: 'match' },
+    { value: 'fill_blank', label: 'Fill Blank', meta: 'Complete gaps', icon: 'blank' },
+    { value: 'short_answer', label: 'Short Answer', meta: 'Typed response', icon: 'answer' },
+  ]
+  return (
+    <Field label="Quiz type">
+      <div style={s.quizTypeGrid}>
+        {types.map(t => {
+          const active = quizType === t.value
+          return (
+            <button
+              key={t.value}
+              type="button"
+              style={{ ...s.quizTypeBtn, ...(active ? s.quizTypeBtnActive : {}) }}
+              onClick={() => onQuizTypeChange(t.value)}
+            >
+              <QuizTypeIcon type={t.icon} />
+              <span style={s.quizTypeLabel}>{t.label}</span>
+              <span style={{ ...s.quizTypeMeta, ...(active ? s.quizTypeMetaActive : {}) }}>{t.meta}</span>
+            </button>
+          )
+        })}
+      </div>
+    </Field>
+  )
+}
+
+function MatchPairsBuilder({ task, onUpdate }) {
+  const pairs = task.pairs?.length ? task.pairs : [{ id: 'p1', prompt: '', answer: '' }, { id: 'p2', prompt: '', answer: '' }]
+
+  function renumber(nextPairs) {
+    return nextPairs.map((p, i) => ({ ...p, id: `p${i + 1}` }))
   }
+  function updatePairs(nextPairs) {
+    onUpdate({ ...task, pairs: renumber(nextPairs), _checkTested: false })
+  }
+  function updatePair(index, field, value) {
+    updatePairs(pairs.map((p, i) => i === index ? { ...p, [field]: value } : p))
+  }
+
+  return (
+    <Field label="Pairs (students match left to right)">
+      <div style={s.quizAnswerStack}>
+        {pairs.map((pair, index) => (
+          <div key={pair.id || index} style={s.quizAnswerCard}>
+            <span style={s.quizAnswerBadge}>{index + 1}</span>
+            <div style={s.matchPairEditorRow}>
+              <div style={s.quizAnswerEditorBlock}>
+                <span style={s.quizAnswerLabel}>Prompt</span>
+                <MarkdownFieldEditor
+                  height={132}
+                  minHeight={118}
+                  ariaLabel={`Match prompt ${index + 1} Markdown editor views`}
+                  value={pair.prompt}
+                  onChange={value => updatePair(index, 'prompt', value)}
+                  placeholder={`Prompt ${index + 1} in Markdown`}
+                />
+              </div>
+              <span style={s.matchArrow}>-</span>
+              <div style={s.quizAnswerEditorBlock}>
+                <span style={s.quizAnswerLabel}>Answer</span>
+                <MarkdownFieldEditor
+                  height={132}
+                  minHeight={118}
+                  ariaLabel={`Match answer ${index + 1} Markdown editor views`}
+                  value={pair.answer}
+                  onChange={value => updatePair(index, 'answer', value)}
+                  placeholder={`Correct answer ${index + 1} in Markdown`}
+                />
+              </div>
+            </div>
+            <button
+              type="button"
+              style={s.removeBtn}
+              onClick={() => updatePairs(pairs.filter((_, i) => i !== index))}
+              disabled={pairs.length <= 2}
+              title="Remove pair"
+            >✕</button>
+          </div>
+        ))}
+        <button type="button" className="btn-ghost" style={s.addCheckBtn} onClick={() => updatePairs([...pairs, { id: '', prompt: '', answer: '' }])}>
+          + Add pair
+        </button>
+      </div>
+    </Field>
+  )
+}
+
+function FillBlankBuilder({ task, onUpdate }) {
+  const mode = task.mode ?? 'drag'
+  const text = task.text ?? ''
+  const blanks = task.blanks ?? []
+  const blankCount = (text.match(/___/g) ?? []).length
+
+  function handleTextChange(newText) {
+    const count = (newText.match(/___/g) ?? []).length
+    let newBlanks = [...blanks]
+    while (newBlanks.length < count) newBlanks.push({ id: `b${newBlanks.length + 1}`, answer: '' })
+    if (newBlanks.length > count) newBlanks = newBlanks.slice(0, count)
+    onUpdate({ ...task, text: newText, blanks: newBlanks, _checkTested: false })
+  }
+
+  function updateBlank(index, answer) {
+    const next = blanks.map((b, i) => i === index ? { ...b, answer } : b)
+    onUpdate({ ...task, blanks: next, _checkTested: false })
+  }
+
+  return (
+    <>
+      <Field label="Mode">
+        <div style={{ display: 'flex', gap: 24 }}>
+          <label style={s.carryRadioLabel}>
+            <input type="radio" checked={mode === 'drag'} onChange={() => onUpdate({ ...task, mode: 'drag' })} />
+            Drag and drop
+          </label>
+          <label style={s.carryRadioLabel}>
+            <input type="radio" checked={mode === 'type'} onChange={() => onUpdate({ ...task, mode: 'type' })} />
+            Type answer
+          </label>
+        </div>
+      </Field>
+      <Field label="Text (use ___ for each blank)">
+        <MarkdownFieldEditor
+          height={150}
+          minHeight={130}
+          ariaLabel="Fill in the blank text Markdown editor views"
+          value={text}
+          onChange={handleTextChange}
+          placeholder="e.g. Python uses ___ to print output and ___ to get input."
+        />
+        <span style={{ fontFamily: 'var(--font-body)', fontSize: '0.82rem', color: '#6b7280' }}>
+          {blankCount} blank{blankCount !== 1 ? 's' : ''} detected
+        </span>
+      </Field>
+      {blanks.length > 0 && (
+        <Field label="Correct answers (in order)">
+          <div style={s.quizAnswerStack}>
+            {blanks.map((blank, index) => (
+              <div key={blank.id} style={s.quizAnswerCard}>
+                <span style={s.quizAnswerBadge}>{index + 1}</span>
+                <div style={s.quizAnswerEditorBlock}>
+                  <span style={s.quizAnswerLabel}>Blank {index + 1}</span>
+                <MarkdownFieldEditor
+                  height={118}
+                  minHeight={104}
+                  ariaLabel={`Blank ${index + 1} answer Markdown editor views`}
+                  value={blank.answer}
+                  onChange={value => updateBlank(index, value)}
+                  placeholder={`Answer for blank ${index + 1}`}
+                />
+                </div>
+              </div>
+            ))}
+          </div>
+        </Field>
+      )}
+    </>
+  )
+}
+
+function ShortAnswerBuilder({ task, onUpdate }) {
+  const check = task.check ?? { type: 'answer_contains', value: '' }
+
+  function updateCheck(updates) {
+    onUpdate({ ...task, check: { ...check, ...updates }, _checkTested: false })
+  }
+
+  return (
+    <Field label="Completion check">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <select
+          style={s.select}
+          value={check.type ?? 'answer_contains'}
+          onChange={e => updateCheck({ type: e.target.value })}
+        >
+          <option value="answer_contains">Answer contains</option>
+          <option value="answer_equals">Answer equals (exact match)</option>
+          <option value="answer_matches_regex">Answer matches regex</option>
+        </select>
+        <textarea
+          style={s.checkValue}
+          value={check.value ?? ''}
+          onChange={e => updateCheck({ value: e.target.value })}
+          placeholder={
+            check.type === 'answer_equals' ? 'Exact expected answer…'
+            : check.type === 'answer_matches_regex' ? 'Regular expression…'
+            : 'Text that the answer must contain…'
+          }
+        />
+        <textarea
+          style={{ ...s.checkValue, minHeight: 74 }}
+          value={check.hint ?? ''}
+          onChange={e => updateCheck({ hint: e.target.value })}
+          placeholder="Suggestion shown when this answer is wrong..."
+        />
+        <p style={{ margin: 0, fontFamily: 'var(--font-body)', fontSize: '0.82rem', color: '#6b7280', lineHeight: 1.5 }}>
+          Matching is case-insensitive. Test by typing an answer in the student preview below.
+        </p>
+      </div>
+    </Field>
+  )
+}
+
+function QuizOptionsBuilder({ task, onUpdate }) {
+  const options = task.options?.length ? task.options : [{ id: 'a', text: '' }, { id: 'b', text: '' }]
+  const correctAnswer = task.check?.type === 'answer_equals' ? task.check.value : ''
+
+  function renumber(nextOptions) {
+    return nextOptions.map((option, index) => ({
+      ...option,
+      id: String.fromCharCode(97 + index),
+    }))
+  }
+
+  function updateOptions(nextOptions, nextAnswer = correctAnswer) {
+    const renumbered = renumber(nextOptions)
+    const answer = renumbered.some(option => option.id === nextAnswer) ? nextAnswer : ''
+    const existingHint = task.check?.hint ? { hint: task.check.hint } : {}
+    onUpdate({
+      ...task,
+      options: renumbered,
+      check: answer ? { type: 'answer_equals', value: answer, ...existingHint } : null,
+      _checkTested: false,
+    })
+  }
+
+  function setCorrectAnswer(answer) {
+    onUpdate({
+      ...task,
+      check: { type: 'answer_equals', value: answer, ...(task.check?.hint ? { hint: task.check.hint } : {}) },
+      _checkTested: false,
+    })
+  }
+
+  return (
+    <Field label="Options">
+      <div style={s.quizOptions}>
+        {options.map((option, index) => (
+          <div key={option.id} style={s.quizOptionCard}>
+            <label style={s.quizCorrectLabel}>
+              <span style={s.quizOptionId}>{option.id}</span>
+              <input
+                type="radio"
+                name={`quiz-correct-${task.id}`}
+                checked={correctAnswer === option.id}
+                onChange={() => setCorrectAnswer(option.id)}
+              />
+              <span style={{ ...s.quizCorrectPill, ...(correctAnswer === option.id ? s.quizCorrectPillActive : {}) }}>
+                Correct
+              </span>
+            </label>
+            <div style={s.quizOptionEditor}>
+              <MarkdownFieldEditor
+                height={132}
+                minHeight={118}
+                ariaLabel={`Option ${option.id.toUpperCase()} Markdown editor views`}
+                value={option.text}
+                onChange={value => updateOptions(options.map((o, i) => i === index ? { ...o, text: value } : o))}
+                placeholder={`Option ${option.id.toUpperCase()} in Markdown`}
+              />
+              <textarea
+                style={{ ...s.checkValue, minHeight: 74 }}
+                value={option.feedback ?? ''}
+                onChange={e => updateOptions(options.map((o, i) => i === index ? { ...o, feedback: e.target.value } : o))}
+                placeholder="Feedback shown if students choose this wrong answer..."
+              />
+            </div>
+            <button
+              type="button"
+              style={s.removeBtn}
+              onClick={() => updateOptions(options.filter((_, i) => i !== index))}
+              disabled={options.length <= 2}
+              title="Remove option"
+            >
+              x
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          className="btn-ghost"
+          style={s.addCheckBtn}
+          onClick={() => updateOptions([...options, { id: '', text: '' }])}
+        >
+          + Add option
+        </button>
+      </div>
+    </Field>
+  )
+}
+
+function formatCheckFailure(result) {
+  return `Check does not pass - ${formatCheckFailureDetail(result)}`
+}
+
+function formatCheckFailureDetail(result) {
+  if (result.type === 'element_exists') return `no element matches selector "${result.selector ?? ''}"`
+  if (result.type === 'element_count') return `expected ${result.value ?? ''} elements matching selector "${result.selector ?? ''}"`
+  if (result.type === 'element_value') return `review expected text or input value "${result.value ?? ''}"`
+  return `review your check value "${result.value ?? ''}"`
+}
+
+function subjectOpFromType(type) {
+  const map = {
+    'code_no_error':               { subject: 'output',  operator: 'no_error' },
+    'output_not_empty':            { subject: 'output',  operator: 'not_empty' },
+    'output_contains':             { subject: 'output',  operator: 'contains' },
+    'output_equals':               { subject: 'output',  operator: 'equals' },
+    'output_not_contains':         { subject: 'output',  operator: 'not_contains' },
+    'output_not_equals':           { subject: 'output',  operator: 'not_equals' },
+    'output_matches_regex':        { subject: 'output',  operator: 'matches_regex' },
+    'output_line_count':           { subject: 'output',  operator: 'line_count' },
+    'code_contains':               { subject: 'code',    operator: 'contains' },
+    'code_equals':                 { subject: 'code',    operator: 'equals' },
+    'code_does_not_contain':       { subject: 'code',    operator: 'not_contains' },
+    'code_not_equals':             { subject: 'code',    operator: 'not_equals' },
+    'code_matches_regex':          { subject: 'code',    operator: 'matches_regex' },
+    'element_exists':              { subject: 'element', operator: 'exists' },
+    'element_count':               { subject: 'element', operator: 'count' },
+    'element_value':               { subject: 'element', operator: 'value_contains' },
+    'element_value_equals':        { subject: 'element', operator: 'value_equals' },
+    'element_value_not_contains':  { subject: 'element', operator: 'value_not_contains' },
+    'element_value_not_equals':    { subject: 'element', operator: 'value_not_equals' },
+    'element_value_matches_regex': { subject: 'element', operator: 'value_matches_regex' },
+  }
+  return map[type] ?? { subject: 'output', operator: 'contains' }
+}
+
+function typeFromSubjectOp(subject, operator) {
+  const maps = {
+    output: {
+      no_error:      'code_no_error',
+      contains:      'output_contains',
+      equals:        'output_equals',
+      not_contains:  'output_not_contains',
+      not_equals:    'output_not_equals',
+      matches_regex: 'output_matches_regex',
+      not_empty:     'output_not_empty',
+      line_count:    'output_line_count',
+    },
+    code: {
+      contains:      'code_contains',
+      equals:        'code_equals',
+      not_contains:  'code_does_not_contain',
+      not_equals:    'code_not_equals',
+      matches_regex: 'code_matches_regex',
+    },
+    element: {
+      exists:              'element_exists',
+      count:               'element_count',
+      value_contains:      'element_value',
+      value_equals:        'element_value_equals',
+      value_not_contains:  'element_value_not_contains',
+      value_not_equals:    'element_value_not_equals',
+      value_matches_regex: 'element_value_matches_regex',
+    },
+  }
+  return maps[subject]?.[operator] ?? 'output_contains'
+}
+
+function getOperatorOptions(subject, { allowCodeNoError }) {
+  if (subject === 'output') return [
+    ...(allowCodeNoError ? [{ value: 'no_error', label: 'no error' }] : []),
+    { value: 'contains',      label: 'contains' },
+    { value: 'equals',        label: 'equals' },
+    { value: 'not_contains',  label: 'does not contain' },
+    { value: 'not_equals',    label: 'does not equal' },
+    { value: 'matches_regex', label: 'matches regex' },
+    { value: 'not_empty',     label: 'is not empty' },
+    { value: 'line_count',    label: 'line count equals' },
+  ]
+  if (subject === 'code') return [
+    { value: 'contains',      label: 'contains' },
+    { value: 'equals',        label: 'equals' },
+    { value: 'not_contains',  label: 'does not contain' },
+    { value: 'not_equals',    label: 'does not equal' },
+    { value: 'matches_regex', label: 'matches regex' },
+  ]
+  if (subject === 'element') return [
+    { value: 'exists',              label: 'exists' },
+    { value: 'count',               label: 'count equals' },
+    { value: 'value_contains',      label: 'value contains' },
+    { value: 'value_equals',        label: 'value equals' },
+    { value: 'value_not_contains',  label: 'value does not contain' },
+    { value: 'value_not_equals',    label: 'value does not equal' },
+    { value: 'value_matches_regex', label: 'value matches regex' },
+  ]
+  return []
+}
+
+function makeCheckSkeleton(type, prev = {}) {
+  const hint = prev.hint ? { hint: prev.hint } : {}
+  if (type === 'code_no_error' || type === 'output_not_empty') return { type, ...hint }
+  if (type === 'element_exists') return { type, selector: prev.selector ?? '', ...hint }
+  if (type === 'element_count') return { type, selector: prev.selector ?? '', value: prev.value ?? '1', ...hint }
+  if (type === 'element_value' || type === 'element_value_equals' || type === 'element_value_not_contains' || type === 'element_value_not_equals' || type === 'element_value_matches_regex') {
+    return { type, selector: prev.selector ?? '', value: prev.value ?? '', ...hint }
+  }
+  return { type, value: prev.value ?? '', ...hint }
+}
+
+function CheckValueEditor({ check, subject, operator, onChange }) {
+  if (check.type === 'code_no_error') {
+    return <div style={s.checkHelp}>Passes when Python runs without an error.</div>
+  }
+  if (check.type === 'output_not_empty') {
+    return <div style={s.checkHelp}>Passes when the run produces any visible output.</div>
+  }
+
+  if (subject === 'element') {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <input
+          style={{ ...s.input, fontFamily: "'JetBrains Mono', monospace", fontSize: '0.88rem' }}
+          value={check.selector ?? ''}
+          onChange={e => onChange({ ...check, selector: e.target.value })}
+          placeholder="CSS selector, e.g. h1  .myClass  #myId  input[type=text]"
+        />
+        {operator === 'exists' && (
+          <div style={s.checkHelp}>Passes when at least one matching element exists in the page.</div>
+        )}
+        {operator === 'count' && (
+          <input
+            style={{ ...s.input, width: 160 }}
+            type="number"
+            min="0"
+            value={check.value ?? '1'}
+            onChange={e => onChange({ ...check, value: e.target.value })}
+            placeholder="Expected count"
+          />
+        )}
+        {operator !== 'exists' && operator !== 'count' && (
+          <input
+            style={s.input}
+            value={check.value ?? ''}
+            onChange={e => onChange({ ...check, value: e.target.value })}
+            placeholder={
+              operator === 'value_matches_regex' ? 'Regular expression, e.g. ^\\d+$  (matched case-insensitively)'
+              : operator === 'value_equals'        ? 'Exact text or input value...'
+              : operator === 'value_not_contains'  ? 'Text that must NOT be present...'
+              : operator === 'value_not_equals'    ? 'Value it must NOT equal...'
+              :                                      'Text that value must contain...'
+            }
+          />
+        )}
+      </div>
+    )
+  }
+
+  if (check.type === 'output_line_count') {
+    return (
+      <input
+        style={{ ...s.input, width: 160 }}
+        type="number"
+        min="0"
+        value={check.value ?? ''}
+        onChange={e => onChange({ ...check, value: e.target.value })}
+        placeholder="Expected number of lines"
+      />
+    )
+  }
+
+  return (
+    <textarea
+      style={s.checkValue}
+      value={check.value ?? ''}
+      onChange={e => onChange({ ...check, value: e.target.value })}
+      placeholder={
+        operator === 'matches_regex' ? 'Regular expression, e.g. ^\\d+$  (matched against lowercased output)'
+        : operator === 'equals'       ? 'Exact expected value...'
+        : operator === 'not_equals'   ? 'Value it must NOT equal...'
+        : operator === 'not_contains' ? 'String that must NOT be present...'
+        :                               'String that must be present...'
+      }
+    />
+  )
+}
+
+function CheckListEditor({ checks, onChange, interactionMode = 'run', allowCodeNoError = false, allowDomChecks = false }) {
+  const submitMode = interactionMode === 'submit'
 
   function updateCheck(index, updated) {
     onChange(checks.map((c, i) => i === index ? updated : c))
@@ -620,50 +1421,69 @@ function CheckListEditor({ checks, onChange, allowCodeNoError = false }) {
     onChange(checks.filter((_, i) => i !== index))
   }
   function addCheck() {
-    onChange([...checks, allowCodeNoError ? { type: 'code_no_error' } : { type: 'output_contains', value: '' }])
+    onChange([...checks, submitMode ? { type: 'code_contains', value: '' } : allowCodeNoError ? { type: 'code_no_error' } : { type: 'output_contains', value: '' }])
+  }
+
+  function handleSubjectChange(index, newSubject) {
+    const current = checks[index]
+    const defaultOp = newSubject === 'output' ? (allowCodeNoError ? 'no_error' : 'contains')
+      : newSubject === 'code' ? 'contains'
+      : 'exists'
+    updateCheck(index, makeCheckSkeleton(typeFromSubjectOp(newSubject, defaultOp), current))
+  }
+
+  function handleOperatorChange(index, newOperator) {
+    const current = checks[index]
+    const { subject } = subjectOpFromType(current.type)
+    updateCheck(index, makeCheckSkeleton(typeFromSubjectOp(subject, newOperator), current))
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
-      {checks.map((check, index) => (
-        <div key={index} style={s.checkRow}>
-          {checks.length > 1 && (
-            <span style={s.checkIndexLabel}>#{index + 1}</span>
-          )}
-          <div style={s.checkEditor}>
-            <select style={{ ...s.select, flex: '0 0 auto' }} value={check.type} onChange={e => updateCheckType(index, e.target.value)}>
-              {allowCodeNoError && <option value="code_no_error">code_no_error</option>}
-              <option value="output_contains">output_contains</option>
-              <option value="output_equals">output_equals</option>
-              <option value="output_line_count">output_line_count</option>
-              <option value="output_not_empty">output_not_empty</option>
-            </select>
-            {check.type === 'code_no_error' || check.type === 'output_not_empty' ? (
-              <div style={s.checkHelp}>
-                {check.type === 'code_no_error'
-                  ? 'Passes when Python runs without an error.'
-                  : 'Passes when the run produces any visible output.'}
-              </div>
-            ) : (
-              <textarea
-                style={s.checkValue}
-                value={check.value ?? ''}
-                onChange={e => updateCheck(index, { ...check, value: e.target.value })}
-                placeholder={
-                  check.type === 'output_line_count'
-                    ? 'Expected number of output lines...'
-                    : check.type === 'output_equals'
-                      ? 'Exact output expected...'
-                      : 'String that output must contain...'
-                }
+      {checks.map((check, index) => {
+        const { subject, operator } = subjectOpFromType(check.type)
+        const operatorOptions = getOperatorOptions(subject, { allowCodeNoError })
+        return (
+          <div key={index} style={s.checkRow}>
+            {checks.length > 1 && <span style={s.checkIndexLabel}>#{index + 1}</span>}
+            <div style={s.checkEditor}>
+              <select
+                style={{ ...s.select, flex: '0 0 auto' }}
+                value={subject}
+                onChange={e => handleSubjectChange(index, e.target.value)}
+              >
+                {!submitMode && <option value="output">Output</option>}
+                <option value="code">Code</option>
+                {allowDomChecks && <option value="element">Element</option>}
+              </select>
+              <select
+                style={{ ...s.select, flex: '0 0 auto' }}
+                value={operator}
+                onChange={e => handleOperatorChange(index, e.target.value)}
+              >
+                {operatorOptions.map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+              <CheckValueEditor
+                check={check}
+                subject={subject}
+                operator={operator}
+                onChange={updated => updateCheck(index, updated)}
               />
+              <textarea
+                style={{ ...s.checkValue, gridColumn: '1 / -1', minHeight: 74 }}
+                value={check.hint ?? ''}
+                onChange={e => updateCheck(index, { ...check, hint: e.target.value })}
+                placeholder="Suggestion shown in the completion banner when this check fails..."
+              />
+            </div>
+            {checks.length > 1 && (
+              <button type="button" style={s.removeCheckBtn} onClick={() => removeCheck(index)} title="Remove check">×</button>
             )}
           </div>
-          {checks.length > 1 && (
-            <button type="button" style={s.removeCheckBtn} onClick={() => removeCheck(index)} title="Remove check">×</button>
-          )}
-        </div>
-      ))}
+        )
+      })}
       <button type="button" className="btn-ghost" style={s.addCheckBtn} onClick={addCheck}>
         + Add check
       </button>
@@ -845,7 +1665,7 @@ export function ScratchToolboxPicker({ toolbox, onChange }) {
         <input
           type="checkbox"
           checked={usesAllBlocks}
-          onChange={e => onChange(e.target.checked ? '' : buildScratchToolboxXml(SCRATCH_ALL_BLOCK_TYPES))}
+          onChange={e => onChange(e.target.checked ? '' : buildScratchToolboxXml([]))}
         />
         <span>All blocks</span>
       </label>
@@ -938,6 +1758,7 @@ function ScratchCheckEditor({ check, onChange, sprites = [{ id: 'sprite1', name:
         property: 'x',
         operator: 'greater_than',
         value: 50,
+        ...(check.hint ? { hint: check.hint } : {}),
       })
       return
     }
@@ -948,11 +1769,12 @@ function ScratchCheckEditor({ check, onChange, sprites = [{ id: 'sprite1', name:
         evaluation: 'manual',
         variableName: 'score',
         value: 10,
+        ...(check.hint ? { hint: check.hint } : {}),
       })
       return
     }
 
-    onChange({ type: 'block_used', evaluation: 'manual', opcode: 'motion_movesteps' })
+    onChange({ type: 'block_used', evaluation: 'manual', opcode: 'motion_movesteps', ...(check.hint ? { hint: check.hint } : {}) })
   }
 
   return (
@@ -1034,15 +1856,22 @@ function ScratchCheckEditor({ check, onChange, sprites = [{ id: 'sprite1', name:
           />
         </>
       )}
+      <textarea
+        style={{ ...s.checkValue, minHeight: 74 }}
+        value={check.hint ?? ''}
+        onChange={e => onChange({ ...check, hint: e.target.value })}
+        placeholder="Suggestion shown in the completion banner when this check fails..."
+      />
     </div>
   )
 }
 
-function CodeWorkspaceTabs({ activeTab, onChange, starterLabel = 'Starter code', testLabel = 'Complete code' }) {
+function CodeWorkspaceTabs({ activeTab, onChange, starterLabel = 'Starter code', testLabel = 'Complete code', rightAction = null }) {
   return (
-    <div style={s.workspaceTabs} role="tablist" aria-label="Code workspace">
+    <div style={s.workspaceTabs} className="ui-tabs ui-tabs--editor" role="tablist" aria-label="Code workspace">
       <button
         type="button"
+        className="ui-tab"
         role="tab"
         aria-selected={activeTab === 'starter'}
         style={{ ...s.workspaceTab, ...(activeTab === 'starter' ? s.workspaceTabActive : {}) }}
@@ -1052,6 +1881,7 @@ function CodeWorkspaceTabs({ activeTab, onChange, starterLabel = 'Starter code',
       </button>
       <button
         type="button"
+        className="ui-tab"
         role="tab"
         aria-selected={activeTab === 'complete'}
         style={{ ...s.workspaceTab, ...(activeTab === 'complete' ? s.workspaceTabActive : {}) }}
@@ -1059,6 +1889,7 @@ function CodeWorkspaceTabs({ activeTab, onChange, starterLabel = 'Starter code',
       >
         {testLabel}
       </button>
+      {rightAction && <div style={s.workspaceTabActions}>{rightAction}</div>}
     </div>
   )
 }
@@ -1079,6 +1910,145 @@ function Modal({ title, children, onClose }) {
   )
 }
 
+function CarryThroughPicker({ task, lesson, onUpdate, isScratch, isPython }) {
+  const taskIndex = lesson.tasks.findIndex(t => t.id === task.id)
+  const prevTask = taskIndex > 0 ? lesson.tasks[taskIndex - 1] : null
+  const otherTasks = lesson.tasks.filter(t => t.id !== task.id)
+
+  const carryField = isScratch ? 'carryBlocksFrom' : 'carryCodeFrom'
+  const carryFrom = isScratch ? task.carryBlocksFrom : task.carryCodeFrom
+
+  const mode = carryFrom == null
+    ? 'new'
+    : (prevTask && carryFrom === prevTask.id ? 'last' : 'other')
+
+  function copyCompleteCode(sourceTask) {
+    const updates = { [carryField]: sourceTask.id }
+    if (isPython) {
+      updates.starterCode = sourceTask.completeCode ?? sourceTask.starterCode ?? ''
+    } else if (isScratch) {
+      updates.starterBlocks = sourceTask.completeBlocks ?? sourceTask.starterBlocks ?? null
+    } else {
+      updates.starterFiles = (sourceTask.completeFiles ?? sourceTask.starterFiles ?? []).map(f => ({ ...f }))
+      const newEntry = sourceTask.completeEntryFile ?? sourceTask.entryFile
+      if (newEntry) updates.entryFile = newEntry
+    }
+    onUpdate({ ...task, ...updates })
+  }
+
+  function handleOther() {
+    const defaultTask = otherTasks.find(t => t.id !== prevTask?.id) ?? otherTasks[0]
+    if (defaultTask) copyCompleteCode(defaultTask)
+  }
+
+  const radioName = `carry-${task.id}`
+
+  return (
+    <Field label={isScratch ? 'Carry blocks from task' : 'Carry code from task'}>
+      <div style={s.carryRadioGroup}>
+        <label style={{
+          ...s.optionChoiceCard,
+          ...(mode === 'last' ? s.optionChoiceCardActive : {}),
+          ...(!prevTask ? s.optionChoiceCardDisabled : {}),
+        }}>
+          <input
+            type="radio"
+            name={radioName}
+            checked={mode === 'last'}
+            disabled={!prevTask}
+            onChange={() => prevTask && copyCompleteCode(prevTask)}
+            style={s.optionChoiceInput}
+          />
+          <span style={s.optionChoiceTitle}>Carry from last task</span>
+          <span style={{ ...s.optionChoiceText, ...(mode === 'last' ? s.optionChoiceTextActive : {}) }}>
+            {prevTask ? `${prevTask.id}. ${prevTask.title || 'Untitled'}` : 'No previous task'}
+          </span>
+        </label>
+
+        <label style={{ ...s.optionChoiceCard, ...(mode === 'new' ? s.optionChoiceCardActive : {}) }}>
+          <input
+            type="radio"
+            name={radioName}
+            checked={mode === 'new'}
+            onChange={() => onUpdate({ ...task, [carryField]: null })}
+            style={s.optionChoiceInput}
+          />
+          <span style={s.optionChoiceTitle}>New starter code</span>
+          <span style={{ ...s.optionChoiceText, ...(mode === 'new' ? s.optionChoiceTextActive : {}) }}>
+            Start this task from its own starter content.
+          </span>
+        </label>
+
+        <label style={{
+          ...s.optionChoiceCard,
+          ...(mode === 'other' ? s.optionChoiceCardActive : {}),
+          ...(otherTasks.length === 0 ? s.optionChoiceCardDisabled : {}),
+        }}>
+          <input
+            type="radio"
+            name={radioName}
+            checked={mode === 'other'}
+            disabled={otherTasks.length === 0}
+            onChange={handleOther}
+            style={s.optionChoiceInput}
+          />
+          <span style={s.optionChoiceTitle}>From other task</span>
+          <span style={{ ...s.optionChoiceText, ...(mode === 'other' ? s.optionChoiceTextActive : {}) }}>
+            Copy complete code from a chosen task.
+          </span>
+        </label>
+
+        {mode === 'other' && (
+          <select
+            style={s.select}
+            value={carryFrom ?? ''}
+            onChange={e => {
+              const sourceTask = lesson.tasks.find(t => t.id === parseInt(e.target.value, 10))
+              if (sourceTask) copyCompleteCode(sourceTask)
+            }}
+          >
+            {otherTasks.map(t => (
+              <option key={t.id} value={t.id}>{t.id}. {t.title || 'Untitled'}</option>
+            ))}
+          </select>
+        )}
+      </div>
+    </Field>
+  )
+}
+
+function TaskFormatIcon({ type }) {
+  const common = { width: 24, height: 24, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round' }
+  if (type === 'scratch') return (
+    <svg {...common}>
+      <rect x="2" y="2" width="9" height="9" rx="1.5" />
+      <rect x="13" y="2" width="9" height="9" rx="1.5" />
+      <rect x="2" y="13" width="9" height="9" rx="1.5" />
+      <rect x="13" y="13" width="9" height="9" rx="1.5" />
+    </svg>
+  )
+  if (type === 'information') return (
+    <svg {...common}>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 16v-4" />
+      <path d="M12 8h.01" />
+    </svg>
+  )
+  if (type === 'quiz') return (
+    <svg {...common}>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+      <path d="M12 17h.01" />
+    </svg>
+  )
+  return (
+    <svg {...common}>
+      <polyline points="16 18 22 12 16 6" />
+      <polyline points="8 6 2 12 8 18" />
+    </svg>
+  )
+}
+
 function Field({ label, children }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -1087,6 +2057,44 @@ function Field({ label, children }) {
       </span>
       {children}
     </div>
+  )
+}
+
+function QuizTypeIcon({ type }) {
+  const common = { width: 22, height: 22, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: '2', strokeLinecap: 'round', strokeLinejoin: 'round' }
+  if (type === 'match') return (
+    <svg {...common}>
+      <path d="M7 7h.01" />
+      <path d="M7 17h.01" />
+      <path d="M17 7h.01" />
+      <path d="M17 17h.01" />
+      <path d="M8 7h8" />
+      <path d="M8 17h8" />
+    </svg>
+  )
+  if (type === 'blank') return (
+    <svg {...common}>
+      <path d="M4 7h16" />
+      <path d="M4 12h6" />
+      <path d="M14 12h6" />
+      <path d="M4 17h16" />
+    </svg>
+  )
+  if (type === 'answer') return (
+    <svg {...common}>
+      <path d="M4 5h16" />
+      <path d="M4 12h10" />
+      <path d="M4 19h7" />
+      <path d="M15 18l2 2 4-5" />
+    </svg>
+  )
+  return (
+    <svg {...common}>
+      <circle cx="7" cy="7" r="2" />
+      <path d="M11 7h8" />
+      <circle cx="7" cy="17" r="2" />
+      <path d="M11 17h8" />
+    </svg>
   )
 }
 
@@ -1340,6 +2348,57 @@ const s = {
     maxWidth: 1120,
     margin: '0 auto',
   },
+  optionsSection: {
+    border: '1px solid var(--ui-border)',
+    borderRadius: 8,
+    overflow: 'hidden',
+    background: '#fff',
+    boxShadow: '0 5px 16px rgba(40, 22, 78, 0.06)',
+  },
+  optionsSectionToggle: {
+    width: '100%',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    padding: '12px 14px',
+    background: 'linear-gradient(180deg, #ffffff 0%, var(--ui-surface-soft) 100%)',
+    border: 'none',
+    cursor: 'pointer',
+    textAlign: 'left',
+    boxShadow: 'none',
+  },
+  optionsSectionTitle: {
+    fontFamily: 'var(--font-body)',
+    fontWeight: 700,
+    fontSize: '0.88rem',
+    color: 'var(--colour-text)',
+    flexShrink: 0,
+  },
+  optionsSummaryText: {
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.82rem',
+    color: '#6b7280',
+    flex: 1,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  optionsChevron: {
+    marginLeft: 'auto',
+    color: 'var(--colour-primary)',
+    fontSize: '1rem',
+    lineHeight: 1,
+    flexShrink: 0,
+    transition: 'transform 0.15s ease',
+  },
+  optionsBody: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 16,
+    padding: '16px',
+    borderTop: '1px solid var(--ui-border)',
+    background: '#fff',
+  },
   input: {
     padding: '8px 10px',
     border: '1px solid #e5e7eb',
@@ -1408,7 +2467,7 @@ const s = {
   },
   checkEditor: {
     display: 'grid',
-    gridTemplateColumns: 'max-content minmax(0, 1fr)',
+    gridTemplateColumns: 'max-content max-content minmax(0, 1fr)',
     gap: 8,
     alignItems: 'start',
     flex: 1,
@@ -1435,6 +2494,215 @@ const s = {
     fontSize: '0.86rem',
     color: '#4b5563',
     background: '#f9fafb',
+  },
+  hintsEditor: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+    border: '1px solid #e5e7eb',
+    borderRadius: 8,
+    background: '#fff',
+    padding: 10,
+  },
+  hintsEmpty: {
+    margin: 0,
+    color: '#9ca3af',
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.86rem',
+  },
+  hintRow: {
+    display: 'grid',
+    gridTemplateColumns: '72px minmax(0, 1fr) 28px',
+    gap: 8,
+    alignItems: 'start',
+  },
+  hintIndex: {
+    paddingTop: 9,
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.82rem',
+    fontWeight: 700,
+    color: 'var(--colour-primary)',
+  },
+  hintInput: {
+    padding: '8px 10px',
+    border: '1px solid #e5e7eb',
+    borderRadius: 6,
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.9rem',
+    color: 'var(--colour-text)',
+    outline: 'none',
+    resize: 'vertical',
+    minHeight: 38,
+    lineHeight: 1.45,
+  },
+  addHintBtn: {
+    alignSelf: 'flex-start',
+    color: 'var(--colour-primary)',
+    border: '1px dashed var(--colour-primary)',
+    padding: '6px 12px',
+    fontSize: '0.83rem',
+  },
+  quizOptions: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 10,
+  },
+  quizTypeGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+    gap: 10,
+  },
+  quizTypeBtn: {
+    minHeight: 92,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    padding: '12px 8px',
+    border: '2px solid #e5e7eb',
+    borderRadius: 10,
+    background: '#fff',
+    color: 'var(--colour-primary)',
+    cursor: 'pointer',
+    transition: 'border-color 0.12s, background 0.12s, color 0.12s',
+  },
+  quizTypeBtnActive: {
+    borderColor: 'var(--colour-primary)',
+    background: 'var(--colour-primary)',
+    color: '#fff',
+  },
+  quizTypeLabel: {
+    fontFamily: 'var(--font-body)',
+    fontWeight: 700,
+    fontSize: '0.82rem',
+    lineHeight: 1.1,
+    textAlign: 'center',
+  },
+  quizTypeMeta: {
+    fontFamily: 'var(--font-body)',
+    fontWeight: 600,
+    fontSize: '0.72rem',
+    lineHeight: 1.2,
+    color: '#6b7280',
+    textAlign: 'center',
+  },
+  quizTypeMetaActive: {
+    color: 'rgba(255, 255, 255, 0.82)',
+  },
+  quizOptionCard: {
+    display: 'grid',
+    gridTemplateColumns: '116px minmax(0, 1fr) 32px',
+    gap: 10,
+    alignItems: 'start',
+    padding: 10,
+    border: '1px solid var(--ui-border)',
+    borderRadius: 8,
+    background: 'var(--ui-surface-soft)',
+  },
+  quizCorrectLabel: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 7,
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.86rem',
+    color: 'var(--colour-text)',
+    cursor: 'pointer',
+    paddingTop: 2,
+  },
+  quizOptionId: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    background: 'var(--colour-primary)',
+    color: '#fff',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontFamily: 'var(--font-title)',
+    fontWeight: 700,
+    textTransform: 'uppercase',
+  },
+  quizCorrectPill: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    minHeight: 24,
+    padding: '4px 8px',
+    border: '1px solid var(--ui-border)',
+    borderRadius: 999,
+    background: '#fff',
+    color: '#6b7280',
+    fontFamily: 'var(--font-body)',
+    fontWeight: 700,
+    fontSize: '0.72rem',
+    lineHeight: 1,
+  },
+  quizCorrectPillActive: {
+    borderColor: '#22c55e',
+    background: '#f0fdf4',
+    color: '#15803d',
+  },
+  quizOptionEditor: {
+    minWidth: 0,
+  },
+  quizAnswerStack: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 10,
+  },
+  quizAnswerCard: {
+    display: 'grid',
+    gridTemplateColumns: '34px minmax(0, 1fr) 32px',
+    gap: 10,
+    alignItems: 'start',
+    padding: 10,
+    border: '1px solid var(--ui-border)',
+    borderRadius: 8,
+    background: 'var(--ui-surface-soft)',
+  },
+  quizAnswerBadge: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    background: 'var(--colour-primary)',
+    color: '#fff',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontFamily: 'var(--font-title)',
+    fontWeight: 700,
+    fontSize: '0.86rem',
+  },
+  quizAnswerEditorBlock: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 6,
+    minWidth: 0,
+  },
+  quizAnswerLabel: {
+    fontFamily: 'var(--font-body)',
+    fontWeight: 700,
+    fontSize: '0.76rem',
+    color: 'var(--colour-primary)',
+  },
+  matchPairEditorRow: {
+    display: 'grid',
+    gridTemplateColumns: 'minmax(0, 1fr) 20px minmax(0, 1fr)',
+    gap: 10,
+    alignItems: 'start',
+  },
+  matchArrow: {
+    alignSelf: 'center',
+    justifySelf: 'center',
+    width: 18,
+    height: 2,
+    borderRadius: 999,
+    background: 'var(--ui-border-strong)',
+    color: 'transparent',
+    userSelect: 'none',
   },
   scratchCheckEditor: {
     display: 'grid',
@@ -1742,6 +3010,12 @@ const s = {
     background: 'var(--colour-primary)',
     color: '#fff',
   },
+  workspaceTabActions: {
+    marginLeft: 'auto',
+    display: 'flex',
+    alignItems: 'center',
+    paddingLeft: 8,
+  },
   pythonEditor: {
     height: 300,
     border: '1px solid #e5e7eb',
@@ -1762,6 +3036,17 @@ const s = {
     borderRadius: 8,
     background: '#fff',
     padding: 12,
+  },
+  infoNotice: {
+    border: '1px solid #d8b4fe',
+    borderRadius: 8,
+    background: '#f5f3ff',
+    color: 'var(--colour-primary)',
+    padding: '12px 14px',
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.9rem',
+    fontWeight: 600,
+    lineHeight: 1.5,
   },
   previewHeader: {
     display: 'flex',
@@ -2045,6 +3330,112 @@ const s = {
     border: '1px solid #e5e7eb',
     flexShrink: 0,
   },
+  carryRadioGroup: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))',
+    gap: 10,
+  },
+  carryRadioLabel: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.88rem',
+    color: 'var(--colour-text)',
+    cursor: 'pointer',
+  },
+  carryRadioLabelDisabled: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.88rem',
+    color: '#9ca3af',
+    cursor: 'not-allowed',
+  },
+  carryNote: {
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.82rem',
+    color: '#9ca3af',
+  },
+  optionChoiceGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+    gap: 10,
+  },
+  optionChoiceCard: {
+    minHeight: 76,
+    display: 'grid',
+    gridTemplateColumns: '18px minmax(0, 1fr)',
+    columnGap: 10,
+    rowGap: 3,
+    alignItems: 'start',
+    padding: '12px 14px',
+    border: '2px solid #e5e7eb',
+    borderRadius: 10,
+    background: '#fff',
+    color: 'var(--colour-text)',
+    cursor: 'pointer',
+    transition: 'border-color 0.12s, background 0.12s, color 0.12s',
+  },
+  optionChoiceCardActive: {
+    borderColor: 'var(--colour-primary)',
+    background: 'var(--colour-primary)',
+    color: '#fff',
+  },
+  optionChoiceCardDisabled: {
+    opacity: 0.52,
+    cursor: 'not-allowed',
+  },
+  optionChoiceInput: {
+    gridRow: '1 / span 2',
+    marginTop: 2,
+    accentColor: 'var(--colour-primary)',
+  },
+  optionChoiceTitle: {
+    fontFamily: 'var(--font-body)',
+    fontWeight: 700,
+    fontSize: '0.86rem',
+    lineHeight: 1.2,
+  },
+  optionChoiceText: {
+    fontFamily: 'var(--font-body)',
+    fontWeight: 600,
+    fontSize: '0.76rem',
+    lineHeight: 1.35,
+    color: '#6b7280',
+  },
+  optionChoiceTextActive: {
+    color: 'rgba(255, 255, 255, 0.82)',
+  },
+  optionToggleCard: {
+    minHeight: 68,
+    display: 'grid',
+    gridTemplateColumns: '18px minmax(0, 1fr)',
+    columnGap: 10,
+    rowGap: 3,
+    alignItems: 'start',
+    padding: '12px 14px',
+    border: '2px solid #e5e7eb',
+    borderRadius: 10,
+    background: '#fff',
+    color: 'var(--colour-text)',
+    cursor: 'pointer',
+    transition: 'border-color 0.12s, background 0.12s, color 0.12s',
+  },
+  optionToggleCardActive: {
+    borderColor: 'var(--colour-primary)',
+    background: 'var(--colour-primary)',
+    color: '#fff',
+  },
+  optionNote: {
+    margin: 0,
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.82rem',
+    color: '#6b7280',
+    lineHeight: 1.5,
+    padding: '0 2px',
+  },
   colorInput: {
     width: 36,
     height: 28,
@@ -2053,5 +3444,35 @@ const s = {
     borderRadius: 5,
     cursor: 'pointer',
     flexShrink: 0,
+  },
+  taskFormatGrid: {
+    display: 'flex',
+    gap: 10,
+  },
+  taskFormatBtn: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    padding: '14px 8px',
+    border: '2px solid #e5e7eb',
+    borderRadius: 10,
+    background: '#fff',
+    color: 'var(--colour-primary)',
+    cursor: 'pointer',
+    transition: 'border-color 0.12s, background 0.12s, color 0.12s',
+  },
+  taskFormatBtnActive: {
+    borderColor: 'var(--colour-primary)',
+    background: 'var(--colour-primary)',
+    color: '#fff',
+  },
+  taskFormatLabel: {
+    fontFamily: 'var(--font-body)',
+    fontWeight: 600,
+    fontSize: '0.82rem',
+    lineHeight: 1,
   },
 }

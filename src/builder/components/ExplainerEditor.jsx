@@ -2,13 +2,39 @@ import React, { useState } from 'react'
 import { MarkdownRenderer } from '../../shared/markdown'
 
 export default function ExplainerEditor({ title, value, onChange }) {
+  return (
+    <MarkdownFieldEditor
+      title={title}
+      value={value}
+      onChange={onChange}
+      ariaLabel="Explainer editor views"
+      placeholder="Write the task explainer in Markdown..."
+      height={240}
+      minHeight={180}
+      showTitle
+    />
+  )
+}
+
+export function MarkdownFieldEditor({
+  title,
+  value,
+  onChange,
+  ariaLabel = 'Markdown editor views',
+  placeholder = 'Write in Markdown...',
+  height = 150,
+  minHeight = 120,
+  showTitle = false,
+}) {
   const [tab, setTab] = useState('entry')
+  const content = value ?? ''
 
   return (
-    <div style={s.wrap}>
-      <div style={s.tabs} role="tablist" aria-label="Explainer editor views">
+    <div style={{ ...s.wrap, height, minHeight }}>
+      <div style={s.tabs} className="ui-tabs" role="tablist" aria-label={ariaLabel}>
         <button
           type="button"
+          className="ui-tab"
           role="tab"
           aria-selected={tab === 'entry'}
           style={tab === 'entry' ? { ...s.tab, ...s.tabActive } : s.tab}
@@ -18,6 +44,7 @@ export default function ExplainerEditor({ title, value, onChange }) {
         </button>
         <button
           type="button"
+          className="ui-tab"
           role="tab"
           aria-selected={tab === 'preview'}
           style={tab === 'preview' ? { ...s.tab, ...s.tabActive } : s.tab}
@@ -31,15 +58,15 @@ export default function ExplainerEditor({ title, value, onChange }) {
         {tab === 'entry' ? (
           <textarea
             style={s.textarea}
-            value={value}
+            value={content}
             onChange={e => onChange(e.target.value)}
-            placeholder="Write the task explainer in Markdown..."
+            placeholder={placeholder}
             spellCheck
           />
         ) : (
           <div style={s.preview}>
-            {value || title
-              ? <MarkdownRenderer title={title} content={value} />
+            {content || (showTitle && title)
+              ? <MarkdownRenderer title={showTitle ? title : undefined} content={content} />
               : <span style={s.empty}>Preview will appear here...</span>}
           </div>
         )}
@@ -52,8 +79,6 @@ const s = {
   wrap: {
     display: 'flex',
     flexDirection: 'column',
-    height: 240,
-    minHeight: 180,
   },
   tabs: {
     display: 'flex',

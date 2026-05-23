@@ -30,6 +30,15 @@ function darkenColor(hex) {
   return `rgb(${r},${g},${b})`
 }
 
+function contrastTextColor(hex) {
+  const num = parseInt(hex.replace('#', ''), 16)
+  const r = num >> 16
+  const g = (num >> 8) & 0xff
+  const b = num & 0xff
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+  return luminance > 0.58 ? '#1f2937' : '#ffffff'
+}
+
 function categorize(text) {
   const t = text.trim().toLowerCase()
   const unwrapped = t.replace(/^<+\s*/, '').replace(/\s*>+$/, '').trim()
@@ -113,6 +122,7 @@ function renderBlockText(text) {
           key={i}
           style={{
             background,
+            color: isCondition || isAnswer ? '#fff' : '#1f2937',
             borderRadius: '999px',
             padding: isCondition ? '1px 8px' : '0 5px',
             margin: '0 1px',
@@ -130,6 +140,7 @@ function renderBlockText(text) {
 function InlineScratchBlock({ text }) {
   const info = categorize(text) ?? { color: '#7c7c7c' }
   const shadow = darkenColor(info.color)
+  const textColor = contrastTextColor(info.color)
   return (
     <span
       style={{
@@ -139,7 +150,7 @@ function InlineScratchBlock({ text }) {
         background: info.color,
         borderRadius: info.hat ? '10px 10px 2px 2px' : '3px',
         padding: '1px 8px',
-        color: 'white',
+        color: textColor,
         fontFamily: "'Quicksand', sans-serif",
         fontWeight: 700,
         fontSize: '0.82em',
@@ -247,6 +258,7 @@ function InlineHighlightedCode({ lang, code }) {
         ...CODE_FONT_STYLE,
         fontSize: '0.88em',
         background: '#fafafa',
+        color: '#1f2937',
         border: '1px solid #e5e7eb',
         padding: '2px 6px',
         borderRadius: '4px',
@@ -328,7 +340,7 @@ function parseMarkdownTables(content) {
   return blocks
 }
 
-function InlineMarkdown({ content }) {
+export function InlineMarkdown({ content }) {
   return (
     <ReactMarkdown
       remarkPlugins={[remarkBreaks]}
@@ -404,6 +416,63 @@ const tableStyles = {
     borderTop: '1px solid #f0f0f0',
     verticalAlign: 'top',
   },
+}
+
+const CALLOUT_VARIANTS = {
+  warning: {
+    border: '#f59e0b',
+    background: '#fffbeb',
+    color: '#78350f',
+  },
+  error: {
+    border: '#ef4444',
+    background: '#fef2f2',
+    color: '#7f1d1d',
+  },
+  success: {
+    border: '#22c55e',
+    background: '#f0fdf4',
+    color: '#14532d',
+  },
+  info: {
+    border: '#3b82f6',
+    background: '#eff6ff',
+    color: '#1e3a8a',
+  },
+  default: {
+    border: 'var(--colour-secondary)',
+    background: '#fffaf0',
+    color: 'var(--colour-text)',
+  },
+}
+
+const CALLOUT_MARKER_PATTERN = /^\s*>?:(warning|error|success|info)\b\s*/i
+
+function getTextFromChildren(children) {
+  return React.Children.toArray(children).map(child => {
+    if (typeof child === 'string' || typeof child === 'number') return String(child)
+    if (React.isValidElement(child)) return getTextFromChildren(child.props.children)
+    return ''
+  }).join('')
+}
+
+function removeCalloutMarker(children) {
+  let removed = false
+  return React.Children.toArray(children).map(child => {
+    if (removed || !React.isValidElement(child)) return child
+    const text = getTextFromChildren(child.props.children)
+    const match = text.match(CALLOUT_MARKER_PATTERN)
+    if (!match) return child
+
+    removed = true
+    const nextChildren = React.Children.toArray(child.props.children).map((nested, index) => {
+      if (index !== 0 || typeof nested !== 'string') return nested
+      return nested.replace(CALLOUT_MARKER_PATTERN, '')
+    }).filter(nested => nested !== '')
+
+    if (!nextChildren.length) return null
+    return React.cloneElement(child, child.props, nextChildren)
+  }).filter(Boolean)
 }
 
 const components = {
@@ -510,17 +579,24 @@ const components = {
     return <li style={{ margin: '3px 0' }}>{children}</li>
   },
   blockquote({ children }) {
+    const markerText = getTextFromChildren(children)
+    const markerMatch = markerText.match(CALLOUT_MARKER_PATTERN)
+    const variant = markerMatch ? markerMatch[1].toLowerCase() : 'default'
+    const style = CALLOUT_VARIANTS[variant]
+    const renderedChildren = markerMatch ? removeCalloutMarker(children) : children
+
     return (
       <blockquote
         style={{
           margin: '10px 0',
           padding: '8px 12px',
-          borderLeft: '4px solid var(--colour-secondary)',
-          background: '#fffaf0',
+          borderLeft: `4px solid ${style.border}`,
+          background: style.background,
+          color: style.color,
           borderRadius: '0 8px 8px 0',
         }}
       >
-        {children}
+        {renderedChildren}
       </blockquote>
     )
   },
@@ -546,11 +622,6 @@ export function MarkdownRenderer({ content, title, style }) {
         ...style,
       }}
     >
-      {heading && (
-        <h1 style={{ ...headingBase, fontSize: '1.45rem', margin: '4px 0 10px' }}>
-          {heading}
-        </h1>
-      )}
       {blocks.map((block, i) => block.type === 'table'
         ? <MarkdownTable key={i} headers={block.headers} align={block.align} rows={block.rows} />
         : (

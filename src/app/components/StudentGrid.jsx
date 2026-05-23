@@ -7,6 +7,7 @@ function formatCheck(check) {
   const checks = Array.isArray(check) ? check : [check]
   return checks.map(c => {
     if (c.type === 'output_contains') return `Contains: "${c.value}"`
+    if (c.type === 'answer_equals') return `Answer: "${c.value}"`
     if (c.type === 'output_equals') return `Equals: "${c.value}"`
     if (c.type === 'output_line_count') return `${c.value} line${c.value === 1 ? '' : 's'}`
     if (c.type === 'output_not_empty') return 'Output is not empty'
@@ -14,7 +15,7 @@ function formatCheck(check) {
   }).join(' · ')
 }
 
-export default function StudentGrid({ students = [], lesson, lessonId, session, onRename, onRemove, onGoLive, onStopLive, collapsed, onToggle }) {
+export default function StudentGrid({ students = [], lesson, lessonId, session, onRename, onRemove, onGoLive, onGoLiveForAll, onStopLive, onRemoteReset, collapsed, onToggle }) {
   const [expandedStudentId, setExpandedStudentId] = useState(null)
   const [checkSectionOpen, setCheckSectionOpen] = useState(false)
 
@@ -141,13 +142,16 @@ export default function StudentGrid({ students = [], lesson, lessonId, session, 
           lesson={lesson}
           session={session}
           isLive={session?.activeStudentView === expandedStudent.anonymousId}
+          isLiveForAll={session?.teacherLive?.sourceStudentId === expandedStudent.anonymousId}
           onGoLive={() => onGoLive?.(expandedStudent.anonymousId)}
+          onGoLiveForAll={() => onGoLiveForAll?.(expandedStudent)}
           onStopLive={() => onStopLive?.()}
           onClose={handleClose}
           hasPrev={expandedIndex > 0}
           hasNext={expandedIndex < students.length - 1}
           onPrev={handlePrev}
           onNext={handleNext}
+          onRemoteReset={onRemoteReset}
         />
       )}
     </div>

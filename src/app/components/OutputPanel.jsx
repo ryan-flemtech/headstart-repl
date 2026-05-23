@@ -109,9 +109,6 @@ export default function OutputPanel({
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }} onClick={e => e.stopPropagation()}>
-          {hasCheck && checkPassed && (
-            <span style={s.checkBadge}>✅ Check passed!</span>
-          )}
           <span style={{ ...s.statusDot, background: statusColour }} />
           <span style={s.statusLabel}>{statusLabel}</span>
         </div>
@@ -178,16 +175,6 @@ const s = {
     fontFamily: 'var(--font-body)',
     fontSize: '0.8rem',
     opacity: 0.85,
-  },
-  checkBadge: {
-    fontFamily: 'var(--font-body)',
-    fontWeight: 600,
-    fontSize: '0.82rem',
-    color: '#22c55e',
-    background: '#f0fdf4',
-    border: '1px solid #bbf7d0',
-    borderRadius: 6,
-    padding: '2px 8px',
   },
   pre: {
     flex: 1,
