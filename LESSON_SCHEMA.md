@@ -30,9 +30,15 @@ Every lesson can contain code tasks plus `information` and `quiz` tasks.
 | `type` | Yes | string | all lessons | One of `python`, `html`, or `scratch`. |
 | `title` | Yes | string | all lessons | Display title. |
 | `description` | Yes | string | all lessons | Short entry screen summary. |
-| `sandboxStarter` | No | string | Python, HTML | Pre-loaded code or file content shown when the teacher puts the session into sandbox mode. Omit to leave the sandbox editor empty. |
-| `assetsPath` | No | string | Scratch mainly | Base folder for Scratch backdrop and costume images. |
-| `tasks` | Yes | array | all lessons | Ordered task list. IDs should be sequential integers starting at `1`. |
+| `level` | No | number | all lessons | Difficulty level shown as a badge in the TopBar. |
+| `sandboxStarter` | No | string | Python, Scratch | Pre-loaded Python code or Scratch state for sandbox mode. |
+| `sandboxStarterFiles` | No | file array | HTML | Pre-loaded HTML files for sandbox mode. |
+| `sandboxToolbox` | No | string | Scratch | Scratch XML toolbox to use in sandbox mode. |
+| `sandboxSprites` | No | sprite array | Scratch | Sprites to use in sandbox mode. |
+| `sandboxBackdrops` | No | backdrop array | Scratch | Backdrops to use in sandbox mode. |
+| `assetsPath` | No | string | all lessons | Base URL path for asset resolution (backdrops, costumes, AssetBrowser). |
+| `assets` | No | string array | all lessons | List of asset file paths shown in the AssetBrowser. |
+| `tasks` | Yes | array | all lessons | Ordered task list. IDs should be sequential integers starting at `1`. May also contain group objects. |
 
 ## Common Task Fields
 
@@ -301,23 +307,20 @@ Do not include code fields, carry fields, `interactionMode`, `options`, or `chec
 
 ## Quiz Tasks
 
-Quiz tasks work in every lesson type. The correct answer is represented as an `answer_equals` check whose value matches an option ID.
+Quiz tasks work in every lesson type. There are four sub-types controlled by `quizType`.
+
+### Multiple Choice
 
 ```json
 {
   "id": 3,
   "taskType": "quiz",
+  "quizType": "multiple_choice",
   "title": "Loop quiz",
   "explainer": "Which loop repeats exactly five times?",
   "options": [
-    {
-      "id": "a",
-      "text": "for i in range(5)"
-    },
-    {
-      "id": "b",
-      "text": "while True"
-    }
+    { "id": "a", "text": "for i in range(5)" },
+    { "id": "b", "text": "while True", "feedback": "This loop runs forever." }
   ],
   "check": {
     "type": "answer_equals",
@@ -330,10 +333,11 @@ Quiz tasks work in every lesson type. The correct answer is represented as an `a
 | Field | Required | Type | Notes |
 |---|---:|---|---|
 | `taskType` | Yes | string | Must be `quiz`. |
+| `quizType` | No | string | `multiple_choice` (default), `match`, `fill_blank`, or `short_answer`. |
 | `title` | Yes | string | Shown in progress UI. |
 | `explainer` | Yes | string | Question text, rendered as Markdown. |
-| `options` | Yes | array | At least two options. |
-| `check` | Yes | object | Must be `{ "type": "answer_equals", "value": "<option id>" }`. |
+| `options` | Yes (multiple_choice) | array | At least two options. |
+| `check` | Yes | object | `{ "type": "answer_equals", "value": "<option id>" }`. |
 | `hints` | No | string array | Optional. |
 
 Option object:
@@ -341,9 +345,115 @@ Option object:
 | Field | Required | Type | Notes |
 |---|---:|---|---|
 | `id` | Yes | string | Usually `a`, `b`, `c`, etc. |
-| `text` | Yes | string | Option label shown to students. |
+| `text` | Yes | string | Option label shown to students. Markdown supported. |
+| `feedback` | No | string | Shown when this wrong option is selected. Markdown supported. |
 
-Do not include code fields, carry fields, or `interactionMode`.
+### Match
+
+Student drags tiles to match each prompt with its answer. All pairs must be correct.
+
+```json
+{
+  "id": 4,
+  "taskType": "quiz",
+  "quizType": "match",
+  "title": "Hardware match",
+  "explainer": "Match each component to its role.",
+  "pairs": [
+    { "id": "1", "prompt": "CPU", "answer": "Processes instructions" },
+    { "id": "2", "prompt": "RAM", "answer": "Temporary memory" }
+  ]
+}
+```
+
+| Field | Required | Type | Notes |
+|---|---:|---|---|
+| `pairs` | Yes | array | At least two pairs. Tiles are shuffled on render. |
+
+Pair object: `{ id: string, prompt: string, answer: string }`. Markdown supported in both fields.
+
+### Fill Blank
+
+Student fills blanks in a sentence by dragging tiles (`mode: "drag"`) or typing (`mode: "type"`).
+
+```json
+{
+  "id": 5,
+  "taskType": "quiz",
+  "quizType": "fill_blank",
+  "title": "Fill the blank",
+  "text": "A ___ repeats code while a condition is true.",
+  "mode": "drag",
+  "blanks": [
+    { "id": "1", "answer": "loop" }
+  ]
+}
+```
+
+| Field | Required | Type | Notes |
+|---|---:|---|---|
+| `text` | Yes | string | Sentence with `___` marking each blank position. |
+| `mode` | No | string | `"drag"` (default) or `"type"`. |
+| `blanks` | Yes | array | One entry per `___` in `text`, in order. |
+
+Blank object: `{ id: string, answer: string }`.
+
+### Short Answer
+
+Student types a free-text answer checked against a pattern.
+
+```json
+{
+  "id": 6,
+  "taskType": "quiz",
+  "quizType": "short_answer",
+  "title": "What does CPU stand for?",
+  "explainer": "Type the full name of the CPU.",
+  "check": {
+    "type": "answer_contains",
+    "value": "Central Processing Unit"
+  }
+}
+```
+
+Supported check types for short answer: `answer_equals`, `answer_contains`, `answer_matches_regex`.
+
+Do not include code fields, carry fields, or `interactionMode` on any quiz task.
+
+## Task Groups
+
+Tasks can be wrapped in group objects. Groups are collapsible in the teacher's TaskNavigator and rendered as sections in the student's progress dots. Subtask titles are auto-derived from the group name ("Group Title - 1", "Group Title - 2", etc.) and should not be set manually.
+
+```json
+{
+  "id": "g-1234567890",
+  "type": "group",
+  "title": "Loops",
+  "subtasks": [
+    {
+      "id": 3,
+      "title": "Loops - 1",
+      "explainer": "...",
+      "starterCode": "..."
+    },
+    {
+      "id": 4,
+      "title": "Loops - 2",
+      "explainer": "...",
+      "starterCode": "..."
+    }
+  ]
+}
+```
+
+| Field | Required | Type | Notes |
+|---|---:|---|---|
+| `id` | Yes | string | String ID (e.g. `"g-1234567890"`) — not an integer. |
+| `type` | Yes | string | Must be `"group"`. |
+| `title` | Yes | string | Group display name. Subtask titles are derived from this. |
+| `subtasks` | Yes | array | Ordered task objects. These follow the same task format as top-level tasks. |
+
+Groups may not be nested (no groups within groups). `carryCodeFrom` / `carryBlocksFrom` references from within a subtask use the subtask's integer `id`.
 
 ## Check Shapes
 
@@ -388,7 +498,10 @@ When `check` is an array, every check must pass.
 | `element_exists` | `type`, `selector` | Yes | No | No | Yes | At least one iframe element matches CSS selector. |
 | `element_count` | `type`, `selector`, `value` | Yes | No | No | Yes | Number of matching iframe elements equals `value`. |
 | `element_value` | `type`, `selector`, `value` | Yes | No | No | Yes | Matching element text/value contains `value`, case-insensitive. |
-| `answer_equals` | `type`, `value` | Quiz only | Quiz only | n/a | n/a | Selected quiz answer ID equals `value`. |
+| `answer_equals` | `type`, `value` | Quiz only | Quiz only | n/a | n/a | Selected answer ID (multiple choice) or text equals `value`. |
+| `answer_contains` | `type`, `value` | Quiz only | Quiz only | n/a | n/a | Free-text answer contains `value` (short answer). |
+| `answer_matches_regex` | `type`, `value` | Quiz only | Quiz only | n/a | n/a | Free-text answer matches regex pattern (short answer). |
+| `quiz_result` | `type` | Quiz only | Quiz only | n/a | n/a | All pairs/blanks correct (match, fill_blank). No `value` needed. |
 
 Submit mode accepts only:
 

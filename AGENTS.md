@@ -1,18 +1,18 @@
 # AGENTS.md — Headstart Coding Classroom REPL Platform
 
-This file provides persistent context for Codex sessions working on this project.
-Always read this file at the start of every session before writing any code.
-For full detail on every feature, read SPEC.md.
+Quick-reference guide for Claude Code and Codex sessions. Read this at the start of every session.
+
+For full detail: **SPEC.md**. For file roles: **CODEBASE_MAP.md**. For lesson JSON: **LESSON_SCHEMA.md**. For feature list: **FEATURES.md**.
 
 ---
 
 ## Project Summary
 
 A browser-based coding classroom tool for Headstart Coding live sessions and solo study.
-Two applications live in this repo:
+Two applications in this repo:
 
-1. **Classroom App** — the main student/teacher coding environment (`/`)
-2. **Lesson Builder** — a teacher-facing tool for creating and testing lesson JSON files (`/builder`)
+1. **Classroom App** — student/teacher coding environment (`/`)
+2. **Lesson Builder** — teacher-facing tool for creating and testing lesson JSON files (`/builder`)
 
 Both are static React apps deployed to GitHub Pages. No backend server exists or should be added.
 
@@ -26,15 +26,14 @@ Both are static React apps deployed to GitHub Pages. No backend server exists or
 | Build tool | Vite |
 | Hosting | GitHub Pages |
 | Real-time sync | Firebase Realtime Database (free tier) — classroom app only |
-| Python execution | Pyodide (WASM) — classroom app AND lesson builder |
+| Python execution | Pyodide (WASM) in a Web Worker — classroom app AND lesson builder |
 | Web output | Sandboxed iframe with Blob URL virtual filesystem — classroom app AND lesson builder |
-| Scratch blocks | scratch-blocks (fork of Google Blockly) — classroom app only |
-| Scratch execution | scratch-vm + scratch-render — classroom app only |
+| Scratch blocks | Custom scratch-blocks (Blockly fork) with hand-rolled interpreter — classroom app only |
 | Code editor | CodeMirror 6 |
 | Markdown | react-markdown + rehype-highlight |
-| Styling | CSS modules or Tailwind — confirm before starting |
+| Styling | CSS custom properties in a shared global stylesheet (`src/index.css`) |
 
-Do not add any other major dependencies without checking the spec and confirming with the user.
+Do not add any other major dependencies without confirming with the user.
 
 ---
 
@@ -42,27 +41,42 @@ Do not add any other major dependencies without checking the spec and confirming
 
 ```
 /
-├── SPEC.md                         # Full project specification — read this
-├── AGENTS.md                       # This file
-├── index.html                      # Classroom app entry
-├── builder/
-│   └── index.html                  # Lesson builder entry
-├── lessons/
-│   ├── python-intro.json           # Sample Python lesson
-│   └── web-intro.json              # Sample HTML lesson
+├── SPEC.md              # Full specification — full detail on every behaviour
+├── AGENTS.md            # This file — quick reference for sessions
+├── CLAUDE.md            # Claude Code session checklist (read first)
+├── LESSON_SCHEMA.md     # Lesson JSON schema reference
+├── FEATURES.md          # Implemented features list
+├── CODEBASE_MAP.md      # One-line role for every file — use for navigation
+├── index.html           # Classroom app entry
+├── builder/index.html   # Lesson builder entry
+├── lessons/             # Static lesson JSON files
 ├── src/
-│   ├── app/                        # Classroom app source
-│   │   ├── components/
-│   │   ├── hooks/
-│   │   └── views/
-│   ├── builder/                    # Lesson builder source
-│   │   ├── components/
-│   │   └── views/
-│   └── shared/                     # Shared modules — used by BOTH apps
-│       ├── codemirror.js           # CodeMirror setup and config
-│       ├── markdown.jsx            # react-markdown renderer
-│       ├── iframe.js               # Virtual filesystem / Blob URL logic
-│       └── pyodide.js              # Pyodide loader and execution
+│   ├── App.jsx          # Classroom router (HashRouter)
+│   ├── main.jsx         # Classroom entry point
+│   ├── index.css        # Global styles and brand CSS custom properties
+│   ├── app/
+│   │   ├── components/  # UI components (19 files)
+│   │   ├── hooks/       # useIdentity.js, useSession.js
+│   │   └── views/       # LandingPage, LessonRoute, StudentView, TeacherView
+│   ├── builder/
+│   │   ├── App.jsx      # Builder root — lesson lifecycle and persistence
+│   │   ├── main.jsx     # Builder entry point
+│   │   ├── components/  # Builder-specific components
+│   │   └── views/       # BuilderView, PreviewView
+│   └── shared/          # Shared modules — used by BOTH apps (never duplicate)
+│       ├── CodeEditor.jsx
+│       ├── SplitPane.jsx
+│       ├── AssetBrowser.jsx
+│       ├── checks.js
+│       ├── codemirror.js
+│       ├── firebase.js
+│       ├── iframe.js
+│       ├── markdown.jsx
+│       ├── pyodide.js
+│       ├── pyodide.worker.js
+│       ├── scratch.js
+│       ├── taskUtils.js
+│       └── useIsMobile.js
 ├── public/
 ├── vite.config.js
 └── package.json
@@ -72,90 +86,23 @@ Do not add any other major dependencies without checking the spec and confirming
 
 ## Shared Modules — Critical
 
-Both apps share execution and rendering logic via `src/shared/`. Never duplicate this logic.
+Both apps import from `src/shared/`. Never duplicate this logic.
 
-| Module | Contents |
+| Module | Key exports / role |
 |---|---|
-| `codemirror.js` | CodeMirror base config, language modes, theme, all extensions |
-| `markdown.jsx` | react-markdown renderer with rehype-highlight |
-| `iframe.js` | Blob URL generation, file reference rewriting, iframe injection |
-| `pyodide.js` | Pyodide loader, stdin intercept, stdout hook, run function |
-| `scratch.js` | scratch-vm factory, scratch-render attachment, storage setup, check evaluation, DEFAULT_PROJECT, DEFAULT_TOOLBOX |
-
-Both the classroom app and lesson builder import from these modules. Build the shared modules first.
-
----
-
-## Lesson JSON Format
-
-Lessons are static JSON files in `/lessons/`. There are two types.
-
-### Python lesson
-
-```json
-{
-  "id": "python-intro",
-  "type": "python",
-  "title": "Introduction to Python",
-  "description": "Short description shown on entry screen.",
-  "tasks": [
-    {
-      "id": 1,
-      "title": "Hello World",
-      "explainer": "Use `print()` to show output.\n\n```python\nprint('Hello')\n```",
-      "starterCode": "# Write your code here\n",
-      "carryCodeFrom": null,
-      "check": {
-        "type": "output_contains",
-        "value": "Hello"
-      }
-    }
-  ]
-}
-```
-
-### HTML/CSS/JS lesson
-
-```json
-{
-  "id": "web-intro",
-  "type": "html",
-  "title": "Introduction to HTML",
-  "description": "Short description.",
-  "tasks": [
-    {
-      "id": 1,
-      "title": "Your First Page",
-      "explainer": "Add a heading using `<h1>`.",
-      "entryFile": "index.html",
-      "carryCodeFrom": null,
-      "starterFiles": [
-        {
-          "name": "index.html",
-          "type": "html",
-          "content": "<!DOCTYPE html>\n<html>\n<body>\n\n</body>\n</html>"
-        },
-        {
-          "name": "style.css",
-          "type": "css",
-          "content": "/* styles here */\n"
-        }
-      ],
-      "check": {
-        "type": "output_contains",
-        "value": "Hello"
-      }
-    }
-  ]
-}
-```
-
-### Rules
-- `id` values are sequential integers starting at 1
-- `carryCodeFrom` is a task `id` integer or null
-- `check` is optional — omit the field entirely if not needed
-- `starterCode` and `starterFiles` are both optional
-- Only check type in v1 is `output_contains`
+| `CodeEditor.jsx` | Shared CodeMirror wrapper — language/readOnly switching via compartments, no remount |
+| `SplitPane.jsx` | Draggable two-pane splitter; clamped [15%, 85%]; right pane can collapse to fixed width |
+| `AssetBrowser.jsx` | Read-only lesson asset file browser with click-to-copy and image hover preview |
+| `checks.js` | `evaluateCheckResults(check, output, context)` — all check types, `CHECK_TYPES` constants |
+| `codemirror.js` | `createBaseExtensions(type, readOnly)`, `headstartTheme`, `headstartHighlight`, `getTabSize(type)` |
+| `firebase.js` | Exports `db` (Firebase Realtime Database reference, initialized from env vars) |
+| `iframe.js` | `buildIframeSrc(files, entryFile, options)`, `waitForIframeText(timeout)` |
+| `markdown.jsx` | `MarkdownRenderer({content, title, style})`, `InlineMarkdown({content})` |
+| `pyodide.js` | `initPyodide()`, `runPython(code, {onOutput?, onInputRequired?})`, `stopPython()`, `provideInput(value)` |
+| `pyodide.worker.js` | Web Worker: Pyodide loader, async `input()` AST transform, stdout/stderr streaming |
+| `scratch.js` | Block definitions, interpreter, `createRunContext()`, `createSpriteState()`, `createRunSignal()` |
+| `taskUtils.js` | `flattenTasks(tasks)`, `getProgressItems(tasks)`, `updateSubtaskTitles(tasks)` |
+| `useIsMobile.js` | `useIsMobile(breakpoint=640) → boolean` |
 
 ---
 
@@ -170,22 +117,40 @@ Lessons are static JSON files in `/lessons/`. There are two types.
       "state": "waiting | active | sandbox | ended",
       "currentTaskId": 1,
       "createdAt": 1234567890,
+      "isPaused": false,
       "activeStudentView": "{anonymousId} | null",
+      "teacherLive": {
+        "active": true,
+        "source": "teacher | student",
+        "sourceStudentId": "uuid | null",
+        "sourceStudentName": "Jamie | null",
+        "taskId": 1,
+        "lessonType": "python",
+        "code": "...",
+        "files": { "index__dot__html": "..." },
+        "output": "...",
+        "runStatus": "success | error | stopped | submitted | null",
+        "checkPassed": true,
+        "updatedAt": 1234567890
+      },
       "sandboxCode": "string | null",
       "sandboxCodePushedAt": 1234567890,
+      "sandboxFiles": { "index__dot__html": "..." },
+      "sandboxFilesUpdatedAt": 1234567890,
       "students": {
         "{anonymousId}": {
           "displayName": "Jamie",
+          "joinedAt": 1234567890,
+          "online": true,
           "currentCode": "string",
-          "currentFiles": {
-            "index.html": "string",
-            "style.css": "string"
-          },
+          "currentFiles": { "index__dot__html": "..." },
           "currentOutput": "string",
+          "currentAnswer": "b",
           "lastRunStatus": "success | error | null",
           "checkPassed": true,
           "lastRunAt": 1234567890,
-          "joinedAt": 1234567890
+          "remoteResetAction": "starter | complete",
+          "remoteResetPushedAt": 1234567890
         }
       }
     }
@@ -193,12 +158,24 @@ Lessons are static JSON files in `/lessons/`. There are two types.
 }
 ```
 
+**File key encoding:** Firebase keys cannot contain dots. `index.html` is stored as `index__dot__html`. Always use `encodeFileKey`/`decodeFileKey` from `useSession.js`. App state and localStorage use the real filenames.
+
 ### Write rules
-- Teacher writes: `state`, `currentTaskId`, `activeStudentView`, `sandboxCode`, `sandboxCodePushedAt`, any student's `displayName`
-- Student writes: their own node under `students/{anonymousId}` only
-- `currentCode` / `currentFiles` written on run normally, per keystroke only when `activeStudentView` matches their Anonymous ID
-- `currentOutput` written line by line during run when being watched (Python), on run completion otherwise
+
+- Teacher writes: `state`, `currentTaskId`, `isPaused`, `activeStudentView`, `teacherLive`, `sandboxCode`, `sandboxCodePushedAt`, `sandboxFiles`, `sandboxFilesUpdatedAt`, any student's `displayName`, student node removal
+- Teacher — remote reset: `remoteResetAction` + `remoteResetPushedAt` on individual student node
+- Student (on run): own `currentCode`/`currentFiles`, `currentOutput`, `lastRunStatus`, `checkPassed`, `lastRunAt`
+- Student (when watched — Python): `currentCode` per keystroke, `currentOutput` line by line during run
+- Student (when watched — HTML): `currentFiles` per active-tab keystroke
+- Student (quiz): `currentAnswer` on submit
 - Firebase v1 security rules are open read/write — do not add authentication logic
+
+### onDisconnect handlers
+
+- `activeStudentView` cleared when teacher disconnects
+- `teacherLive` set to null when teacher disconnects
+- Student `online` **key removed** on disconnect (not set to false)
+- Session node deleted when teacher calls `endSession()` and disconnects
 
 ---
 
@@ -206,40 +183,12 @@ Lessons are static JSON files in `/lessons/`. There are two types.
 
 **Critical — do not deviate from these key formats.**
 
-### Student work — Python
-```
-headstart_{lessonId}_{taskId}_{anonymousId}
-```
-Value: `{ code: string, output: string, runStatus: "success" | "error" | null }`
-
-### Student work — HTML/CSS/JS (one entry per file)
-```
-headstart_{lessonId}_{taskId}_{filename}_{anonymousId}
-```
-Value: `{ content: string }`
-
-### Student identity
-```
-headstart_identity
-```
-Value: `{ anonymousId: string, displayName: string, lastSessionTimestamp: number }`
-
-### Lesson builder state
-```
-headstart_builder_current
-```
-Value: full lesson JSON object
-
----
-
-## Identity Model
-
-- Anonymous ID is a random UUID generated on first visit, stored in `localStorage` (not `sessionStorage`)
-- Display Name is separate from Anonymous ID — teacher can rename without affecting keys
-- On page load, compare `lastSessionTimestamp` in localStorage against Firebase `sessionCreatedAt`
-  - Match → same session → skip name entry, restore work, greet by name
-  - Differ → new session → fresh name entry, generate new Anonymous ID
-- Duplicate names get numeric suffix: `Jamie` → `Jamie-2` → `Jamie-3`
+| Key | Value |
+|---|---|
+| `headstart_identity` | `{ anonymousId, displayName, lastSessionTimestamp }` |
+| `headstart_{lessonId}_{taskId}_{anonymousId}` | `{ code?, output?, runStatus?, state? }` — Python/Scratch |
+| `headstart_{lessonId}_{taskId}_{filename}_{anonymousId}` | `{ content }` — HTML per-file |
+| `headstart_builder_current` | Full lesson JSON object |
 
 ---
 
@@ -247,12 +196,14 @@ Value: full lesson JSON object
 
 | URL | Behaviour |
 |---|---|
-| `/lesson/:lessonId` | Student entry point |
+| `/` | Landing page — student enters lesson ID |
+| `/lesson/:lessonId` | Solo student mode |
+| `/lesson/:lessonId?live=true` | Live student mode (joins Firebase session) |
 | `/lesson/:lessonId?teacher=true` | Teacher view |
+| `/lesson/:lessonId?teacher=true&present=true` | Teacher presentation (StudentView watching teacherLive) |
 | `/builder` | Lesson builder |
 
-- No room IDs — one session per lesson at a time
-- `?teacher=true` is the only auth mechanism in v1 — do not add password logic
+No room IDs. One session per lesson. `?teacher=true` is the only auth mechanism.
 
 ---
 
@@ -260,10 +211,23 @@ Value: full lesson JSON object
 
 | State | Meaning |
 |---|---|
-| `waiting` | Session created, teacher hasn't started yet — students in waiting room |
-| `active` | Live lesson in progress — teacher controls task |
+| `waiting` | Session created — students in waiting room |
+| `active` | Live lesson — teacher controls current task |
 | `sandbox` | Freeform mode — no task, no checks |
 | `ended` | Session finished |
+
+`isPaused: true` overlays any state to freeze student navigation without ending the session.
+
+---
+
+## Identity Model
+
+- Anonymous ID: random UUID generated on first visit, stored in `localStorage`
+- Display Name: separate — teacher can rename without affecting keys or localStorage
+- Session timestamp comparison: stored `lastSessionTimestamp` vs Firebase `createdAt`
+  - Match → same session → skip name entry, restore work
+  - Differ → new session → fresh name entry, new Anonymous ID
+- Duplicate names get numeric suffix: `Jamie` → `Jamie-2` → `Jamie-3`
 
 ---
 
@@ -272,228 +236,66 @@ Value: full lesson JSON object
 ### Code carry-through
 - Check localStorage for `carryCodeFrom` task ID before loading `starterCode`
 - Per-file for HTML lessons — carry each file independently by filename
-- Graceful fallback: carry → starterCode → empty editor
+- Scratch: `carryBlocksFrom` works identically
+- Fallback chain: saved carry → starterCode/starterFiles → empty editor
 
 ### Live view (activeStudentView)
 - Default expanded view shows last-run snapshot only — no streaming
-- Streaming only activates when teacher clicks "Go Live"
+- Streaming activates only when teacher clicks "Go Live"
 - On "Go Live": one-time fetch first, then set `activeStudentView`
 - Closing modal by ANY means (button, click outside, Escape, tab close) must clear `activeStudentView`
-- Use Firebase `onDisconnect` to clear `activeStudentView` on unexpected tab close
+- Firebase `onDisconnect` clears `activeStudentView` on unexpected tab close
 - Only one student streams at a time
+
+### Teacher live broadcast (teacherLive)
+- Separate from `activeStudentView` — broadcasts teacher's or a student's screen to ALL students
+- Opens via `?teacher=true&present=true` presentation window
+- `onDisconnect` clears `teacherLive` automatically
+
+### Remote reset
+- Teacher writes `remoteResetAction` ("starter" or "complete") + `remoteResetPushedAt` to student node
+- Student detects timestamp change and applies reset silently (no prompt)
 
 ### Sandbox mode
 - Student code saved to localStorage BEFORE editor clears on sandbox entry
-- Sandbox code is discarded on return to lesson — never saved
-- Push to All is forced — no student prompt
-- `sandboxCodePushedAt` timestamp used as change trigger (not the code itself)
+- Sandbox content discarded on return to lesson — never saved to localStorage
+- `sandboxCodePushedAt` / `sandboxFilesUpdatedAt` timestamps used as change triggers (not the values)
+- HTML sandbox: files stored with `__dot__` encoding in Firebase
 
-### Output / iframe updates during live view
-- Code mirror updates per keystroke (always during live view)
-- Python output updates line by line during a run only — not between runs
-- HTML iframe re-renders on Run only — not per keystroke
-- Between runs: output panel / iframe holds last run state
+### Pyodide
+- Runs in a Web Worker — never blocks the main thread
+- `stopPython()` terminates the worker to kill infinite loops; replacement pre-warmed immediately
+- `input()` handled via Python AST transform; resolved when `provideInput()` is called
 
-### Student grid
-- Dynamic — no hard cap, renders however many students are present
-- Soft recommended max of 12 for UI comfort
-
----
-
-## Lesson Builder — Execution
-
-The builder includes full code execution. It is NOT just a form editor.
-
-### Python execution in builder
-- Pyodide loaded on first Run — same shared module as classroom app
-- Loading screen: "Getting Python ready…"
-- Run button beneath starter code editor
-- Full output panel — same styling as classroom app
-- `input()` supported — inline input field in output panel
-- Each run is a fresh execution context
-
-### HTML execution in builder
-- Run button beneath file editor
-- Sandboxed iframe preview beneath Run button
-- Same virtual filesystem / Blob URL shared module as classroom app
-- Multi-file projects render correctly
-
-### Check verification in builder
-- After Run, if task has a completion check: evaluate it against actual output
-- Show result beneath output panel:
-  - ✅ Green: "Check passes — students will see the completion banner"
-  - ⚠️ Amber: "Check does not pass with this output — review your check value"
-- Informational only — does not block saving or downloading
-- Validation warning added if check exists but has never been tested
-
----
-
-## CodeMirror Shared Config
-
-All CodeMirror instances across both apps must use the same base configuration from `src/shared/codemirror.js`. Key settings:
-
-- Python: `@codemirror/lang-python`, tab size 4
-- HTML: `@codemirror/lang-html`, tab size 2
-- CSS: `@codemirror/lang-css`, tab size 2
-- JavaScript: `@codemirror/lang-javascript`, tab size 2
-- Autocomplete on, triggers per keystroke, not in comments or strings
-- Auto-indentation on
-- Line numbers on
-- Bracket matching on
-- Active line highlight on
-- Read-only mode toggled programmatically
-
----
-
-## Pyodide Notes
-
-- Load Pyodide once per session — not on demand per run
-- Shared loading logic in `src/shared/pyodide.js` — used by both classroom app and builder
-- Show loading screen: "Getting Python ready…" with progress indicator
-- `input()` must be intercepted — execution pauses, inline input field shown in output panel
-- Each run uses a fresh execution context — no state between runs
-- Only stdlib — no pip installs in v1
-- No file I/O
-
----
-
-## iframe Virtual Filesystem
-
-Shared logic in `src/shared/iframe.js` — used by both classroom app and builder:
-- Convert each file to a Blob URL
-- Scan HTML entry file for `href` and `src` attributes referencing other files
-- Rewrite those references to Blob URLs
-- Inject rewritten HTML into sandboxed iframe
-
-iframe sandbox attributes: `allow-scripts allow-same-origin`
-Do not add `allow-forms`, `allow-top-navigation`, or `allow-popups`.
-
----
-
-## Brand & Theming
-
-All UI across both apps must use the Headstart Coding brand. Apply these as CSS custom properties at the root level in a shared stylesheet imported by both apps.
-
-### CSS Custom Properties
-
-```css
-:root {
-  /* Colours */
-  --colour-primary:        #6222CC;
-  --colour-primary-dark:   #4e1aa3;   /* darken for hover states on primary elements */
-  --colour-secondary:      #FBA504;
-  --colour-secondary-dark: #e09400;   /* darken for hover states on buttons */
-  --colour-text:           rgb(58, 59, 60);
-  --colour-text-on-primary: #ffffff;  /* white text on primary purple backgrounds */
-  --colour-text-on-secondary: #ffffff; /* white text on secondary yellow buttons */
-
-  /* Typography */
-  --font-title:  'Montserrat', sans-serif;
-  --font-body:   'Quicksand', sans-serif;
-  --font-code:   'JetBrains Mono', monospace;
-
-  /* Font weights */
-  --font-weight-title: 700;  /* Montserrat Bold */
-  --font-weight-body:  400;
-  --font-weight-body-medium: 600;
-}
-```
-
-### Google Fonts Import
-
-Both apps must import these fonts at the top of the root stylesheet:
-
-```css
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@700&family=Quicksand:wght@400;600&family=JetBrains+Mono&display=swap');
-```
-
-### Usage Rules
-
-| Element | Font | Colour |
-|---|---|---|
-| Page titles, section headings | Montserrat Bold | White (`--colour-text-on-primary`) on primary purple background |
-| Task titles, card headings | Montserrat Bold | `--colour-text` or white depending on background |
-| Body text, explainers, labels | Quicksand | `--colour-text` |
-| Buttons (primary actions) | Quicksand Medium | White on `--colour-secondary` (#FBA504) |
-| Code in editors | JetBrains Mono | Determined by CodeMirror theme |
-| Code in explainers | JetBrains Mono | Determined by CodeMirror theme |
-
-### Colour Application
-
-| Element | Colour |
-|---|---|
-| Section backgrounds, top bars, panels | `--colour-primary` (#6222CC) |
-| Primary buttons (Run, Start Session, Download) | `--colour-secondary` (#FBA504) |
-| Secondary buttons, outlines | `--colour-primary` with white text |
-| Hover states on primary buttons | `--colour-secondary-dark` |
-| Status — success | Green — `#22c55e` |
-| Status — error | Red — `#ef4444` |
-| Status — not run | Grey — `#9ca3af` |
-| Check passed | Green — `#22c55e` |
-| Read-only editor tint | Muted red — `rgba(239, 68, 68, 0.08)` |
-| Card backgrounds | White |
-| Page background | `#f5f5f5` or white |
-
-### CodeMirror Theme
-
-Use a light CodeMirror theme that complements the purple/yellow brand without clashing. Suggested: a custom light theme with:
-- Editor background: `#fafafa`
-- Active line: `#f0eafa` (light purple tint)
-- Selection: `#e9d5ff`
-- Gutter background: `#f0f0f0`
-- Syntax colours: standard light theme palette
-
-Do not use a dark editor theme — the overall UI is light and a dark editor would be jarring.
-
-### Notes
-
-- Never use Inter, Roboto, Arial, or system fonts — always Montserrat for titles and Quicksand for body
-- Montserrat is titles and headings only — do not use it for body copy or labels
-- Quicksand handles all body text, labels, button text, and UI copy
-- Yellow (`--colour-secondary`) is for buttons and key interactive elements — do not use it as a background for large areas
-- Purple (`--colour-primary`) is the dominant brand colour — use it confidently for section backgrounds and top bars
+### File key encoding (Firebase)
+- Always use `encodeFileKey`/`decodeFileKey` from `useSession.js` when reading/writing `currentFiles` or `sandboxFiles`
+- App state and localStorage use raw filenames with real dots
 
 ---
 
 ## What Not To Do
 
 - Do not add a backend server or API
-- Do not add authentication or login beyond `?teacher=true`
+- Do not add authentication beyond `?teacher=true`
 - Do not use `sessionStorage` for the Anonymous ID — use `localStorage`
-- Do not write student code to Firebase on every keystroke unless `activeStudentView` matches
-- Do not re-render the iframe on every keystroke during live view — only on Run
+- Do not write student code to Firebase per keystroke unless `activeStudentView` matches
+- Do not re-render the iframe per keystroke during live view — only on Run
 - Do not hardcode student limits
-- Do not add pip install support in v1
-- Do not add file I/O support in v1
-- Do not deviate from the Firebase data model or localStorage key formats
-- Do not duplicate Pyodide, iframe, CodeMirror, or Markdown logic — always use shared modules
-- Do not add dependencies not listed in this file without confirming with the user
+- Do not add pip install support
+- Do not add file I/O support
+- Do not deviate from Firebase data model or localStorage key formats
+- Do not duplicate Pyodide, iframe, CodeMirror, checks, or Markdown logic — always use shared modules
+- Do not store Firebase file keys with raw dots — always encode with `encodeFileKey`
+- Do not add dependencies without confirming with the user
 
 ---
 
-## Recommended Build Order
+## Doc Hygiene
 
-1. Vite + React scaffolding and repo structure
-2. Shared modules: CodeMirror config, Markdown renderer, iframe virtual filesystem, Pyodide loader
-3. Lesson Builder — form editor, explainer preview, code execution, check verification, export/import
-4. Classroom app — static first (hardcoded lesson, no Firebase)
-5. Classroom app — Python execution (shared Pyodide module already built)
-6. Classroom app — HTML/CSS/JS iframe execution (shared iframe module already built)
-7. Classroom app — Firebase session lifecycle and student sync
-8. Classroom app — teacher view and student grid
-9. Classroom app — live view and sandbox mode
-10. Polish, GitHub Pages deployment, cross-browser testing
+After any significant change, update the relevant section of SPEC.md, LESSON_SCHEMA.md, or this file before closing the task. Update CODEBASE_MAP.md when files are added, moved, or removed.
+
+When a library or CDN module is added, removed, or upgraded to a new major version, update **LICENSES.md** with the package name, version, and license. Check the license in the package's `package.json` or repository — pay particular attention to copyleft licenses (AGPL, GPL) before adding anything new.
 
 ---
 
-## Session Start Checklist
-
-At the start of every Codex session:
-1. Read this file (AGENTS.md)
-2. Read SPEC.md for the feature being worked on today
-3. Review existing code in the relevant directory before writing anything new
-4. Confirm the narrow goal for this session before starting
-
----
-
-*Last updated: Specification v2.2*
+*Last updated: May 2026 — merged from AGENTS.md + CLAUDE.md following codebase audit.*
