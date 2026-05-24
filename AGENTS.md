@@ -290,6 +290,89 @@ No room IDs. One session per lesson. `?teacher=true` is the only auth mechanism.
 
 ---
 
+## Git Workflow
+
+When implementing any new feature, always create a branch before writing any code:
+
+```bash
+git checkout -b feature/<short-kebab-case-description>
+```
+
+All feature work happens on this branch — never commit directly to `main`. Keep branches focused: one feature per branch.
+
+**Branch naming conventions:**
+- `feature/` — new functionality
+- `fix/` — bug fixes
+- `refactor/` — code restructuring with no behaviour change
+
+When the feature is complete, commit with a descriptive message and push to remote:
+
+```bash
+git push -u origin feature/<branch-name>
+```
+
+Then open a pull request using the GitHub CLI:
+
+```bash
+gh pr create --title "<Feature title>" --body "<summary of what was implemented, any non-obvious decisions made, and how to verify it works>"
+```
+
+Do not merge the PR — leave it open for review.
+
+---
+
+## Testing
+
+Read **TESTING.md** for full detail on tool choices, layer definitions, coverage thresholds, and what NOT to test.
+
+### Standing instructions — follow these on every session that touches tests or code
+
+**Test runner:** `npm test` (Vitest, unit + component). `npm run test:e2e` (Playwright, E2E). Never run tests via a raw `node` or `vite` command.
+
+**Where tests live:**
+- Unit and component tests: `src/**/__tests__/*.test.{js,jsx}` — mirroring source directory layout
+- E2E tests: `e2e/*.spec.js`
+- No co-located test files (never `src/shared/checks.test.js` next to `checks.js`)
+
+**Before writing a new test file:**
+1. Read the source file you are testing — never assume function signatures
+2. Check whether a `__tests__/` directory already exists for that location; if not, create it
+3. Mock at the module boundary, not inside the implementation
+
+**Mock rules:**
+- Firebase: `vi.mock('firebase/database', ...)` — never let tests hit the real database
+- localStorage: use jsdom's built-in; call `localStorage.clear()` in `beforeEach`
+- `window.matchMedia`: already mocked globally in `src/test/setup.js`
+- `URL.createObjectURL` / `URL.revokeObjectURL`: already mocked globally in `src/test/setup.js`
+- `crypto.randomUUID`: already mocked globally in `src/test/setup.js`
+- Pyodide / Web Worker: mock the `pyodide.js` manager interface with `vi.mock`; never import the worker directly in tests
+- `react-router-dom`: mock `useNavigate`, `useParams`, `useSearchParams` as needed per component
+
+**When adding a new source file:**
+- If it exports pure functions → add a unit test file in the matching `__tests__/` directory
+- If it is a React component or hook → add a component test file
+- If it changes a critical user journey → consider whether an E2E test needs updating
+
+**Coverage thresholds** are set deliberately low while complex components (StudentView, TeacherView, useSession, builder views) remain untested. Do not raise thresholds until the corresponding tests exist. See the phase table in TESTING.md.
+
+**Do not test:**
+- Firebase `onDisconnect` behaviour (requires real network disconnection)
+- Pyodide WASM execution (Web Worker; test the `pyodide.js` interface only via mock)
+- Scratch VM rendering (canvas-based, not jsdom-compatible)
+- CodeMirror `EditorView` internals (test config factories only)
+
+**E2E tests (Playwright):**
+- Only cover flows that do NOT require Firebase — solo student flows and builder flows
+- Firebase-dependent flows (live session, remote reset, activeStudentView) require Firebase Emulator and are out of scope until that infrastructure is set up
+- Base URL: `http://localhost:5173/editor/` — the Vite base is `/editor/`, not `/`
+- Hash routes: use `page.goto('#/lesson/:lessonId')` — Playwright prepends the baseURL
+
+**When the test suite fails in CI or before a build:**
+- `npm test` exits non-zero → `npm run build` will also fail (via `prebuild` lifecycle hook)
+- Fix the failing tests before merging or deploying — do not lower thresholds to make the build pass
+
+---
+
 ## Doc Hygiene
 
 After any significant change, update the relevant section of SPEC.md, LESSON_SCHEMA.md, or this file before closing the task. Update CODEBASE_MAP.md when files are added, moved, or removed.

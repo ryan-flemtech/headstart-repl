@@ -1,0 +1,201 @@
+import { describe, it, expect } from 'vitest'
+import {
+  flattenTasks,
+  findTaskById,
+  findGroupForTask,
+  getProgressItems,
+  updateTaskInTasks,
+  updateSubtaskTitles,
+} from '../taskUtils.js'
+
+// ─── Fixtures ────────────────────────────────────────────────────────────────
+
+const task1 = { id: 't1', title: 'Task 1' }
+const task2 = { id: 't2', title: 'Task 2' }
+const sub1  = { id: 's1', title: 'Group A - 1' }
+const sub2  = { id: 's2', title: 'Group A - 2' }
+const group = { id: 'g1', type: 'group', title: 'Group A', subtasks: [sub1, sub2] }
+
+// ─── flattenTasks ─────────────────────────────────────────────────────────────
+
+describe('flattenTasks', () => {
+  it('returns empty array for null input', () => {
+    expect(flattenTasks(null)).toEqual([])
+  })
+
+  it('returns empty array for empty array', () => {
+    expect(flattenTasks([])).toEqual([])
+  })
+
+  it('returns standalone tasks unchanged', () => {
+    expect(flattenTasks([task1, task2])).toEqual([task1, task2])
+  })
+
+  it('expands group to its subtasks', () => {
+    expect(flattenTasks([group])).toEqual([sub1, sub2])
+  })
+
+  it('mixes standalone tasks and groups in order', () => {
+    expect(flattenTasks([task1, group, task2])).toEqual([task1, sub1, sub2, task2])
+  })
+
+  it('handles group with no subtasks property', () => {
+    const emptyGroup = { id: 'gx', type: 'group', title: 'Empty' }
+    expect(flattenTasks([emptyGroup])).toEqual([])
+  })
+
+  it('returns a new array reference', () => {
+    const input = [task1]
+    const result = flattenTasks(input)
+    expect(result).not.toBe(input)
+  })
+})
+
+// ─── findTaskById ─────────────────────────────────────────────────────────────
+
+describe('findTaskById', () => {
+  it('returns null when tasks is empty', () => {
+    expect(findTaskById([], 't1')).toBeNull()
+  })
+
+  it('finds a standalone task', () => {
+    expect(findTaskById([task1, task2], 't1')).toBe(task1)
+  })
+
+  it('finds a subtask inside a group', () => {
+    expect(findTaskById([group], 's2')).toBe(sub2)
+  })
+
+  it('returns null for an unknown id', () => {
+    expect(findTaskById([task1, group], 'zzz')).toBeNull()
+  })
+})
+
+// ─── findGroupForTask ─────────────────────────────────────────────────────────
+
+describe('findGroupForTask', () => {
+  it('returns null when tasks is null', () => {
+    expect(findGroupForTask(null, 's1')).toBeNull()
+  })
+
+  it('returns null for a standalone task', () => {
+    expect(findGroupForTask([task1], 't1')).toBeNull()
+  })
+
+  it('returns the group containing the subtask', () => {
+    expect(findGroupForTask([task1, group], 's1')).toBe(group)
+  })
+
+  it('returns null when id is not in any group', () => {
+    expect(findGroupForTask([group], 'zzz')).toBeNull()
+  })
+})
+
+// ─── getProgressItems ─────────────────────────────────────────────────────────
+
+describe('getProgressItems', () => {
+  it('returns empty array for null input', () => {
+    expect(getProgressItems(null)).toEqual([])
+  })
+
+  it('maps standalone tasks to progress items with single taskId', () => {
+    const [item] = getProgressItems([task1])
+    expect(item).toEqual({ type: 'task', id: 't1', title: 'Task 1', taskIds: ['t1'] })
+  })
+
+  it('maps group to progress item with all subtask ids', () => {
+    const [item] = getProgressItems([group])
+    expect(item).toEqual({ type: 'group', id: 'g1', title: 'Group A', taskIds: ['s1', 's2'] })
+  })
+
+  it('handles group with no subtasks gracefully', () => {
+    const emptyGroup = { id: 'gx', type: 'group', title: 'Empty' }
+    const [item] = getProgressItems([emptyGroup])
+    expect(item.taskIds).toEqual([])
+  })
+})
+
+// ─── updateTaskInTasks ────────────────────────────────────────────────────────
+
+describe('updateTaskInTasks', () => {
+  it('replaces a standalone task by id', () => {
+    const updated = { id: 't1', title: 'Updated Task 1' }
+    const result = updateTaskInTasks([task1, task2], updated)
+    expect(result[0]).toBe(updated)
+    expect(result[1]).toBe(task2)
+  })
+
+  it('replaces a subtask inside a group', () => {
+    const updatedSub = { id: 's1', title: 'New Sub 1' }
+    const result = updateTaskInTasks([group], updatedSub)
+    expect(result[0].subtasks[0]).toBe(updatedSub)
+    expect(result[0].subtasks[1]).toBe(sub2)
+  })
+
+  it('leaves unrelated items untouched', () => {
+    const updated = { id: 't2', title: 'Updated 2' }
+    const result = updateTaskInTasks([task1, task2], updated)
+    expect(result[0]).toBe(task1)
+  })
+
+  it('returns a new array reference (immutability)', () => {
+    const input = [task1]
+    const result = updateTaskInTasks(input, { id: 't1', title: 'New' })
+    expect(result).not.toBe(input)
+  })
+
+  it('returns a new group object when a subtask is updated', () => {
+    const updatedSub = { id: 's1', title: 'New Sub 1' }
+    const result = updateTaskInTasks([group], updatedSub)
+    expect(result[0]).not.toBe(group)
+  })
+})
+
+// ─── updateSubtaskTitles ──────────────────────────────────────────────────────
+
+describe('updateSubtaskTitles', () => {
+  it('returns empty array for null input', () => {
+    expect(updateSubtaskTitles(null)).toEqual([])
+  })
+
+  it('leaves standalone tasks unchanged', () => {
+    const result = updateSubtaskTitles([task1, task2])
+    expect(result[0]).toBe(task1)
+    expect(result[1]).toBe(task2)
+  })
+
+  it('renames subtasks to "GroupTitle - N" format', () => {
+    const groupWithWrongTitles = {
+      id: 'g2', type: 'group', title: 'My Group',
+      subtasks: [
+        { id: 'x1', title: 'Wrong' },
+        { id: 'x2', title: 'Also Wrong' },
+      ],
+    }
+    const [result] = updateSubtaskTitles([groupWithWrongTitles])
+    expect(result.subtasks[0].title).toBe('My Group - 1')
+    expect(result.subtasks[1].title).toBe('My Group - 2')
+  })
+
+  it('preserves subtask objects whose title is already correct', () => {
+    const alreadyCorrect = {
+      id: 'g3', type: 'group', title: 'Group A',
+      subtasks: [
+        { id: 's1', title: 'Group A - 1' },
+        { id: 's2', title: 'Group A - 2' },
+      ],
+    }
+    const [result] = updateSubtaskTitles([alreadyCorrect])
+    expect(result).toBe(alreadyCorrect)
+    expect(result.subtasks[0]).toBe(alreadyCorrect.subtasks[0])
+  })
+
+  it('keeps original subtask title when group has no title', () => {
+    const untitledGroup = {
+      id: 'g4', type: 'group', title: '',
+      subtasks: [{ id: 'y1', title: 'Keep Me' }],
+    }
+    const [result] = updateSubtaskTitles([untitledGroup])
+    expect(result.subtasks[0].title).toBe('Keep Me')
+  })
+})
