@@ -1,7 +1,7 @@
 import React from 'react'
 import { CodeEditor } from '../../shared/CodeEditor'
 
-export default function PythonEditor({ code, onChange, readOnly = false, pyodideStatus }) {
+export default function PythonEditor({ code, onChange, readOnly = false, pyodideStatus, editorStyle }) {
   return (
     <div style={s.wrap}>
       {pyodideStatus === 'loading' && (
@@ -17,7 +17,7 @@ export default function PythonEditor({ code, onChange, readOnly = false, pyodide
         language="python"
         readOnly={readOnly}
         onChange={onChange}
-        style={{ flex: 1, minHeight: 240 }}
+        style={{ flex: 1, minHeight: 240, ...editorStyle }}
       />
     </div>
   )

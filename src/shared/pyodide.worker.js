@@ -20,12 +20,13 @@ const PYODIDE_CDN = 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/'
 
 let pyodide = null
 let _inputResolve = null
+let _lastVariables = {}
 
 // Python wrapper — same AST-transform approach as before, but now running in a Worker.
 // `import js as _js` gives access to this worker's globalThis.
 const WRAPPER = `
 import js as _js
-import sys, builtins, ast
+import sys, builtins, ast, json
 
 async def _hs_input(prompt=''):
     val = await _js.__hsInput(str(prompt) if prompt else '')
@@ -79,6 +80,24 @@ exec(compile(_mod, '<student>', 'exec'), _g)
 try:
     await _g['__hs_run__']()
 finally:
+    _hs_vars = {}
+    for _name, _value in _g.items():
+        if _name.startswith('_') or _name in ('__builtins__', '__name__'):
+            continue
+        try:
+            _hs_json = json.dumps(_value)
+            _hs_vars[_name] = {
+                'type': type(_value).__name__,
+                'json': _hs_json,
+                'repr': repr(_value),
+            }
+        except Exception:
+            _hs_vars[_name] = {
+                'type': type(_value).__name__,
+                'json': None,
+                'repr': repr(_value),
+            }
+    _js.__hsSetVariables(_hs_vars)
     sys.stdout.flush()
     sys.stderr.flush()
 `
@@ -90,6 +109,10 @@ globalThis.__hsInput = async (prompt) => {
     self.postMessage({ type: 'input_required', prompt: String(prompt) })
     _inputResolve = resolve
   })
+}
+
+globalThis.__hsSetVariables = (variables) => {
+  _lastVariables = variables?.toJs ? variables.toJs({ dict_converter: Object.fromEntries }) : (variables ?? {})
 }
 
 self.onmessage = async ({ data }) => {
@@ -114,6 +137,7 @@ self.onmessage = async ({ data }) => {
     }
 
     _inputResolve = null
+    _lastVariables = {}
 
     let _stdoutBuf = ''
     let _stderrBuf = ''
@@ -169,12 +193,12 @@ self.onmessage = async ({ data }) => {
     try {
       await pyodide.runPythonAsync(WRAPPER)
       flushBuffers()
-      self.postMessage({ type: 'done', status: 'success' })
+      self.postMessage({ type: 'done', status: 'success', variables: _lastVariables })
     } catch (err) {
       flushBuffers()
       const msg = String(err).replace(/^PythonError:\s*/, '')
       self.postMessage({ type: 'output', text: msg + '\n', kind: 'stderr' })
-      self.postMessage({ type: 'done', status: 'error' })
+      self.postMessage({ type: 'done', status: 'error', variables: _lastVariables })
     }
     return
   }

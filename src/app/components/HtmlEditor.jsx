@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { CodeEditor } from '../../shared/CodeEditor'
 import AssetBrowser from '../../shared/AssetBrowser'
 
-export default function HtmlEditor({ files = [], activeFile, onTabChange, onFileChange, readOnly = false, assetsPath, assets }) {
+export default function HtmlEditor({ files = [], activeFile, onTabChange, onFileChange, readOnly = false, assetsPath, assets, attachedTop = false }) {
   const [showAssets, setShowAssets] = useState(false)
   const current = files.find(f => f.name === activeFile) ?? files[0]
   const hasAssets = !!(assetsPath && assets?.length)
@@ -10,7 +10,7 @@ export default function HtmlEditor({ files = [], activeFile, onTabChange, onFile
   return (
     <div style={s.wrap}>
       {/* File tabs + Assets toggle */}
-      <div style={s.tabs} className="ui-tabs">
+      <div style={{ ...s.tabs, ...(attachedTop ? s.tabsAttachedTop : {}) }} className="ui-tabs">
         {files.map(f => (
           <button
             key={f.name}
@@ -54,7 +54,7 @@ export default function HtmlEditor({ files = [], activeFile, onTabChange, onFile
           language={current.type ?? 'html'}
           readOnly={readOnly}
           onChange={content => onFileChange?.(current.name, content)}
-          style={{ flex: 1, minHeight: 240 }}
+          style={{ flex: 1, minHeight: 240, ...(attachedTop ? s.editorAttachedTop : {}) }}
         />
       )}
     </div>
@@ -76,6 +76,9 @@ const s = {
     borderRadius: '8px 8px 0 0',
     overflowX: 'auto',
     flexShrink: 0,
+  },
+  tabsAttachedTop: {
+    borderRadius: 0,
   },
   tab: {
     background: 'transparent',
@@ -110,5 +113,8 @@ const s = {
     overflowY: 'auto',
     flexShrink: 0,
     borderBottom: '1px solid #e5e7eb',
+  },
+  editorAttachedTop: {
+    borderRadius: '0 0 8px 8px',
   },
 }

@@ -53,8 +53,13 @@
       "Bash(git -C \"C:\\\\Users\\\\rflem\\\\Documents\\\\hsc repl\" diff --stat HEAD)",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\rflem\\\\Documents\\\\hsc repl\\\\src\\\\app\" -Recurse -Type f)",
       "Bash(cd /mnt/c/Users/rflem/Documents && ls -la \"hsc repl/src/\" 2>/dev/null | head -20)",
+<<<<<<< HEAD
       "Bash(dir \"C:\\\\Users\\\\rflem\\\\Documents\\\\HSC Repl\\\\*.md\")",
       "Bash(node -e ' *)"
+=======
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\rflem\\\\Documents\\\\hsc repl\" -Recurse -Directory)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\rflem\\\\Documents\\\\hsc repl\\\\src\\\\app\" -Recurse -Directory)"
+>>>>>>> 453105a7b645c237ee8619d6f059fb00ed201f87
     ]
   }
 }

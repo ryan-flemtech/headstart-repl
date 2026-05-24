@@ -33,7 +33,7 @@ function validateLesson(lesson) {
   flat.forEach((task, i) => {
     const n = i + 1
     if (!task.title)    errors.push(`Task ${n} is missing a title`)
-    if (task.taskType === 'information' && !task.explainer?.trim()) {
+    if (task.taskType === 'information' && task.informationType !== 'introduction' && !task.explainer?.trim()) {
       errors.push(`Task ${n} is an information task but has no explainer`)
     }
 
@@ -109,10 +109,25 @@ function validateLesson(lesson) {
       if (task.interactionMode === 'submit' && checksArr.some(c => !checkAllowedForSubmit(c))) {
         errors.push(`Task ${n} uses submit mode but has a check that requires running the code`)
       }
-      if (checksArr.some(c => ['element_exists', 'element_count', 'element_value'].includes(c.type) && !c.selector?.trim())) {
+      if (checksArr.some(c => c.type?.startsWith('element_') && !c.selector?.trim())) {
         errors.push(`Task ${n} has an element check but no CSS selector`)
       }
-      if (checksArr.some(c => !['code_no_error', 'output_not_empty', 'element_exists'].includes(c.type) && !c.value && c.value !== 0)) {
+      if (checksArr.some(c => c.type === 'element_attribute' && !c.attribute?.trim())) {
+        errors.push(`Task ${n} has an element attribute check but no attribute name`)
+      }
+      if (checksArr.some(c => c.type === 'element_style_property' && !c.property?.trim())) {
+        errors.push(`Task ${n} has an element style check but no CSS property`)
+      }
+      if (checksArr.some(c => c.type?.startsWith('variable_') && !c.name?.trim())) {
+        errors.push(`Task ${n} has a variable check but no variable name`)
+      }
+      if (checksArr.some(c => c.type === 'variable_dict_key_value' && !c.key?.trim())) {
+        errors.push(`Task ${n} has a dictionary key-value check but no key`)
+      }
+      if (checksArr.some(c => c.type === 'variable_array_nth_item' && (c.index == null || c.index === '' || Number(c.index) < 0))) {
+        errors.push(`Task ${n} has an array N-th item check but no valid index`)
+      }
+      if (checksArr.some(c => !['code_no_error', 'output_not_empty', 'element_exists', 'element_attribute', 'element_style_property', 'variable_exists'].includes(c.type) && !c.value && c.value !== 0)) {
         errors.push(`Task ${n} has a check enabled but no check value`)
       }
     }
@@ -140,7 +155,7 @@ function validateLesson(lesson) {
       ? quizHasCheckValue(task)
       : type === 'scratch'
       ? !!task.check
-      : normalizeChecks(task.check).some(c => c.type === 'code_no_error' || c.type === 'output_not_empty' || c.type === 'element_exists' || c.value)
+      : normalizeChecks(task.check).some(c => c.type === 'code_no_error' || c.type === 'output_not_empty' || c.type === 'element_exists' || c.type === 'element_attribute' || c.type === 'element_style_property' || c.type === 'variable_exists' || c.value)
     if (checkHasValue && !task._checkTested)
       warnings.push(`Task ${n} has a completion check that hasn't been tested — run the task to verify it`)
   })
@@ -180,7 +195,14 @@ function normalizeTasksForExport(tasks) {
 
   function normalizeTask(task) {
     if (task.taskType === 'information') {
-      const exported = { id: idMap[task.id], taskType: 'information', title: task.title, explainer: task.explainer ?? '' }
+      const informationType = task.informationType ?? 'standard'
+      const exported = {
+        id: idMap[task.id],
+        taskType: 'information',
+        title: task.title,
+        explainer: task.explainer ?? '',
+      }
+      if (informationType !== 'standard') exported.informationType = informationType
       return exported
     }
 
