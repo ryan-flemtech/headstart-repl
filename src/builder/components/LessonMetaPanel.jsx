@@ -1,17 +1,41 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import SplitPane from '../../shared/SplitPane'
 import { CodeEditor } from '../../shared/CodeEditor'
 import FileManager from './FileManager'
 import ScratchWorkspace from '../../app/components/ScratchWorkspace'
 import { ScratchToolboxPicker, SpriteManager, BackdropManager } from './TaskEditor'
 import { DEFAULT_SPRITES } from '../../shared/scratch'
+import { useAssets } from '../../shared/useAssets'
 
 export default function LessonMetaPanel({ lesson, onUpdate, onCollapse }) {
   const [sandboxOpen, setSandboxOpen] = useState(false)
+  const { lessonAssets, loading: assetsLoading } = useAssets()
+  const lastAutoKeyRef = useRef('')
 
   function set(field, value) {
     onUpdate(prev => ({ ...prev, [field]: value }))
   }
+
+  // Auto-populate assetsPath when lesson ID changes
+  useEffect(() => {
+    if (!lesson.id) return
+    const newPath = `/assets/${lesson.id}/`
+    if (lesson.assetsPath !== newPath) {
+      onUpdate(prev => ({ ...prev, assetsPath: newPath }))
+    }
+  }, [lesson.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-populate assets list when manifest loads or ID/type changes
+  useEffect(() => {
+    if (assetsLoading || !lesson.id) return
+    const key = `${lesson.id}__${lesson.type}`
+    if (key === lastAutoKeyRef.current) return
+    lastAutoKeyRef.current = key
+    const merged = lessonAssets(lesson.id, lesson.type)
+    if (merged.length > 0) {
+      onUpdate(prev => ({ ...prev, assets: merged }))
+    }
+  }, [lesson.id, lesson.type, assetsLoading]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const isPython = lesson.type === 'python'
   const isScratch = lesson.type === 'scratch'
@@ -88,10 +112,7 @@ export default function LessonMetaPanel({ lesson, onUpdate, onCollapse }) {
               />
             </Field>
 
-            <AssetManager
-              assets={lesson.assets ?? []}
-              onChange={assets => set('assets', assets.length ? assets : undefined)}
-            />
+            <AssetSummary lessonId={lesson.id} lessonType={lesson.type} assets={lesson.assets} />
           </>
         )}
 
@@ -131,6 +152,8 @@ export default function LessonMetaPanel({ lesson, onUpdate, onCollapse }) {
                 sprites={lesson.sandboxSprites?.length > 0 ? lesson.sandboxSprites : DEFAULT_SPRITES}
                 backdrops={lesson.sandboxBackdrops?.length > 0 ? lesson.sandboxBackdrops : [{ id: 'backdrop1', name: 'Backdrop 1', colour: '#ffffff' }]}
                 assetsPath={lesson.assetsPath ?? ''}
+                lessonId={lesson.id}
+                lessonType={lesson.type}
                 onChange={state => set('sandboxStarter', state ? JSON.stringify(state) : undefined)}
                 onToolboxChange={v => set('sandboxToolbox', v || undefined)}
                 onSpritesChange={sprites => set('sandboxSprites', sprites)}
@@ -164,7 +187,7 @@ function cloneScratchStarter(value) {
   return JSON.parse(JSON.stringify(value))
 }
 
-function ScratchSandboxStarter({ value, toolbox, sprites, backdrops, assetsPath, onChange, onToolboxChange, onSpritesChange, onBackdropsChange }) {
+function ScratchSandboxStarter({ value, toolbox, sprites, backdrops, assetsPath, lessonId, lessonType, onChange, onToolboxChange, onSpritesChange, onBackdropsChange }) {
   const [activeTab, setActiveTab] = useState('starter')
   const [testBlocks, setTestBlocks] = useState(() => cloneScratchStarter(parseScratchStarter(value)))
   const [syncNowKey, setSyncNowKey] = useState(0)
@@ -232,6 +255,8 @@ function ScratchSandboxStarter({ value, toolbox, sprites, backdrops, assetsPath,
                 sprites={sprites}
                 onChange={onSpritesChange}
                 assetsPath={resolvedAssets}
+                lessonId={lessonId}
+                lessonType={lessonType}
               />
             </div>
             <div style={s.sidebarSection}>
@@ -240,6 +265,8 @@ function ScratchSandboxStarter({ value, toolbox, sprites, backdrops, assetsPath,
                 backdrops={backdrops}
                 onChange={onBackdropsChange}
                 assetsPath={resolvedAssets}
+                lessonId={lessonId}
+                lessonType={lessonType}
               />
             </div>
           </div>
@@ -316,41 +343,38 @@ function SandboxStarterFiles({ files, onChange }) {
   )
 }
 
-function AssetManager({ assets, onChange }) {
-  const [draft, setDraft] = useState('')
+function AssetSummary({ lessonId, lessonType, assets }) {
+  const { loading, error } = useAssets()
+  const count = assets?.length ?? 0
 
-  function add() {
-    const v = draft.trim().replace(/^\//, '')
-    if (!v || assets.includes(v)) return
-    onChange([...assets, v])
-    setDraft('')
+  let text
+  if (loading) {
+    text = 'Loading asset manifest…'
+  } else if (error) {
+    text = 'Could not load asset manifest. Add files to public/assets/ and restart the dev server.'
+  } else if (count > 0) {
+    const folderPart = lessonId ? `/assets/${lessonId}/` : 'lesson folder'
+    const sharedPart = lessonType ? ` and shared/${lessonType}/` : ''
+    text = `${count} asset${count !== 1 ? 's' : ''} auto-detected from ${folderPart}${sharedPart}`
+  } else {
+    const folderPart = lessonId ? `/assets/${lessonId}/` : 'a lesson folder'
+    text = `No assets found. Add files to public/${folderPart} to populate this field automatically.`
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+    <div style={s.assetSummary}>
       <span style={s.fieldLabel}>Asset files</span>
-      <div style={{ display: 'flex', gap: 6 }}>
-        <input
-          style={{ ...s.input, flex: 1 }}
-          value={draft}
-          onChange={e => setDraft(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && add()}
-          placeholder="images/logo.png"
-        />
-        <button style={s.addBtn} onClick={add}>Add</button>
-      </div>
-      {assets.map(path => (
-        <div key={path} style={s.assetRow}>
-          <span style={s.assetPath}>{path}</span>
-          <button
-            style={s.removeBtn}
-            onClick={() => onChange(assets.filter(a => a !== path))}
-            title="Remove"
-          >
-            x
-          </button>
+      <p style={s.summaryText}>{text}</p>
+      {count > 0 && (
+        <div style={s.assetChipRow}>
+          {assets.slice(0, 8).map(f => (
+            <span key={f} style={s.assetChip}>{f}</span>
+          ))}
+          {count > 8 && (
+            <span style={s.assetChip}>+{count - 8} more</span>
+          )}
         </div>
-      ))}
+      )}
     </div>
   )
 }
@@ -499,6 +523,30 @@ const s = {
     cursor: 'pointer',
     padding: '0 2px',
     lineHeight: 1,
+  },
+  assetSummary: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 4,
+  },
+  assetChipRow: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 4,
+    marginTop: 2,
+  },
+  assetChip: {
+    fontFamily: 'var(--font-code)',
+    fontSize: '0.72rem',
+    padding: '2px 7px',
+    borderRadius: 4,
+    background: '#f0ebff',
+    color: 'var(--colour-primary)',
+    border: '1px solid #ddd6fe',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    maxWidth: 200,
   },
   sandboxSummary: {
     display: 'flex',

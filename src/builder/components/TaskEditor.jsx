@@ -5,6 +5,7 @@ import { initPyodide, runPython, stopPython, provideInput, isPyodideReady } from
 import { buildIframeSrc, waitForIframeText } from '../../shared/iframe'
 import { evaluateSingleCheck, filterChecksForInteraction, normalizeChecks } from '../../shared/checks'
 import AssetBrowser from '../../shared/AssetBrowser'
+import AssetPicker from '../../shared/AssetPicker'
 import ExplainerEditor, { MarkdownFieldEditor } from './ExplainerEditor'
 import FileManager from './FileManager'
 import BuilderOutputPanel from './BuilderOutputPanel'
@@ -803,6 +804,8 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                           sprites={task.sprites?.length > 0 ? task.sprites : DEFAULT_SPRITES}
                           onChange={sprites => set('sprites', sprites)}
                           assetsPath={lesson.assetsPath ? resolveAssetsPath(lesson.assetsPath) : ''}
+                          lessonId={lesson.id}
+                          lessonType={lesson.type}
                         />
                       </div>
                       <div style={s.sidebarSection}>
@@ -811,6 +814,8 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                           backdrops={task.backdrops?.length > 0 ? task.backdrops : [{ id: 'backdrop1', name: 'Backdrop 1', colour: '#ffffff' }]}
                           onChange={backdrops => set('backdrops', backdrops)}
                           assetsPath={lesson.assetsPath ? resolveAssetsPath(lesson.assetsPath) : ''}
+                          lessonId={lesson.id}
+                          lessonType={lesson.type}
                         />
                       </div>
                     </div>
@@ -2427,7 +2432,7 @@ function QuizTypeIcon({ type }) {
 
 const SPRITE_TYPE_OPTIONS = SPRITE_TYPES.map(t => ({ value: t, label: t.charAt(0).toUpperCase() + t.slice(1) }))
 
-export function SpriteManager({ sprites, onChange, assetsPath = '' }) {
+export function SpriteManager({ sprites, onChange, assetsPath = '', lessonId, lessonType }) {
   const [expandedCostumes, setExpandedCostumes] = React.useState({})
 
   function addSprite() {
@@ -2517,6 +2522,8 @@ export function SpriteManager({ sprites, onChange, assetsPath = '' }) {
             <CostumeManager
               costumes={sp.costumes ?? []}
               assetsPath={assetsPath}
+              lessonId={lessonId}
+              lessonType={lessonType}
               onAdd={() => addCostume(sp.id)}
               onRemove={idx => removeCostume(sp.id, idx)}
               onUpdate={(idx, field, value) => updateCostume(sp.id, idx, field, value)}
@@ -2531,7 +2538,7 @@ export function SpriteManager({ sprites, onChange, assetsPath = '' }) {
   )
 }
 
-function CostumeManager({ costumes, assetsPath, onAdd, onRemove, onUpdate }) {
+function CostumeManager({ costumes, assetsPath, lessonId, lessonType, onAdd, onRemove, onUpdate }) {
   return (
     <div style={s.costumeManager}>
       {costumes.length === 0 && (
@@ -2550,12 +2557,15 @@ function CostumeManager({ costumes, assetsPath, onAdd, onRemove, onUpdate }) {
               onChange={e => onUpdate(idx, 'name', e.target.value)}
               placeholder="Costume name"
             />
-            <input
-              style={{ ...s.input, flex: '2 1 160px', minWidth: 0 }}
-              value={c.image ?? ''}
-              onChange={e => onUpdate(idx, 'image', e.target.value)}
-              placeholder="e.g. sprites/cat1.png"
-            />
+            <div style={{ flex: '2 1 160px', minWidth: 0 }}>
+              <AssetPicker
+                lessonId={lessonId}
+                lessonType={lessonType}
+                value={c.image ?? ''}
+                onChange={v => onUpdate(idx, 'image', v)}
+                placeholder="e.g. sprites/cat1.png"
+              />
+            </div>
             {resolvedUrl && (
               <img
                 src={resolvedUrl}
@@ -2581,7 +2591,7 @@ function CostumeManager({ costumes, assetsPath, onAdd, onRemove, onUpdate }) {
   )
 }
 
-export function BackdropManager({ backdrops, onChange, assetsPath }) {
+export function BackdropManager({ backdrops, onChange, assetsPath, lessonId, lessonType }) {
   function add() {
     const next = backdrops.length + 1
     onChange([...backdrops, { id: `backdrop${next}`, name: `Backdrop ${next}`, colour: '#87CEEB' }])
@@ -2623,12 +2633,15 @@ export function BackdropManager({ backdrops, onChange, assetsPath }) {
             </select>
             {isImage ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: '1 1 160px', minWidth: 0 }}>
-                <input
-                  style={{ ...s.input, flex: 1, minWidth: 0 }}
-                  value={b.image ?? ''}
-                  onChange={e => update(b.id, { image: e.target.value })}
-                  placeholder="e.g. backdrops/sky.png"
-                />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <AssetPicker
+                    lessonId={lessonId}
+                    lessonType={lessonType}
+                    value={b.image ?? ''}
+                    onChange={v => update(b.id, { image: v })}
+                    placeholder="e.g. backdrops/sky.png"
+                  />
+                </div>
                 {resolvedUrl && (
                   <img
                     src={resolvedUrl}
