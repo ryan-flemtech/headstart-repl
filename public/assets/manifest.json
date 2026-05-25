@@ -1,0 +1,16 @@
+{
+  "lessons": {
+    "lesson-1": [
+      "images/images.jpg"
+    ],
+    "web": [
+      "level 1/lesson-1/images/images.jpg"
+    ]
+  },
+  "shared": {
+    "python": [],
+    "html": [],
+    "scratch": [],
+    "common": []
+  }
+}
