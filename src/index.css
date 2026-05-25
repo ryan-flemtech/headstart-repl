@@ -449,16 +449,20 @@ select {
   gap: 16px;
 }
 
-.information-recap__left,
 .information-task--introduction {
   background: var(--colour-primary);
   color: var(--colour-text-on-primary);
 }
 
 .information-recap__left {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   overflow: auto;
   border-radius: 8px;
   padding: 24px 28px;
+  background: #fff;
+  text-align: center;
 }
 
 .information-recap__left h1,
@@ -469,19 +473,6 @@ select {
   font-family: var(--font-title);
   font-weight: var(--font-weight-title);
   letter-spacing: 0;
-  color: inherit;
-}
-
-.information-recap__left p,
-.information-recap__left li,
-.information-recap__left td,
-.information-recap__left th {
-  color: inherit;
-}
-
-.information-recap__left code {
-  background: rgba(0, 0, 0, 0.2);
-  color: inherit;
 }
 
 .information-recap__content {
