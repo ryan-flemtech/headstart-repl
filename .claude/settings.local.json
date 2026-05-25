@@ -53,13 +53,21 @@
       "Bash(git -C \"C:\\\\Users\\\\rflem\\\\Documents\\\\hsc repl\" diff --stat HEAD)",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\rflem\\\\Documents\\\\hsc repl\\\\src\\\\app\" -Recurse -Type f)",
       "Bash(cd /mnt/c/Users/rflem/Documents && ls -la \"hsc repl/src/\" 2>/dev/null | head -20)",
-<<<<<<< HEAD
       "Bash(dir \"C:\\\\Users\\\\rflem\\\\Documents\\\\HSC Repl\\\\*.md\")",
-      "Bash(node -e ' *)"
-=======
+      "Bash(node -e ' *)",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\rflem\\\\Documents\\\\hsc repl\" -Recurse -Directory)",
-      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\rflem\\\\Documents\\\\hsc repl\\\\src\\\\app\" -Recurse -Directory)"
->>>>>>> 453105a7b645c237ee8619d6f059fb00ed201f87
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\rflem\\\\Documents\\\\hsc repl\\\\src\\\\app\" -Recurse -Directory)",
+      "Bash(gh issue *)",
+      "Bash(git checkout *)",
+      "Bash(npm test *)",
+      "Bash(npx vitest *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(gh pr create --repo Headstart-Coding-Launchpad/editor --title 'Two Pane View: rename recap type and make both panes editable markdown' --body ' *)",
+      "Bash(gh repo *)",
+      "Bash(gh pr create --title 'Two Pane View: rename recap type and make both panes editable markdown' --body ' *)",
+      "Bash(git remote *)"
     ]
   }
 }
