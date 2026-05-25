@@ -6,6 +6,14 @@ import ScratchWorkspace from '../../app/components/ScratchWorkspace'
 import { ScratchToolboxPicker, SpriteManager, BackdropManager } from './TaskEditor'
 import { DEFAULT_SPRITES } from '../../shared/scratch'
 import { useAssets } from '../../shared/useAssets'
+import { isImageFile, useImagePreview, ImagePreviewTooltip } from '../../shared/AssetImagePreview'
+
+function resolveAssetsPath(rawPath) {
+  if (!rawPath) return ''
+  const base = import.meta.env.BASE_URL.replace(/\/$/, '')
+  const encoded = rawPath.split('/').map(seg => (seg ? encodeURIComponent(seg) : seg)).join('/')
+  return window.location.origin + base + encoded
+}
 
 export default function LessonMetaPanel({ lesson, onUpdate, onCollapse }) {
   const [sandboxOpen, setSandboxOpen] = useState(false)
@@ -112,7 +120,7 @@ export default function LessonMetaPanel({ lesson, onUpdate, onCollapse }) {
               />
             </Field>
 
-            <AssetSummary lessonId={lesson.id} lessonType={lesson.type} assets={lesson.assets} />
+            <AssetSummary lessonId={lesson.id} lessonType={lesson.type} assets={lesson.assets} assetsPath={resolveAssetsPath(lesson.assetsPath)} />
           </>
         )}
 
@@ -343,7 +351,26 @@ function SandboxStarterFiles({ files, onChange }) {
   )
 }
 
-function AssetSummary({ lessonId, lessonType, assets }) {
+function AssetChip({ f, assetsPath }) {
+  const { preview, showPreview, hidePreview } = useImagePreview()
+  const canPreview = isImageFile(f) && assetsPath
+  const chipRef = useRef(null)
+  return (
+    <>
+      <span
+        ref={chipRef}
+        style={s.assetChip}
+        onMouseEnter={canPreview ? () => showPreview(assetsPath.replace(/\/$/, '') + '/' + f, chipRef.current) : undefined}
+        onMouseLeave={canPreview ? hidePreview : undefined}
+      >
+        {f}
+      </span>
+      {canPreview && <ImagePreviewTooltip preview={preview} />}
+    </>
+  )
+}
+
+function AssetSummary({ lessonId, lessonType, assets, assetsPath }) {
   const { loading, error } = useAssets()
   const count = assets?.length ?? 0
 
@@ -368,7 +395,7 @@ function AssetSummary({ lessonId, lessonType, assets }) {
       {count > 0 && (
         <div style={s.assetChipRow}>
           {assets.slice(0, 8).map(f => (
-            <span key={f} style={s.assetChip}>{f}</span>
+            <AssetChip key={f} f={f} assetsPath={assetsPath} />
           ))}
           {count > 8 && (
             <span style={s.assetChip}>+{count - 8} more</span>

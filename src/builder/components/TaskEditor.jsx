@@ -2564,6 +2564,7 @@ function CostumeManager({ costumes, assetsPath, lessonId, lessonType, onAdd, onR
                 value={c.image ?? ''}
                 onChange={v => onUpdate(idx, 'image', v)}
                 placeholder="e.g. sprites/cat1.png"
+                assetsPath={assetsPath}
               />
             </div>
             {resolvedUrl && (
@@ -2640,6 +2641,7 @@ export function BackdropManager({ backdrops, onChange, assetsPath, lessonId, les
                     value={b.image ?? ''}
                     onChange={v => update(b.id, { image: v })}
                     placeholder="e.g. backdrops/sky.png"
+                    assetsPath={assetsPath}
                   />
                 </div>
                 {resolvedUrl && (
