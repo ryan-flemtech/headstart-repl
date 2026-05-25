@@ -443,7 +443,7 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
           <div style={s.infoTypeGrid}>
             {[
               { value: 'standard', label: 'Standard', hint: 'Markdown explainer' },
-              { value: 'recap', label: 'Recap', hint: 'Recap pane plus markdown' },
+              { value: 'recap', label: 'Two Pane View', hint: 'Two editable markdown panes' },
               { value: 'introduction', label: 'Introduction', hint: 'Lesson metadata slide' },
             ].map(option => {
               const active = (task.informationType ?? 'standard') === option.value
@@ -463,10 +463,25 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
         </Field>
       )}
 
+      {isInformation && (task.informationType ?? 'standard') === 'recap' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <span style={{ fontFamily: 'var(--font-body)', fontWeight: 600, fontSize: '0.88rem', color: 'var(--colour-text)' }}>
+            Left pane (Markdown)
+          </span>
+          <ExplainerEditor
+            title={task.title}
+            value={task.leftContent ?? ''}
+            onChange={v => set('leftContent', v)}
+            lessonType={lesson.type}
+            inlineCodeLanguages={explainerInlineCodeLanguages}
+          />
+        </div>
+      )}
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontFamily: 'var(--font-body)', fontWeight: 600, fontSize: '0.88rem', color: 'var(--colour-text)' }}>
-            Explainer (Markdown)
+            {isInformation && (task.informationType ?? 'standard') === 'recap' ? 'Right pane (Markdown)' : 'Explainer (Markdown)'}
           </span>
           <label style={s.checkToggle}>
             <input

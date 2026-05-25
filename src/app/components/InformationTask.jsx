@@ -31,8 +31,8 @@ export default function InformationTask({ task, lesson, fill = true }) {
   if (informationType === 'recap') {
     return (
       <section className="information-task information-task--recap">
-        <div className="information-recap__label">
-          <h1>Recap!</h1>
+        <div className="information-recap__left">
+          <MarkdownRenderer content={task?.leftContent ?? ''} textScale={markdownTextScale} />
         </div>
         <div className="information-recap__content">
           <MarkdownRenderer content={task?.explainer ?? ''} textScale={markdownTextScale} />

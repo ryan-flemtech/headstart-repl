@@ -449,33 +449,45 @@ select {
   gap: 16px;
 }
 
-.information-recap__label,
+.information-recap__left,
 .information-task--introduction {
   background: var(--colour-primary);
   color: var(--colour-text-on-primary);
 }
 
-.information-recap__label {
+.information-recap__left {
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: auto;
   border-radius: 8px;
-  padding: 32px;
+  padding: 24px 28px;
   text-align: center;
+  font-family: var(--font-title);
+  font-weight: var(--font-weight-title);
 }
 
-.information-recap__label h1,
+.information-recap__left h1,
+.information-recap__left h2,
+.information-recap__left h3,
 .information-intro__content h1 {
-  margin: 0;
+  margin: 0 0 0.5em;
   font-family: var(--font-title);
   font-weight: var(--font-weight-title);
   letter-spacing: 0;
   color: inherit;
 }
 
-.information-recap__label h1 {
-  font-size: 3rem;
-  line-height: 1;
+.information-recap__left p,
+.information-recap__left li,
+.information-recap__left td,
+.information-recap__left th {
+  color: inherit;
+}
+
+.information-recap__left code {
+  background: rgba(0, 0, 0, 0.2);
+  color: inherit;
 }
 
 .information-recap__content {
@@ -533,12 +545,8 @@ select {
     grid-template-columns: 1fr;
   }
 
-  .information-recap__label {
+  .information-recap__left {
     min-height: 160px;
-  }
-
-  .information-recap__label h1 {
-    font-size: 2.4rem;
   }
 
   .information-task--introduction {
