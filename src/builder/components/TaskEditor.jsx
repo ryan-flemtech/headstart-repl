@@ -773,16 +773,6 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
               />
             </>
           )}
-
-          {lesson.assetsPath && lesson.assets?.length > 0 && (
-            <Field label="Asset browser (read-only - copy paths to use in explainer)">
-              <AssetBrowser
-                assetsPath={resolveAssetsPath(lesson.assetsPath)}
-                assets={lesson.assets}
-                copyMode="full"
-              />
-            </Field>
-          )}
         </>
       ) : isScratch ? (
         <>
