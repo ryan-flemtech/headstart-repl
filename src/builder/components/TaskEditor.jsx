@@ -5,7 +5,7 @@ import { initPyodide, runPython, stopPython, provideInput, isPyodideReady } from
 import { buildIframeSrc, waitForIframeText } from '../../shared/iframe'
 import { evaluateSingleCheck, filterChecksForInteraction, normalizeChecks } from '../../shared/checks'
 import AssetBrowser from '../../shared/AssetBrowser'
-import AssetPicker from '../../shared/AssetPicker'
+import { useAssets } from '../../shared/useAssets'
 import ExplainerEditor, { MarkdownFieldEditor } from './ExplainerEditor'
 import FileManager from './FileManager'
 import BuilderOutputPanel from './BuilderOutputPanel'
@@ -2558,6 +2558,10 @@ export function SpriteManager({ sprites, onChange, assetsPath = '', lessonId, le
 }
 
 function CostumeManager({ costumes, assetsPath, lessonId, lessonType, onAdd, onRemove, onUpdate }) {
+  const [browsingIdx, setBrowsingIdx] = React.useState(null)
+  const { lessonAssets } = useAssets()
+  const assets = lessonAssets(lessonId, lessonType)
+
   return (
     <div style={s.costumeManager}>
       {costumes.length === 0 && (
@@ -2567,40 +2571,58 @@ function CostumeManager({ costumes, assetsPath, lessonId, lessonType, onAdd, onR
         const resolvedUrl = c.image && assetsPath
           ? assetsPath.replace(/\/$/, '') + '/' + c.image.replace(/^\//, '')
           : null
+        const isBrowsing = browsingIdx === idx
         return (
-          <div key={idx} style={s.costumeRow}>
-            {idx === 0 && <span style={s.costumeTag}>Default</span>}
-            <input
-              style={{ ...s.input, flex: '1 1 100px', minWidth: 0 }}
-              value={c.name}
-              onChange={e => onUpdate(idx, 'name', e.target.value)}
-              placeholder="Costume name"
-            />
-            <div style={{ flex: '2 1 160px', minWidth: 0 }}>
-              <AssetPicker
-                lessonId={lessonId}
-                lessonType={lessonType}
-                value={c.image ?? ''}
-                onChange={v => onUpdate(idx, 'image', v)}
-                placeholder="e.g. sprites/cat1.png"
-                assetsPath={assetsPath}
+          <div key={idx} style={s.costumeBlock}>
+            <div style={s.costumeRow}>
+              {idx === 0 && <span style={s.costumeTag}>Default</span>}
+              <input
+                style={{ ...s.input, flex: '1 1 100px', minWidth: 0 }}
+                value={c.name}
+                onChange={e => onUpdate(idx, 'name', e.target.value)}
+                placeholder="Costume name"
               />
+              <input
+                style={{ ...s.input, flex: '2 1 120px', minWidth: 0, fontFamily: 'var(--font-code)', fontSize: '0.8rem' }}
+                value={c.image ?? ''}
+                onChange={e => onUpdate(idx, 'image', e.target.value)}
+                placeholder="e.g. sprites/cat1.png"
+              />
+              {assets.length > 0 && (
+                <button
+                  type="button"
+                  style={{ ...s.browseToggleBtn, ...(isBrowsing ? s.browseToggleBtnActive : {}) }}
+                  onClick={() => setBrowsingIdx(isBrowsing ? null : idx)}
+                  title="Browse assets"
+                >
+                  Browse
+                </button>
+              )}
+              {resolvedUrl && (
+                <img
+                  src={resolvedUrl}
+                  alt=""
+                  style={s.costumeThumb}
+                  onError={e => { e.target.style.display = 'none' }}
+                  onLoad={e => { e.target.style.display = 'block' }}
+                />
+              )}
+              <button
+                type="button"
+                style={s.removeBtn}
+                onClick={() => onRemove(idx)}
+                title="Remove costume"
+              >✕</button>
             </div>
-            {resolvedUrl && (
-              <img
-                src={resolvedUrl}
-                alt=""
-                style={s.costumeThumb}
-                onError={e => { e.target.style.display = 'none' }}
-                onLoad={e => { e.target.style.display = 'block' }}
+            {isBrowsing && assetsPath && assets.length > 0 && (
+              <AssetBrowser
+                assetsPath={assetsPath}
+                assets={assets}
+                mode="select"
+                onSelect={path => { onUpdate(idx, 'image', path); setBrowsingIdx(null) }}
+                style={s.inlineBrowser}
               />
             )}
-            <button
-              type="button"
-              style={s.removeBtn}
-              onClick={() => onRemove(idx)}
-              title="Remove costume"
-            >✕</button>
           </div>
         )
       })}
@@ -2612,6 +2634,10 @@ function CostumeManager({ costumes, assetsPath, lessonId, lessonType, onAdd, onR
 }
 
 export function BackdropManager({ backdrops, onChange, assetsPath, lessonId, lessonType }) {
+  const [browsingId, setBrowsingId] = React.useState(null)
+  const { lessonAssets } = useAssets()
+  const assets = lessonAssets(lessonId, lessonType)
+
   function add() {
     const next = backdrops.length + 1
     onChange([...backdrops, { id: `backdrop${next}`, name: `Backdrop ${next}`, colour: '#87CEEB' }])
@@ -2631,66 +2657,84 @@ export function BackdropManager({ backdrops, onChange, assetsPath, lessonId, les
         const resolvedUrl = isImage && b.image && assetsPath
           ? assetsPath.replace(/\/$/, '') + '/' + b.image.replace(/^\//, '')
           : null
+        const isBrowsing = browsingId === b.id
         return (
-          <div key={b.id} style={s.backdropRow}>
-            {i === 0 && <span style={s.backdropTag}>Default</span>}
-            <input
-              style={{ ...s.input, flex: '1 1 110px', minWidth: 0 }}
-              value={b.name}
-              onChange={e => update(b.id, { name: e.target.value })}
-              placeholder="Name"
-            />
-            <select
-              style={{ ...s.select, flex: '0 0 auto' }}
-              value={isImage ? 'image' : 'colour'}
-              onChange={e => {
-                if (e.target.value === 'image') update(b.id, { image: '', colour: undefined })
-                else update(b.id, { colour: b.colour ?? '#ffffff', image: undefined })
-              }}
-            >
-              <option value="colour">Colour</option>
-              <option value="image">Image</option>
-            </select>
-            {isImage ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: '1 1 160px', minWidth: 0 }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <AssetPicker
-                    lessonId={lessonId}
-                    lessonType={lessonType}
+          <div key={b.id} style={s.backdropBlock}>
+            <div style={s.backdropRow}>
+              {i === 0 && <span style={s.backdropTag}>Default</span>}
+              <input
+                style={{ ...s.input, flex: '1 1 110px', minWidth: 0 }}
+                value={b.name}
+                onChange={e => update(b.id, { name: e.target.value })}
+                placeholder="Name"
+              />
+              <select
+                style={{ ...s.select, flex: '0 0 auto' }}
+                value={isImage ? 'image' : 'colour'}
+                onChange={e => {
+                  if (e.target.value === 'image') update(b.id, { image: '', colour: undefined })
+                  else update(b.id, { colour: b.colour ?? '#ffffff', image: undefined })
+                }}
+              >
+                <option value="colour">Colour</option>
+                <option value="image">Image</option>
+              </select>
+              {isImage ? (
+                <>
+                  <input
+                    style={{ ...s.input, flex: '2 1 120px', minWidth: 0, fontFamily: 'var(--font-code)', fontSize: '0.8rem' }}
                     value={b.image ?? ''}
-                    onChange={v => update(b.id, { image: v })}
+                    onChange={e => update(b.id, { image: e.target.value })}
                     placeholder="e.g. backdrops/sky.png"
-                    assetsPath={assetsPath}
                   />
+                  {assets.length > 0 && (
+                    <button
+                      type="button"
+                      style={{ ...s.browseToggleBtn, ...(isBrowsing ? s.browseToggleBtnActive : {}) }}
+                      onClick={() => setBrowsingId(isBrowsing ? null : b.id)}
+                      title="Browse assets"
+                    >
+                      Browse
+                    </button>
+                  )}
+                  {resolvedUrl && (
+                    <img
+                      src={resolvedUrl}
+                      alt=""
+                      style={s.backdropThumb}
+                      onError={e => { e.target.style.display = 'none' }}
+                      onLoad={e => { e.target.style.display = 'block' }}
+                    />
+                  )}
+                </>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <input
+                    type="color"
+                    value={b.colour ?? '#ffffff'}
+                    onChange={e => update(b.id, { colour: e.target.value })}
+                    style={s.colorInput}
+                  />
+                  <div style={{ ...s.backdropSwatch, background: b.colour ?? '#ffffff' }} />
                 </div>
-                {resolvedUrl && (
-                  <img
-                    src={resolvedUrl}
-                    alt=""
-                    style={s.backdropThumb}
-                    onError={e => { e.target.style.display = 'none' }}
-                    onLoad={e => { e.target.style.display = 'block' }}
-                  />
-                )}
-              </div>
-            ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <input
-                  type="color"
-                  value={b.colour ?? '#ffffff'}
-                  onChange={e => update(b.id, { colour: e.target.value })}
-                  style={s.colorInput}
-                />
-                <div style={{ ...s.backdropSwatch, background: b.colour ?? '#ffffff' }} />
-              </div>
+              )}
+              <button
+                type="button"
+                style={s.removeBtn}
+                onClick={() => remove(b.id)}
+                disabled={backdrops.length <= 1}
+                title="Remove backdrop"
+              >✕</button>
+            </div>
+            {isBrowsing && assetsPath && assets.length > 0 && (
+              <AssetBrowser
+                assetsPath={assetsPath}
+                assets={assets}
+                mode="select"
+                onSelect={path => { update(b.id, { image: path }); setBrowsingId(null) }}
+                style={s.inlineBrowser}
+              />
             )}
-            <button
-              type="button"
-              style={s.removeBtn}
-              onClick={() => remove(b.id)}
-              disabled={backdrops.length <= 1}
-              title="Remove backdrop"
-            >✕</button>
           </div>
         )
       })}
@@ -3576,6 +3620,11 @@ const s = {
     flexDirection: 'column',
     gap: 6,
   },
+  costumeBlock: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 4,
+  },
   costumeRow: {
     display: 'flex',
     alignItems: 'center',
@@ -3656,11 +3705,38 @@ const s = {
     borderRadius: 8,
     background: '#fafafa',
   },
+  backdropBlock: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 4,
+  },
   backdropRow: {
     display: 'flex',
     alignItems: 'center',
     gap: 8,
     flexWrap: 'wrap',
+  },
+  browseToggleBtn: {
+    padding: '4px 10px',
+    fontSize: '0.78rem',
+    fontFamily: 'var(--font-body)',
+    fontWeight: 600,
+    border: '1px solid var(--colour-primary)',
+    borderRadius: 4,
+    background: 'transparent',
+    color: 'var(--colour-primary)',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+    flexShrink: 0,
+  },
+  browseToggleBtnActive: {
+    background: 'var(--colour-primary)',
+    color: '#fff',
+  },
+  inlineBrowser: {
+    maxHeight: 160,
+    overflowY: 'auto',
+    borderRadius: 4,
   },
   backdropTag: {
     fontFamily: 'var(--font-body)',
