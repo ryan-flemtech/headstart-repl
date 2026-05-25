@@ -6,7 +6,7 @@ import ScratchWorkspace from '../../app/components/ScratchWorkspace'
 import { ScratchToolboxPicker, SpriteManager, BackdropManager } from './TaskEditor'
 import { DEFAULT_SPRITES } from '../../shared/scratch'
 import { useAssets } from '../../shared/useAssets'
-import { isImageFile, useImagePreview, ImagePreviewTooltip } from '../../shared/AssetImagePreview'
+import AssetBrowser from '../../shared/AssetBrowser'
 
 function resolveAssetsPath(rawPath) {
   if (!rawPath) return ''
@@ -347,25 +347,6 @@ function SandboxStarterFiles({ files, onChange }) {
   )
 }
 
-function AssetChip({ f, assetsPath }) {
-  const { preview, showPreview, hidePreview } = useImagePreview()
-  const canPreview = isImageFile(f) && assetsPath
-  const chipRef = useRef(null)
-  return (
-    <>
-      <span
-        ref={chipRef}
-        style={s.assetChip}
-        onMouseEnter={canPreview ? () => showPreview(assetsPath.replace(/\/$/, '') + '/' + f, chipRef.current) : undefined}
-        onMouseLeave={canPreview ? hidePreview : undefined}
-      >
-        {f}
-      </span>
-      {canPreview && <ImagePreviewTooltip preview={preview} />}
-    </>
-  )
-}
-
 function AssetSummary({ lessonId, lessonType, assets, assetsPath }) {
   const { loading, error } = useAssets()
   const count = assets?.length ?? 0
@@ -388,15 +369,13 @@ function AssetSummary({ lessonId, lessonType, assets, assetsPath }) {
     <div style={s.assetSummary}>
       <span style={s.fieldLabel}>Asset files</span>
       <p style={s.summaryText}>{text}</p>
-      {count > 0 && (
-        <div style={s.assetChipRow}>
-          {assets.slice(0, 8).map(f => (
-            <AssetChip key={f} f={f} assetsPath={assetsPath} />
-          ))}
-          {count > 8 && (
-            <span style={s.assetChip}>+{count - 8} more</span>
-          )}
-        </div>
+      {count > 0 && assetsPath && (
+        <AssetBrowser
+          assetsPath={assetsPath}
+          assets={assets}
+          copyMode="relative"
+          style={s.assetBrowserInPanel}
+        />
       )}
     </div>
   )
@@ -552,24 +531,9 @@ const s = {
     flexDirection: 'column',
     gap: 4,
   },
-  assetChipRow: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: 4,
-    marginTop: 2,
-  },
-  assetChip: {
-    fontFamily: 'var(--font-code)',
-    fontSize: '0.72rem',
-    padding: '2px 7px',
-    borderRadius: 4,
-    background: '#f0ebff',
-    color: 'var(--colour-primary)',
-    border: '1px solid #ddd6fe',
-    whiteSpace: 'nowrap',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    maxWidth: 200,
+  assetBrowserInPanel: {
+    maxHeight: 180,
+    overflowY: 'auto',
   },
   sandboxSummary: {
     display: 'flex',

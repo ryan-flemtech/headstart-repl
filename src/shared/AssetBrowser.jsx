@@ -16,7 +16,7 @@ function buildTree(assets) {
   return root
 }
 
-function DirNode({ name, children, assetsPath, copyMode, depth }) {
+function DirNode({ name, children, assetsPath, copyMode, mode, onSelect, depth }) {
   const [open, setOpen] = React.useState(true)
   return (
     <div>
@@ -29,14 +29,14 @@ function DirNode({ name, children, assetsPath, copyMode, depth }) {
       </button>
       {open && Object.entries(children).map(([n, node]) =>
         node._dir
-          ? <DirNode key={n} name={n} children={node._ch} assetsPath={assetsPath} copyMode={copyMode} depth={depth + 1} />
-          : <FileNode key={n} name={n} path={node._path} assetsPath={assetsPath} copyMode={copyMode} depth={depth + 1} />
+          ? <DirNode key={n} name={n} children={node._ch} assetsPath={assetsPath} copyMode={copyMode} mode={mode} onSelect={onSelect} depth={depth + 1} />
+          : <FileNode key={n} name={n} path={node._path} assetsPath={assetsPath} copyMode={copyMode} mode={mode} onSelect={onSelect} depth={depth + 1} />
       )}
     </div>
   )
 }
 
-function FileNode({ name, path, assetsPath, copyMode, depth }) {
+function FileNode({ name, path, assetsPath, copyMode, mode, onSelect, depth }) {
   const [copied, setCopied] = React.useState(false)
   const rowRef = useRef(null)
   const { preview, showPreview, hidePreview } = useImagePreview()
@@ -51,6 +51,10 @@ function FileNode({ name, path, assetsPath, copyMode, depth }) {
     })
   }
 
+  function handleSelect() {
+    onSelect?.(path)
+  }
+
   return (
     <div
       ref={rowRef}
@@ -59,32 +63,41 @@ function FileNode({ name, path, assetsPath, copyMode, depth }) {
       onMouseLeave={isImageFile(name) ? hidePreview : undefined}
     >
       <span style={s.itemLabel}>{isImageFile(name) ? '🖼' : '📄'} {name}</span>
-      <button style={s.copyBtn} onClick={handleCopy}>
-        {copied ? '✓' : 'Copy'}
-      </button>
+      {mode === 'select' ? (
+        <button style={s.actionBtn} onClick={handleSelect}>
+          Select
+        </button>
+      ) : (
+        <button style={s.actionBtn} onClick={handleCopy}>
+          {copied ? '✓' : 'Copy'}
+        </button>
+      )}
       <ImagePreviewTooltip preview={preview} />
     </div>
   )
 }
 
 /**
- * Renders a read-only tree of lesson assets with click-to-copy and image previews.
+ * Renders a tree of lesson assets.
  *
  * assetsPath  – fully resolved URL base, e.g. "/headstart-repl/assets/web-intro/"
  * assets      – array of relative paths, e.g. ["images/logo.png", "fonts/x.woff2"]
- * copyMode    – "relative" copies just the path; "full" copies assetsPath + path
+ * copyMode    – "relative" copies just the path; "full" copies assetsPath + path (browse mode only)
+ * mode        – "browse" (default) shows Copy button; "select" shows Select button and calls onSelect
+ * onSelect    – called with the relative asset path when mode="select" and user clicks Select
+ * style       – optional style overrides on the outer panel
  */
-export default function AssetBrowser({ assetsPath, assets, copyMode = 'relative' }) {
+export default function AssetBrowser({ assetsPath, assets, copyMode = 'relative', mode = 'browse', onSelect, style }) {
   if (!assetsPath || !assets?.length) return null
 
   const tree = buildTree(assets)
 
   return (
-    <div style={s.panel}>
+    <div style={{ ...s.panel, ...style }}>
       {Object.entries(tree).map(([name, node]) =>
         node._dir
-          ? <DirNode key={name} name={name} children={node._ch} assetsPath={assetsPath} copyMode={copyMode} depth={0} />
-          : <FileNode key={name} name={name} path={node._path} assetsPath={assetsPath} copyMode={copyMode} depth={0} />
+          ? <DirNode key={name} name={name} children={node._ch} assetsPath={assetsPath} copyMode={copyMode} mode={mode} onSelect={onSelect} depth={0} />
+          : <FileNode key={name} name={name} path={node._path} assetsPath={assetsPath} copyMode={copyMode} mode={mode} onSelect={onSelect} depth={0} />
       )}
     </div>
   )
@@ -125,7 +138,7 @@ const s = {
   },
   arrow: { fontSize: '0.7rem', color: '#9ca3af', flexShrink: 0, width: 10 },
   itemLabel: { flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  copyBtn: {
+  actionBtn: {
     flexShrink: 0,
     padding: '2px 8px',
     background: 'var(--colour-primary)',
