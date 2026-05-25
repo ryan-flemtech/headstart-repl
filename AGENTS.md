@@ -321,6 +321,12 @@ Do not merge the PR — leave it open for review.
 
 ### Responding to PR review comments
 
+When a commit is made in response to a PR review comment, always post a follow-up reply on that PR comment thread explaining what was changed and which commit addresses it:
+
+```bash
+gh pr comment <pr-number> --body "Addressed in <commit-sha>: <brief explanation of what was changed>"
+```
+
 When asked to handle or address a comment on a pull request, always reply directly to that comment thread — even before starting work — to acknowledge what will be done. Once the commit is made, post a follow-up reply on the same thread explaining what was changed and which commit addresses it:
 
 ```bash

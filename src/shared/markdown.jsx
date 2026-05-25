@@ -273,6 +273,7 @@ function InlineHighlightedCode({ lang, code }) {
 
 const BlockCodeContext = React.createContext(false)
 const MarkdownScaleContext = React.createContext(1)
+const MarkdownInheritColorContext = React.createContext(false)
 
 function splitTableRow(line) {
   const trimmed = line.trim()
@@ -386,7 +387,6 @@ function MarkdownTable({ headers, align, rows }) {
 const headingBase = {
   fontFamily: 'var(--font-title)',
   fontWeight: 700,
-  color: 'var(--colour-primary-dark)',
   lineHeight: 1.25,
 }
 
@@ -479,19 +479,27 @@ function removeCalloutMarker(children) {
 const components = {
   h1({ children }) {
     const scale = React.useContext(MarkdownScaleContext)
-    return <h1 style={{ ...headingBase, fontSize: `${1.45 * scale}rem`, margin: '4px 0 10px' }}>{children}</h1>
+    const inheritColor = React.useContext(MarkdownInheritColorContext)
+    const color = inheritColor ? 'inherit' : 'var(--colour-primary-dark)'
+    return <h1 style={{ ...headingBase, color, fontSize: `${1.45 * scale}rem`, margin: '4px 0 10px' }}>{children}</h1>
   },
   h2({ children }) {
     const scale = React.useContext(MarkdownScaleContext)
-    return <h2 style={{ ...headingBase, fontSize: `${1.22 * scale}rem`, margin: '4px 0 8px' }}>{children}</h2>
+    const inheritColor = React.useContext(MarkdownInheritColorContext)
+    const color = inheritColor ? 'inherit' : 'var(--colour-primary-dark)'
+    return <h2 style={{ ...headingBase, color, fontSize: `${1.22 * scale}rem`, margin: '4px 0 8px' }}>{children}</h2>
   },
   h3({ children }) {
     const scale = React.useContext(MarkdownScaleContext)
-    return <h3 style={{ ...headingBase, fontSize: `${1.05 * scale}rem`, margin: '8px 0 6px' }}>{children}</h3>
+    const inheritColor = React.useContext(MarkdownInheritColorContext)
+    const color = inheritColor ? 'inherit' : 'var(--colour-primary-dark)'
+    return <h3 style={{ ...headingBase, color, fontSize: `${1.05 * scale}rem`, margin: '8px 0 6px' }}>{children}</h3>
   },
   h4({ children }) {
     const scale = React.useContext(MarkdownScaleContext)
-    return <h4 style={{ ...headingBase, fontSize: `${0.95 * scale}rem`, margin: '8px 0 4px' }}>{children}</h4>
+    const inheritColor = React.useContext(MarkdownInheritColorContext)
+    const color = inheritColor ? 'inherit' : 'var(--colour-primary-dark)'
+    return <h4 style={{ ...headingBase, color, fontSize: `${0.95 * scale}rem`, margin: '8px 0 4px' }}>{children}</h4>
   },
   code({ node, className, children, ...props }) {
     const isInBlock = React.useContext(BlockCodeContext)
@@ -508,13 +516,14 @@ const components = {
       if (categorize(text)) {
         return <InlineScratchBlock text={text.trim()} />
       }
+      const inheritColor = React.useContext(MarkdownInheritColorContext)
       return (
         <code
           style={{
             ...CODE_FONT_STYLE,
             fontSize: '0.88em',
-            background: '#f0eafa',
-            color: '#4e1aa3',
+            background: inheritColor ? 'rgba(0,0,0,0.2)' : '#f0eafa',
+            color: inheritColor ? 'inherit' : '#4e1aa3',
             padding: '2px 6px',
             borderRadius: '4px',
           }}
@@ -607,7 +616,9 @@ const components = {
     )
   },
   strong({ children }) {
-    return <strong style={{ fontWeight: 700, color: 'var(--colour-primary)' }}>{children}</strong>
+    const inheritColor = React.useContext(MarkdownInheritColorContext)
+    const color = inheritColor ? 'inherit' : 'var(--colour-primary)'
+    return <strong style={{ fontWeight: 700, color }}>{children}</strong>
   },
   em({ children }) {
     return <em>{children}</em>
@@ -628,16 +639,17 @@ const components = {
   },
 }
 
-export function MarkdownRenderer({ content, title, style, textScale = 1 }) {
+export function MarkdownRenderer({ content, title, style, textScale = 1, inheritColor = false }) {
   const blocks = parseMarkdownTables(content)
   const heading = String(title ?? '').trim()
 
   return (
+    <MarkdownInheritColorContext.Provider value={inheritColor}>
     <MarkdownScaleContext.Provider value={textScale}>
       <div
         style={{
           fontFamily: "'Quicksand', sans-serif",
-          color: 'var(--colour-text)',
+          color: inheritColor ? 'inherit' : 'var(--colour-text)',
           fontSize: `${15 * textScale}px`,
           lineHeight: 1.65,
           ...style,
@@ -663,5 +675,6 @@ export function MarkdownRenderer({ content, title, style, textScale = 1 }) {
             ))}
       </div>
     </MarkdownScaleContext.Provider>
+    </MarkdownInheritColorContext.Provider>
   )
 }
