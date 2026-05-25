@@ -340,7 +340,7 @@ gh pr comment <pr-number> --body "Addressed in <commit-sha>: <brief explanation 
 
 ### Closing the worktree after submitting a PR
 
-After `gh pr create` completes successfully, exit and remove the worktree using the ExitWorktree tool (or, if running in a terminal, `git worktree remove <path>`). This keeps the repo tidy and signals that the branch is in review.
+After gh pr create completes successfully, check out the branch in the main working directory (git checkout <branch>), then exit and remove the worktree using the ExitWorktree tool. This allows testing with the local environment before the PR is merged.
 
 ---
 
