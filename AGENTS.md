@@ -319,6 +319,23 @@ gh pr create --title "<Feature title>" --body "<summary of what was implemented,
 
 Do not merge the PR — leave it open for review.
 
+### Responding to PR review comments
+
+When asked to handle or address a comment on a pull request, always reply directly to that comment thread — even before starting work — to acknowledge what will be done. Once the commit is made, post a follow-up reply on the same thread explaining what was changed and which commit addresses it:
+
+```bash
+# Reply to a specific review comment thread
+gh api repos/{owner}/{repo}/pulls/comments/{comment_id}/replies \
+  --method POST --field body="Addressed in <commit-sha>: <brief explanation of what was changed>"
+
+# Or post a general PR comment
+gh pr comment <pr-number> --body "Addressed in <commit-sha>: <brief explanation of what was changed>"
+```
+
+### Closing the worktree after submitting a PR
+
+After `gh pr create` completes successfully, exit and remove the worktree using the ExitWorktree tool (or, if running in a terminal, `git worktree remove <path>`). This keeps the repo tidy and signals that the branch is in review.
+
 ---
 
 ## Testing
