@@ -32,7 +32,7 @@ export default function InformationTask({ task, lesson, fill = true }) {
     return (
       <section className="information-task information-task--recap">
         <div className="information-recap__left">
-          <MarkdownRenderer content={task?.leftContent ?? ''} textScale={markdownTextScale} />
+          <MarkdownRenderer content={task?.leftContent ?? ''} textScale={markdownTextScale} inheritColor />
         </div>
         <div className="information-recap__content">
           <MarkdownRenderer content={task?.explainer ?? ''} textScale={markdownTextScale} />
