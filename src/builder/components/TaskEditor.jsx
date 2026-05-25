@@ -474,6 +474,8 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
             onChange={v => set('leftContent', v)}
             lessonType={lesson.type}
             inlineCodeLanguages={explainerInlineCodeLanguages}
+            assets={lesson.assets ?? []}
+            assetsPath={lesson.assetsPath ? resolveAssetsPath(lesson.assetsPath) : ''}
           />
         </div>
       )}
@@ -499,6 +501,8 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
             onChange={v => set('explainer', v)}
             lessonType={lesson.type}
             inlineCodeLanguages={explainerInlineCodeLanguages}
+            assets={lesson.assets ?? []}
+            assetsPath={lesson.assetsPath ? resolveAssetsPath(lesson.assetsPath) : ''}
           />
         )}
       </div>

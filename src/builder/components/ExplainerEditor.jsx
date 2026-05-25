@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { MarkdownRenderer } from '../../shared/markdown'
 
+const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'])
+
 const SCRATCH_BLOCK_CATEGORIES = [
   {
     label: 'Events',
@@ -89,7 +91,7 @@ const SCRATCH_BLOCK_CATEGORIES = [
   },
 ]
 
-export default function ExplainerEditor({ title, value, onChange, lessonType, inlineCodeLanguages }) {
+export default function ExplainerEditor({ title, value, onChange, lessonType, inlineCodeLanguages, assets, assetsPath }) {
   return (
     <MarkdownFieldEditor
       title={title}
@@ -102,6 +104,8 @@ export default function ExplainerEditor({ title, value, onChange, lessonType, in
       showTitle
       lessonType={lessonType}
       inlineCodeLanguages={inlineCodeLanguages}
+      assets={assets}
+      assetsPath={assetsPath}
     />
   )
 }
@@ -117,6 +121,8 @@ export function MarkdownFieldEditor({
   showTitle = false,
   lessonType = null,
   inlineCodeLanguages = null,
+  assets = null,
+  assetsPath = '',
 }) {
   const [tab, setTab] = useState('entry')
   const textareaRef = useRef(null)
@@ -219,6 +225,14 @@ export function MarkdownFieldEditor({
       newVal = before + toInsert + after
       cursorStart = start + toInsert.length
       cursorEnd = cursorStart
+    } else if (action.startsWith('image:')) {
+      const path = action.slice('image:'.length)
+      const base = assetsPath ? assetsPath.replace(/\/$/, '') : ''
+      const url = base ? base + '/' + path.replace(/^\//, '') : path
+      const toInsert = `![Image](${url})`
+      newVal = before + toInsert + after
+      cursorStart = start + toInsert.length
+      cursorEnd = cursorStart
     }
 
     if (newVal !== val) {
@@ -258,7 +272,12 @@ export function MarkdownFieldEditor({
       </div>
 
       {tab === 'entry' && (
-        <MarkdownToolbar lessonType={lessonType} inlineCodeLanguages={inlineCodeLanguages} onAction={applyFormat} />
+        <MarkdownToolbar
+          lessonType={lessonType}
+          inlineCodeLanguages={inlineCodeLanguages}
+          onAction={applyFormat}
+          imageAssets={(assets ?? []).filter(p => IMAGE_EXTS.has(p.split('.').pop().toLowerCase()))}
+        />
       )}
 
       <div style={s.pane}>
@@ -283,7 +302,7 @@ export function MarkdownFieldEditor({
   )
 }
 
-function MarkdownToolbar({ lessonType, inlineCodeLanguages, onAction }) {
+function MarkdownToolbar({ lessonType, inlineCodeLanguages, onAction, imageAssets = [] }) {
   const [openDropdown, setOpenDropdown] = useState(null)
   const toolbarRef = useRef(null)
 
@@ -503,6 +522,47 @@ function MarkdownToolbar({ lessonType, inlineCodeLanguages, onAction }) {
                     ))}
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* Image assets — only when the lesson has image assets */}
+      {imageAssets.length > 0 && (
+        <>
+          <span style={s.sep} />
+          <div style={s.toolbarGroup}>
+            <button
+              type="button"
+              title="Insert image"
+              style={s.toolbarBtn}
+              onMouseDown={e => {
+                e.preventDefault()
+                setOpenDropdown(d => d === 'image' ? null : 'image')
+              }}
+            >
+              Image ▾
+            </button>
+            {openDropdown === 'image' && (
+              <div style={{ ...s.dropdown, width: 220, maxHeight: 260, overflowY: 'auto' }}>
+                {imageAssets.map(path => {
+                  const name = path.split('/').pop()
+                  return (
+                    <button
+                      key={path}
+                      type="button"
+                      style={s.dropdownItem}
+                      onMouseDown={e => {
+                        e.preventDefault()
+                        onAction('image:' + path)
+                        setOpenDropdown(null)
+                      }}
+                    >
+                      {name}
+                    </button>
+                  )
+                })}
               </div>
             )}
           </div>

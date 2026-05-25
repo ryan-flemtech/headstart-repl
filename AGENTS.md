@@ -97,7 +97,7 @@ Both apps import from `src/shared/`. Never duplicate this logic.
 | `codemirror.js` | `createBaseExtensions(type, readOnly)`, `headstartTheme`, `headstartHighlight`, `getTabSize(type)` |
 | `firebase.js` | Exports `db` (Firebase Realtime Database reference, initialized from env vars) |
 | `iframe.js` | `buildIframeSrc(files, entryFile, options)`, `waitForIframeText(timeout)` |
-| `markdown.jsx` | `MarkdownRenderer({content, title, style})`, `InlineMarkdown({content})` |
+| `markdown.jsx` | `MarkdownRenderer({content, title, style})`, `InlineMarkdown({content})` — supports `img` via standard Markdown image syntax |
 | `pyodide.js` | `initPyodide()`, `runPython(code, {onOutput?, onInputRequired?})`, `stopPython()`, `provideInput(value)` |
 | `pyodide.worker.js` | Web Worker: Pyodide loader, async `input()` AST transform, stdout/stderr streaming |
 | `scratch.js` | Block definitions, interpreter, `createRunContext()`, `createSpriteState()`, `createRunSignal()` |
@@ -326,6 +326,21 @@ When a commit is made in response to a PR review comment, always post a follow-u
 ```bash
 gh pr comment <pr-number> --body "Addressed in <commit-sha>: <brief explanation of what was changed>"
 ```
+
+When asked to handle or address a comment on a pull request, always reply directly to that comment thread — even before starting work — to acknowledge what will be done. Once the commit is made, post a follow-up reply on the same thread explaining what was changed and which commit addresses it:
+
+```bash
+# Reply to a specific review comment thread
+gh api repos/{owner}/{repo}/pulls/comments/{comment_id}/replies \
+  --method POST --field body="Addressed in <commit-sha>: <brief explanation of what was changed>"
+
+# Or post a general PR comment
+gh pr comment <pr-number> --body "Addressed in <commit-sha>: <brief explanation of what was changed>"
+```
+
+### Closing the worktree after submitting a PR
+
+After `gh pr create` completes successfully, exit and remove the worktree using the ExitWorktree tool (or, if running in a terminal, `git worktree remove <path>`). This keeps the repo tidy and signals that the branch is in review.
 
 ---
 
