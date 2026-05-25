@@ -1,10 +1,5 @@
-import React, { useState, useRef } from 'react'
-
-const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'])
-
-function isImage(name) {
-  return IMAGE_EXTS.has(name.split('.').pop().toLowerCase())
-}
+import React, { useRef } from 'react'
+import { isImageFile, useImagePreview, ImagePreviewTooltip } from './AssetImagePreview'
 
 function buildTree(assets) {
   const root = {}
@@ -22,7 +17,7 @@ function buildTree(assets) {
 }
 
 function DirNode({ name, children, assetsPath, copyMode, depth }) {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = React.useState(true)
   return (
     <div>
       <button
@@ -42,9 +37,9 @@ function DirNode({ name, children, assetsPath, copyMode, depth }) {
 }
 
 function FileNode({ name, path, assetsPath, copyMode, depth }) {
-  const [copied, setCopied] = useState(false)
-  const [previewPos, setPreviewPos] = useState(null)
+  const [copied, setCopied] = React.useState(false)
   const rowRef = useRef(null)
+  const { preview, showPreview, hidePreview } = useImagePreview()
 
   const staticUrl = assetsPath + path
   const copyValue = copyMode === 'full' ? staticUrl : path
@@ -56,34 +51,18 @@ function FileNode({ name, path, assetsPath, copyMode, depth }) {
     })
   }
 
-  function handleMouseEnter() {
-    if (!isImage(name) || !rowRef.current) return
-    const rect = rowRef.current.getBoundingClientRect()
-    const tipW = 192  // maxWidth 180 + padding 12
-    const tipH = 156  // maxHeight 140 + padding 12
-    const x = rect.right + 8 + tipW > window.innerWidth
-      ? rect.left - tipW - 8
-      : rect.right + 8
-    const y = Math.min(rect.top, window.innerHeight - tipH - 8)
-    setPreviewPos({ x, y })
-  }
-
   return (
     <div
       ref={rowRef}
       style={{ ...s.fileRow, paddingLeft: 8 + depth * 14 }}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={() => setPreviewPos(null)}
+      onMouseEnter={isImageFile(name) ? () => showPreview(staticUrl, rowRef.current) : undefined}
+      onMouseLeave={isImageFile(name) ? hidePreview : undefined}
     >
-      <span style={s.itemLabel}>{isImage(name) ? '🖼' : '📄'} {name}</span>
+      <span style={s.itemLabel}>{isImageFile(name) ? '🖼' : '📄'} {name}</span>
       <button style={s.copyBtn} onClick={handleCopy}>
         {copied ? '✓' : 'Copy'}
       </button>
-      {previewPos && (
-        <div style={{ ...s.tooltip, left: previewPos.x, top: previewPos.y }}>
-          <img src={staticUrl} alt={name} style={s.previewImg} />
-        </div>
-      )}
+      <ImagePreviewTooltip preview={preview} />
     </div>
   )
 }
@@ -156,21 +135,5 @@ const s = {
     fontSize: '0.75rem',
     cursor: 'pointer',
     fontFamily: 'var(--font-body)',
-  },
-  tooltip: {
-    position: 'fixed',
-    zIndex: 9999,
-    background: '#fff',
-    border: '1px solid #e5e7eb',
-    borderRadius: 6,
-    padding: 6,
-    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-    pointerEvents: 'none',
-  },
-  previewImg: {
-    maxWidth: 180,
-    maxHeight: 140,
-    display: 'block',
-    borderRadius: 4,
   },
 }
