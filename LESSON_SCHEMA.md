@@ -302,10 +302,11 @@ Information tasks work in every lesson type. They can render as a standard expla
 | `taskType` | Yes | string | Must be `information`. |
 | `informationType` | No | string | `standard`, `recap`, or `introduction`. Defaults to `standard`. |
 | `title` | Yes | string | Shown in progress UI. |
-| `explainer` | Yes* | string | Markdown content. Required for `standard` and `recap`; optional for `introduction`, which renders lesson metadata. |
+| `leftContent` | No | string | Markdown for the left pane. Only used when `informationType` is `recap`. |
+| `explainer` | Yes* | string | Markdown content. Required for `standard` and `recap` (right pane); optional for `introduction`, which renders lesson metadata. |
 | `hints` | No | string array | Optional, although information tasks normally do not need hints. |
 
-`standard` renders the explainer as before. `recap` renders two panes: a purple "Recap!" pane and a Markdown pane using `explainer`. `introduction` renders the lesson title, level, lesson type, and description from the lesson metadata on a purple background.
+`standard` renders the explainer as before. `recap` (also called "Two Pane View" in the builder) renders two side-by-side markdown panes: a purple left pane using `leftContent` and a white right pane using `explainer`. `introduction` renders the lesson title, level, lesson type, and description from the lesson metadata on a purple background.
 
 Do not include code fields, carry fields, `interactionMode`, `options`, or `check`.
 
