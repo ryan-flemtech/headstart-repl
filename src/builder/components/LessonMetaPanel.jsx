@@ -106,23 +106,19 @@ export default function LessonMetaPanel({ lesson, onUpdate, onCollapse }) {
           />
         </Field>
 
-        {(lesson.type === 'html' || lesson.type === 'scratch') && (
-          <>
-            <Field label="Assets path" hint="e.g. /assets/scratch-intro/">
-              <input
-                style={s.input}
-                value={lesson.assetsPath ?? ''}
-                onChange={e => {
-                  const v = e.target.value
-                  set('assetsPath', v || undefined)
-                }}
-                placeholder="/assets/lesson-id/"
-              />
-            </Field>
+        <Field label="Assets path" hint="e.g. /assets/scratch-intro/">
+          <input
+            style={s.input}
+            value={lesson.assetsPath ?? ''}
+            onChange={e => {
+              const v = e.target.value
+              set('assetsPath', v || undefined)
+            }}
+            placeholder="/assets/lesson-id/"
+          />
+        </Field>
 
-            <AssetSummary lessonId={lesson.id} lessonType={lesson.type} assets={lesson.assets} assetsPath={resolveAssetsPath(lesson.assetsPath)} />
-          </>
-        )}
+        <AssetSummary lessonId={lesson.id} lessonType={lesson.type} assets={lesson.assets} assetsPath={resolveAssetsPath(lesson.assetsPath)} />
 
         <div style={s.divider} />
 
