@@ -612,6 +612,20 @@ const components = {
   em({ children }) {
     return <em>{children}</em>
   },
+  img({ src, alt }) {
+    return (
+      <img
+        src={src}
+        alt={alt ?? ''}
+        style={{
+          maxWidth: '100%',
+          borderRadius: 6,
+          display: 'block',
+          margin: '10px 0',
+        }}
+      />
+    )
+  },
 }
 
 export function MarkdownRenderer({ content, title, style, textScale = 1 }) {
@@ -640,7 +654,7 @@ export function MarkdownRenderer({ content, title, style, textScale = 1 }) {
               allowedElements={[
                 'h1', 'h2', 'h3', 'h4',
                 'p', 'strong', 'em', 'code', 'pre', 'br', 'span',
-                'ul', 'ol', 'li', 'blockquote',
+                'ul', 'ol', 'li', 'blockquote', 'img',
               ]}
               unwrapDisallowed
             >
