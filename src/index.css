@@ -317,6 +317,17 @@ select {
 .status-dot--error   { background: #ef4444; }
 .status-dot--idle    { background: #9ca3af; }
 
+/* Teacher live broadcast dot shown in student banner */
+.live-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ef4444;
+  flex-shrink: 0;
+  animation: online-pulse 1.2s ease-in-out infinite;
+}
+
 /* Student presence badges */
 @keyframes online-pulse {
   0%, 100% { opacity: 1; transform: scale(1); }
