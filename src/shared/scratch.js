@@ -86,7 +86,7 @@ export const SCRATCH_BLOCK_DEFINITIONS = {
       this.jsonInit({
         type: 'event_broadcast',
         message0: 'broadcast %1',
-        args0: [stringInput('BROADCAST_INPUT', 'message1')],
+        args0: [{ type: 'field_input', name: 'BROADCAST_INPUT', text: 'message1' }],
         previousStatement: null,
         nextStatement: null,
         colour: '#FFAB19',
@@ -98,7 +98,7 @@ export const SCRATCH_BLOCK_DEFINITIONS = {
       this.jsonInit({
         type: 'event_broadcastandwait',
         message0: 'broadcast %1 and wait',
-        args0: [stringInput('BROADCAST_INPUT', 'message1')],
+        args0: [{ type: 'field_input', name: 'BROADCAST_INPUT', text: 'message1' }],
         previousStatement: null,
         nextStatement: null,
         colour: '#FFAB19',
@@ -530,8 +530,6 @@ export const DEFAULT_TOOLBOX = {
 }
 
 const VALUE_INPUT_DEFAULTS = {
-  event_broadcast: { BROADCAST_INPUT: textShadow('message1') },
-  event_broadcastandwait: { BROADCAST_INPUT: textShadow('message1') },
   motion_movesteps: { STEPS: numberShadow(10) },
   motion_turnright: { DEGREES: numberShadow(15) },
   motion_turnleft: { DEGREES: numberShadow(15) },
@@ -1258,5 +1256,30 @@ export function saveWorkspace(Blockly, workspace) {
 }
 
 export function loadWorkspace(Blockly, workspace, state) {
-  Blockly.serialization.workspaces.load(state, workspace)
+  Blockly.serialization.workspaces.load(migrateBroadcastState(state), workspace)
+}
+
+// Converts old input_value+shadow format for broadcast blocks to the new field_input format.
+// Needed for workspaces saved before the broadcast block definition changed.
+function migrateBroadcastState(state) {
+  if (!state?.blocks?.blocks) return state
+  const clone = JSON.parse(JSON.stringify(state))
+  for (const block of clone.blocks.blocks) migrateBroadcastBlock(block)
+  return clone
+}
+
+function migrateBroadcastBlock(block) {
+  if (!block) return
+  if (block.type === 'event_broadcast' || block.type === 'event_broadcastandwait') {
+    const text = block.inputs?.BROADCAST_INPUT?.shadow?.fields?.TEXT
+    if (text != null && block.fields?.BROADCAST_INPUT == null) {
+      block.fields = { ...(block.fields ?? {}), BROADCAST_INPUT: String(text) }
+      delete block.inputs.BROADCAST_INPUT
+      if (!Object.keys(block.inputs).length) delete block.inputs
+    }
+  }
+  if (block.next?.block) migrateBroadcastBlock(block.next.block)
+  for (const inp of Object.values(block.inputs ?? {})) {
+    if (inp?.block) migrateBroadcastBlock(inp.block)
+  }
 }
