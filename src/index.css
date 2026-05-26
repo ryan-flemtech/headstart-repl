@@ -392,6 +392,64 @@ select {
   background: #eab308;
 }
 
+/* Teacher lesson and current-task timers */
+.teacher-timers {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #fff;
+  flex-shrink: 0;
+}
+
+.teacher-timer-card {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  border: 1px solid #d8b4fe;
+  border-radius: 8px;
+  padding: 6px 12px;
+  background: #f7f2ff;
+  color: var(--colour-primary);
+  font-family: var(--font-body);
+}
+
+.teacher-timer-card strong {
+  font-family: var(--font-code);
+  font-size: 1rem;
+}
+
+.teacher-timer-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.teacher-timer-plan {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.teacher-timer-card--task {
+  margin-left: auto;
+}
+
+@keyframes teacherTimerExpired {
+  0%, 100% {
+    background: #fef2f2;
+    border-color: #fca5a5;
+  }
+  50% {
+    background: #fecaca;
+    border-color: #ef4444;
+  }
+}
+
+.teacher-timer-card--expired {
+  color: #991b1b;
+  animation: teacherTimerExpired 1s ease-in-out infinite;
+}
+
 /* Task transition animation */
 @keyframes taskSlideFromRight {
   from {

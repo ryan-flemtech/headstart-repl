@@ -50,6 +50,9 @@ export function useSession(lessonId) {
       state:                 'waiting',
       currentTaskId:         1,
       createdAt:             Date.now(),
+      startedAt:             null,
+      currentTaskStartedAt:  null,
+      endedAt:               null,
       activeStudentView:     null,
       teacherLive:           null,
       isPaused:              false,
@@ -66,12 +69,19 @@ export function useSession(lessonId) {
   }
 
   async function startSession() {
-    await update(ref(db, `sessions/${lessonId}`), { state: 'active' })
+    const now = Date.now()
+    await update(ref(db, `sessions/${lessonId}`), {
+      state:                'active',
+      startedAt:            now,
+      currentTaskStartedAt: now,
+      endedAt:              null,
+    })
   }
 
   async function endSession() {
     await update(ref(db, `sessions/${lessonId}`), {
       state:                 'ended',
+      endedAt:               Date.now(),
       activeStudentView:     null,
       teacherLive:           null,
       sandboxCode:           null,
@@ -86,7 +96,7 @@ export function useSession(lessonId) {
   }
 
   async function setTaskId(taskId) {
-    const updates = { currentTaskId: taskId }
+    const updates = { currentTaskId: taskId, currentTaskStartedAt: Date.now() }
     for (const anonymousId of Object.keys(session?.students ?? {})) {
       updates[`students/${anonymousId}/checkPassed`]    = false
       updates[`students/${anonymousId}/lastRunStatus`]  = null
@@ -118,6 +128,7 @@ export function useSession(lessonId) {
   async function exitSandbox() {
     await update(ref(db, `sessions/${lessonId}`), {
       state:                 'active',
+      currentTaskStartedAt:  Date.now(),
       sandboxCode:           null,
       sandboxCodePushedAt:   null,
       sandboxFiles:          null,

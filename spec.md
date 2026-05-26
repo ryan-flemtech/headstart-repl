@@ -99,6 +99,7 @@ Every lesson type (Python, HTML, Scratch) can contain any mix of:
 | `title` | Yes | string | Shown in progress UI |
 | `taskType` | No | string | Omit for code tasks; `"information"` or `"quiz"` for non-code |
 | `explainer` | No | string | Markdown shown above editor. Required for information tasks. |
+| `estimatedMinutes` | No | positive integer | Approximate duration used for builder totals and the live teacher countdown. |
 | `check` | No | object or array | Completion check. Arrays require all checks to pass. |
 | `interactionMode` | No | string | `"run"` (default) or `"submit"` |
 | `hints` | No | string[] | Progressive hints revealed on demand |
@@ -334,6 +335,9 @@ Submit mode accepts only: `code_contains`, `code_does_not_contain`, `code_equals
       "state": "waiting | active | sandbox | ended",
       "currentTaskId": 1,
       "createdAt": 1234567890,
+      "startedAt": "1234567890 | null",
+      "currentTaskStartedAt": "1234567890 | null",
+      "endedAt": "1234567890 | null",
       "isPaused": false,
       "activeStudentView": "{anonymousId} | null",
       "teacherLive": {
@@ -390,7 +394,7 @@ Submit mode accepts only: `code_contains`, `code_does_not_contain`, `code_equals
 
 | Writer | Fields |
 |---|---|
-| Teacher | `state`, `currentTaskId`, `isPaused`, `activeStudentView`, `teacherLive`, `sandboxCode`, `sandboxCodePushedAt`, `sandboxFiles`, `sandboxFilesUpdatedAt`, any student's `displayName` |
+| Teacher | `state`, `currentTaskId`, `startedAt`, `currentTaskStartedAt`, `endedAt`, `isPaused`, `activeStudentView`, `teacherLive`, `sandboxCode`, `sandboxCodePushedAt`, `sandboxFiles`, `sandboxFilesUpdatedAt`, any student's `displayName` |
 | Teacher — student management | Remove student node; push `remoteResetAction` + `remoteResetPushedAt` to individual student |
 | Student — on run | `currentCode`/`currentFiles`, `currentOutput`, `lastRunStatus`, `checkPassed`, `lastRunAt` |
 | Student — when watched (Python) | `currentCode` per keystroke; `currentOutput` line by line during run; `currentSelection` and `currentActivity` editor interactions |
@@ -498,6 +502,8 @@ Note: Scratch saves workspace state under the `state` field in the Python-keyed 
 ```
 
 Both left and right panels are collapsible. Layout adapts on mobile.
+
+After a session starts, a timer strip shows elapsed lesson time and the summed planned duration when task estimates exist. Timed active tasks show a countdown; moving the class to a task or returning from sandbox restarts that countdown, and it flashes after reaching zero.
 
 ## 24. Task Navigator (left panel)
 
@@ -730,6 +736,7 @@ Full-featured lesson authoring tool. Includes live code execution (Python via Py
 Supports all task types: code (Python/HTML/Scratch), information, quiz (all 4 sub-types).
 
 Task type switching (`taskType`, `quizType`) clears incompatible fields. Interaction mode switching (`run` / `submit`) filters checks to only compatible types.
+Each task accepts optional estimated minutes; the task-list header shows their lesson-wide total.
 
 Quiz builders:
 - Multiple choice: options list with text inputs and correct-answer radio
@@ -751,7 +758,7 @@ After Run, if task has a check:
 
 Validation runs continuously. Errors block download. Warnings prompt confirmation.
 
-Key **errors**: missing ID/title, invalid ID format, no tasks, task missing title, quiz < 2 options, no correct answer selected, empty check value, duplicate HTML filenames, invalid carry reference.  
+Key **errors**: missing ID/title, invalid ID format, no tasks, task missing title, invalid estimated minutes, quiz < 2 options, no correct answer selected, empty check value, duplicate HTML filenames, invalid carry reference.
 Key **warnings**: no starter code, untested check.
 
 Export: `normalizeTasksForExport()` remaps task IDs sequentially (1, 2, 3…) regardless of internal IDs. Filename: `{lessonId}.json`. Pretty-printed JSON.

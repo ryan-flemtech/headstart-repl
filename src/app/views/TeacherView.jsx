@@ -12,6 +12,7 @@ import InformationTask from '../components/InformationTask'
 import StudentGrid from '../components/StudentGrid'
 import QuizTask from '../components/QuizTask'
 import LiveActivityToast from '../components/LiveActivityToast'
+import TeacherTimers from '../components/TeacherTimers'
 
 function resolveAssetsPath(rawPath) {
   if (!rawPath) return ''
@@ -352,6 +353,7 @@ export default function TeacherView({ lessonId }) {
   // displayTaskId: what the teacher's centre panel is currently showing
   const displayTaskId = previewTaskId ?? currentTaskId
   const task = flatTasks.find(t => t.id === displayTaskId)
+  const currentTask = flatTasks.find(t => t.id === (session?.currentTaskId ?? currentTaskId))
   const displayIndex = flatTasks.findIndex(t => t.id === displayTaskId)
   const showingComplete = teacherCodeTab === 'complete' && !isInSandbox
   const isInformationTask = task?.taskType === 'information'
@@ -471,6 +473,7 @@ export default function TeacherView({ lessonId }) {
           </div>
         }
       />
+      <TeacherTimers session={session} task={currentTask} tasks={lesson.tasks} />
       <LiveActivityToast activity={editorActivity} showClicks={false} />
 
 

@@ -88,6 +88,7 @@ All features listed here are implemented in the current codebase. Replaces `Quiz
 ### Session Management
 - Create, start, pause/resume, end, restart session
 - Share link button (copies `?live=true` URL)
+- Lesson elapsed timer with planned total and per-task countdown that flashes when time expires
 
 ### Task Navigator
 - Task list with group collapse
@@ -197,6 +198,7 @@ All features listed here are implemented in the current codebase. Replaces `Quiz
 
 ### Task Editor
 - Explainer editor with Edit / Preview tabs (live Markdown rendering)
+- Optional estimated minutes per task with summed lesson duration in the task list
 - Starter code / starter files (per lesson type)
 - Complete code / complete files (reference solution)
 - Carry-through configuration (`carryCodeFrom`, `carryBlocksFrom`)
@@ -224,7 +226,7 @@ All features listed here are implemented in the current codebase. Replaces `Quiz
 - `beforeunload` warning on unsaved changes
 
 ### Validation
-- Errors (block download): missing ID/title, invalid ID format, no tasks, empty check value, quiz < 2 options, no correct answer, duplicate HTML filenames, invalid carry reference
+- Errors (block download): missing ID/title, invalid ID format, no tasks, invalid estimated minutes, empty check value, quiz < 2 options, no correct answer, duplicate HTML filenames, invalid carry reference
 - Warnings (confirm download): no starter code, untested check
 
 ### Preview

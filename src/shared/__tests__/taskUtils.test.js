@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import {
   flattenTasks,
+  getEstimatedMinutes,
+  getTotalEstimatedMinutes,
+  formatEstimatedMinutes,
   findTaskById,
   findGroupForTask,
   getProgressItems,
@@ -48,6 +51,30 @@ describe('flattenTasks', () => {
     const input = [task1]
     const result = flattenTasks(input)
     expect(result).not.toBe(input)
+  })
+})
+
+describe('estimated task duration helpers', () => {
+  it('normalizes positive duration values and ignores missing or invalid values', () => {
+    expect(getEstimatedMinutes({ estimatedMinutes: '12' })).toBe(12)
+    expect(getEstimatedMinutes({ estimatedMinutes: 2.6 })).toBeNull()
+    expect(getEstimatedMinutes({ estimatedMinutes: 0 })).toBeNull()
+    expect(getEstimatedMinutes({ estimatedMinutes: 'nope' })).toBeNull()
+  })
+
+  it('totals estimates across standalone tasks and grouped subtasks', () => {
+    const timedGroup = {
+      ...group,
+      subtasks: [{ ...sub1, estimatedMinutes: 4 }, { ...sub2, estimatedMinutes: 6 }],
+    }
+    expect(getTotalEstimatedMinutes([{ ...task1, estimatedMinutes: 5 }, timedGroup, task2])).toBe(15)
+  })
+
+  it('formats minute totals for the builder', () => {
+    expect(formatEstimatedMinutes(0)).toBe('No estimate')
+    expect(formatEstimatedMinutes(15)).toBe('15 min')
+    expect(formatEstimatedMinutes(60)).toBe('1 hr')
+    expect(formatEstimatedMinutes(75)).toBe('1 hr 15 min')
   })
 })
 

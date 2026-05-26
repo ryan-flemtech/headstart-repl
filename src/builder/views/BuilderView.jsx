@@ -33,6 +33,9 @@ function validateLesson(lesson) {
   flat.forEach((task, i) => {
     const n = i + 1
     if (!task.title)    errors.push(`Task ${n} is missing a title`)
+    if (task.estimatedMinutes != null && (!Number.isInteger(Number(task.estimatedMinutes)) || Number(task.estimatedMinutes) <= 0)) {
+      errors.push(`Task ${n} estimated time must be a positive whole number of minutes`)
+    }
     if (task.taskType === 'information' && task.informationType !== 'introduction' && !task.explainer?.trim()) {
       errors.push(`Task ${n} is an information task but has no explainer`)
     }
@@ -202,6 +205,7 @@ function normalizeTasksForExport(tasks) {
         title: task.title,
         explainer: task.explainer ?? '',
       }
+      if (task.estimatedMinutes != null) exported.estimatedMinutes = task.estimatedMinutes
       if (informationType !== 'standard') exported.informationType = informationType
       return exported
     }

@@ -6,6 +6,24 @@ export function flattenTasks(tasks) {
   )
 }
 
+export function getEstimatedMinutes(task) {
+  const minutes = Number(task?.estimatedMinutes)
+  return Number.isInteger(minutes) && minutes > 0 ? minutes : null
+}
+
+export function getTotalEstimatedMinutes(tasks) {
+  return flattenTasks(tasks).reduce((total, task) => total + (getEstimatedMinutes(task) ?? 0), 0)
+}
+
+export function formatEstimatedMinutes(minutes) {
+  if (!minutes) return 'No estimate'
+  const hours = Math.floor(minutes / 60)
+  const remainder = minutes % 60
+  if (!hours) return `${remainder} min`
+  if (!remainder) return `${hours} hr`
+  return `${hours} hr ${remainder} min`
+}
+
 // Find a task by ID, searching inside groups.
 export function findTaskById(tasks, id) {
   return flattenTasks(tasks).find(t => t.id === id) ?? null
