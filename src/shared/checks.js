@@ -105,6 +105,11 @@ export function evaluateSingleCheck(check, output, context = {}) {
   }
 
   if (check.type === 'answer_contains') {
+    const answerOptions = parseMultipleContainOptions(check.value)
+    if (answerOptions) {
+      const actual = normalizeOutput(context.answer ?? output)
+      return answerOptions.some(opt => wildcardContains(actual, normalizeOutput(opt)))
+    }
     return wildcardContains(normalizeOutput(context.answer ?? output), normalizeOutput(check.value))
   }
 
@@ -137,6 +142,11 @@ export function evaluateSingleCheck(check, output, context = {}) {
   }
 
   if (check.type === 'code_contains') {
+    const codeOptions = parseMultipleContainOptions(check.value)
+    if (codeOptions) {
+      const actual = normalizeOutput(context.code ?? '')
+      return codeOptions.some(opt => wildcardContains(actual, normalizeOutput(opt)))
+    }
     return wildcardContains(normalizeOutput(context.code ?? ''), normalizeOutput(check.value))
   }
 
@@ -167,6 +177,11 @@ export function evaluateSingleCheck(check, output, context = {}) {
       const el = context.iframeDoc.querySelector(check.selector)
       if (!el) return false
       const raw = getElementText(el)
+      const elemOptions = parseMultipleContainOptions(check.value)
+      if (elemOptions) {
+        const actual = normalizeOutput(raw)
+        return elemOptions.some(opt => wildcardContains(actual, normalizeOutput(opt)))
+      }
       return wildcardContains(normalizeOutput(raw), normalizeOutput(check.value))
     } catch { return false }
   }
@@ -255,9 +270,12 @@ export function evaluateSingleCheck(check, output, context = {}) {
     return valueEquals(variable.value[index], parseCheckValue(check.value))
   }
 
-  const actual = normalizeOutput(output)
-  const expected = normalizeOutput(check.value)
-  return wildcardContains(actual, expected)
+  const outputOptions = parseMultipleContainOptions(check.value)
+  if (outputOptions) {
+    const actual = normalizeOutput(output)
+    return outputOptions.some(opt => wildcardContains(actual, normalizeOutput(opt)))
+  }
+  return wildcardContains(normalizeOutput(output), normalizeOutput(check.value))
 }
 
 export function evaluateCheck(check, output, context = {}) {
@@ -369,6 +387,22 @@ function normalizeTypeName(type) {
     dictionary: 'dictionary',
   }
   return aliases[raw] ?? raw
+}
+
+// Parses "option1","option2" format into an array. Returns null if not in that format.
+function parseMultipleContainOptions(value) {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  if (!trimmed.startsWith('"')) return null
+  const options = []
+  const regex = /"([^"]*)"/g
+  let match
+  while ((match = regex.exec(trimmed)) !== null) {
+    options.push(match[1])
+  }
+  const stripped = trimmed.replace(/"[^"]*"/g, '').replace(/[\s,]/g, '')
+  if (stripped !== '') return null
+  return options.length > 0 ? options : null
 }
 
 function wildcardContains(text, pattern) {

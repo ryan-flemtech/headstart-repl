@@ -1261,7 +1261,7 @@ function ShortAnswerBuilder({ task, onUpdate, lessonType = null }) {
           placeholder={
             check.type === 'answer_equals' ? 'Exact expected answer…'
             : check.type === 'answer_matches_regex' ? 'Regular expression…'
-            : 'Text that the answer must contain…'
+            : 'Text that the answer must contain… or "option1","option2" for any one of multiple values'
           }
         />
         <MarkdownFieldEditor
@@ -1743,7 +1743,7 @@ function CheckValueEditor({ check, subject, operator, onChange, output = '', cod
           : operator === 'equals'       ? 'Exact expected value...'
           : operator === 'not_equals'   ? 'Value it must NOT equal...'
           : operator === 'not_contains' ? 'String that must NOT be present...'
-          :                               'String that must be present...'
+          :                               'String that must be present… or "option1","option2" for any one of multiple values'
         }
       />
     </div>
