@@ -11,7 +11,7 @@
       "PowerShell(*)",
       "Bash(gh pr *)",
       "Bash(ls *)"
-    ]
-  },
-  "defaultMode": "acceptEdits"
+    ],
+    "defaultMode": "acceptEdits"
+  }
 }
