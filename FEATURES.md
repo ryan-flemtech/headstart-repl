@@ -47,6 +47,7 @@ All features listed here are implemented in the current codebase. Replaces `Quiz
 | `output_equals` | Python, HTML | Run | Output exactly matches value (case-insensitive, trimmed) |
 | `output_line_count` | Python, HTML | Run | Output line count equals value |
 | `output_not_empty` | Python, HTML | Run | Output is not empty |
+| `output_empty` | Python, HTML | Run | Output is empty or whitespace-only |
 | `code_contains` | Python, HTML | Run + Submit | Source includes value |
 | `code_does_not_contain` | Python, HTML | Run + Submit | Source does not include value |
 | `code_equals` | Python, HTML | Run + Submit | Source equals value |

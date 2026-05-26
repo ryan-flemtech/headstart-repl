@@ -130,6 +130,17 @@ describe('evaluateSingleCheck — output_not_empty', () => {
   })
 })
 
+describe('evaluateSingleCheck — output_empty', () => {
+  it('returns true for empty or whitespace-only output', () => {
+    expect(evaluateSingleCheck({ type: 'output_empty' }, '')).toBe(true)
+    expect(evaluateSingleCheck({ type: 'output_empty' }, ' \n\t ')).toBe(true)
+  })
+
+  it('returns false when output has content', () => {
+    expect(evaluateSingleCheck({ type: 'output_empty' }, 'some text')).toBe(false)
+  })
+})
+
 // ─── output_line_count ────────────────────────────────────────────────────────
 
 describe('evaluateSingleCheck — output_line_count', () => {
@@ -321,6 +332,10 @@ describe('evaluateCheckWithCode', () => {
 describe('checkRequiresRun', () => {
   it('returns true for output_contains', () => {
     expect(checkRequiresRun({ type: 'output_contains' })).toBe(true)
+  })
+
+  it('returns true for output_empty', () => {
+    expect(checkRequiresRun({ type: 'output_empty' })).toBe(true)
   })
 
   it('returns false for code_contains', () => {

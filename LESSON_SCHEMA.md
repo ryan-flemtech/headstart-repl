@@ -515,6 +515,7 @@ When `check` is an array, every check must pass.
 | `output_equals` | `type`, `value` | Yes | No | Yes | Yes | Case-insensitive exact output/body-text match after trimming trailing newlines. |
 | `output_line_count` | `type`, `value` | Yes | No | Yes | Yes | Output/body text must contain exactly this many lines. |
 | `output_not_empty` | `type` | Yes | No | Yes | Yes | Output/body text must not be empty. |
+| `output_empty` | `type` | Yes | No | Yes | Yes | Output/body text must be empty or whitespace-only. |
 | `code_contains` | `type`, `value` | Yes | Yes | Yes | Yes | Source code contains value, case-insensitive. |
 | `code_does_not_contain` | `type`, `value` | Yes | Yes | Yes | Yes | Source code does not contain value, case-insensitive. |
 | `code_equals` | `type`, `value` | Yes | Yes | Yes | Yes | Source code exactly equals value, case-insensitive, ignoring final newlines. |
@@ -755,7 +756,7 @@ For Scratch toolbox XML, use fenced `xml` code blocks only when documenting the 
 - `carryCodeFrom` and `carryBlocksFrom` must reference an existing task ID.
 - Submit mode cannot use run-required checks.
 - DOM checks need a CSS selector.
-- Checks that need a value must provide one, except `code_no_error`, `output_not_empty`, and `element_exists`.
+- Checks that need a value must provide one, except `code_no_error`, `output_not_empty`, `output_empty`, and `element_exists`.
 - Scratch toolbox XML must parse if provided.
 - Scratch `sprite_property` checks need `property`, `operator`, and `value`.
 - Scratch `block_used` checks need `opcode`.

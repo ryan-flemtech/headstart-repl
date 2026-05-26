@@ -294,6 +294,7 @@ Groups are collapsible in TaskNavigator and rendered as sections in progress dot
 | `output_equals` | ✅ | ✅ | ✅ | — | Output matches value after trim (case-insensitive) |
 | `output_line_count` | ✅ | ✅ | ✅ | — | Output has exactly N lines |
 | `output_not_empty` | ✅ | ✅ | ✅ | — | Output is not empty |
+| `output_empty` | ✅ | ✅ | ✅ | — | Output is empty or whitespace-only |
 | `code_contains` | ✅ | ✅ | ✅ | ✅ | Source includes value (case-insensitive) |
 | `code_does_not_contain` | ✅ | ✅ | ✅ | ✅ | Source does not include value |
 | `code_equals` | ✅ | ✅ | ✅ | ✅ | Source equals value (case-insensitive, trimmed) |

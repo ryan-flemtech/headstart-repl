@@ -1525,6 +1525,7 @@ function formatCheckFailure(result) {
 }
 
 function formatCheckFailureDetail(result) {
+  if (result.type === 'output_empty') return 'output is not empty'
   if (result.type === 'element_exists') return `no element matches selector "${result.selector ?? ''}"`
   if (result.type === 'element_count') return `expected ${result.value ?? ''} elements matching selector "${result.selector ?? ''}"`
   if (result.type === 'element_value') return `review expected text or input value "${result.value ?? ''}"`
@@ -1535,6 +1536,7 @@ function subjectOpFromType(type) {
   const map = {
     'code_no_error':               { subject: 'output',  operator: 'no_error' },
     'output_not_empty':            { subject: 'output',  operator: 'not_empty' },
+    'output_empty':                { subject: 'output',  operator: 'empty' },
     'output_contains':             { subject: 'output',  operator: 'contains' },
     'output_equals':               { subject: 'output',  operator: 'equals' },
     'output_not_contains':         { subject: 'output',  operator: 'not_contains' },
@@ -1578,6 +1580,7 @@ function typeFromSubjectOp(subject, operator) {
       not_equals:    'output_not_equals',
       matches_regex: 'output_matches_regex',
       not_empty:     'output_not_empty',
+      empty:         'output_empty',
       line_count:    'output_line_count',
     },
     code: {
@@ -1622,6 +1625,7 @@ function getOperatorOptions(subject, { allowCodeNoError }) {
     { value: 'not_equals',    label: 'does not equal' },
     { value: 'matches_regex', label: 'matches regex' },
     { value: 'not_empty',     label: 'is not empty' },
+    { value: 'empty',         label: 'is empty' },
     { value: 'line_count',    label: 'line count equals' },
   ]
   if (subject === 'code') return [
@@ -1658,7 +1662,7 @@ function getOperatorOptions(subject, { allowCodeNoError }) {
 
 function makeCheckSkeleton(type, prev = {}) {
   const hint = prev.hint ? { hint: prev.hint } : {}
-  if (type === 'code_no_error' || type === 'output_not_empty') return { type, ...hint }
+  if (type === 'code_no_error' || type === 'output_not_empty' || type === 'output_empty') return { type, ...hint }
   if (type === 'variable_exists') return { type, name: prev.name ?? '', ...hint }
   if (type === 'variable_dict_key_value') return { type, name: prev.name ?? '', key: prev.key ?? '', value: prev.value ?? '', ...hint }
   if (type === 'variable_array_nth_item') return { type, name: prev.name ?? '', index: prev.index ?? '0', value: prev.value ?? '', ...hint }
@@ -1679,6 +1683,9 @@ function CheckValueEditor({ check, subject, operator, onChange, output = '', cod
   }
   if (check.type === 'output_not_empty') {
     return <div style={s.checkHelp}>Passes when the run produces any visible output.</div>
+  }
+  if (check.type === 'output_empty') {
+    return <div style={s.checkHelp}>Passes when the run produces no visible output.</div>
   }
 
   if (subject === 'element') {
