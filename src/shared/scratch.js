@@ -86,7 +86,7 @@ export const SCRATCH_BLOCK_DEFINITIONS = {
       this.jsonInit({
         type: 'event_broadcast',
         message0: 'broadcast %1',
-        args0: [stringInput('BROADCAST_INPUT', 'message1')],
+        args0: [{ type: 'field_input', name: 'BROADCAST_INPUT', text: 'message1' }],
         previousStatement: null,
         nextStatement: null,
         colour: '#FFAB19',
@@ -98,7 +98,7 @@ export const SCRATCH_BLOCK_DEFINITIONS = {
       this.jsonInit({
         type: 'event_broadcastandwait',
         message0: 'broadcast %1 and wait',
-        args0: [stringInput('BROADCAST_INPUT', 'message1')],
+        args0: [{ type: 'field_input', name: 'BROADCAST_INPUT', text: 'message1' }],
         previousStatement: null,
         nextStatement: null,
         colour: '#FFAB19',
@@ -530,8 +530,6 @@ export const DEFAULT_TOOLBOX = {
 }
 
 const VALUE_INPUT_DEFAULTS = {
-  event_broadcast: { BROADCAST_INPUT: textShadow('message1') },
-  event_broadcastandwait: { BROADCAST_INPUT: textShadow('message1') },
   motion_movesteps: { STEPS: numberShadow(10) },
   motion_turnright: { DEGREES: numberShadow(15) },
   motion_turnleft: { DEGREES: numberShadow(15) },
