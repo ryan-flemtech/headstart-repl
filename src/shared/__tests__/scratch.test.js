@@ -36,6 +36,113 @@ function makeReceiverHat(fieldValue) {
   }
 }
 
+// --- migrateBroadcastState ---
+// Replicate the migration logic to test the state transformation for old-format workspaces.
+
+function migrateBroadcastBlock(block) {
+  if (!block) return
+  if (block.type === 'event_broadcast' || block.type === 'event_broadcastandwait') {
+    const text = block.inputs?.BROADCAST_INPUT?.shadow?.fields?.TEXT
+    if (text != null && block.fields?.BROADCAST_INPUT == null) {
+      block.fields = { ...(block.fields ?? {}), BROADCAST_INPUT: String(text) }
+      delete block.inputs.BROADCAST_INPUT
+      if (!Object.keys(block.inputs).length) delete block.inputs
+    }
+  }
+  if (block.next?.block) migrateBroadcastBlock(block.next.block)
+  for (const inp of Object.values(block.inputs ?? {})) {
+    if (inp?.block) migrateBroadcastBlock(inp.block)
+  }
+}
+
+function migrateBroadcastState(state) {
+  if (!state?.blocks?.blocks) return state
+  const clone = JSON.parse(JSON.stringify(state))
+  for (const block of clone.blocks.blocks) migrateBroadcastBlock(block)
+  return clone
+}
+
+function oldFormatBroadcastState(text) {
+  return {
+    blocks: {
+      languageVersion: 0,
+      blocks: [{
+        type: 'event_broadcast',
+        inputs: { BROADCAST_INPUT: { shadow: { type: 'text', fields: { TEXT: text } } } },
+      }],
+    },
+  }
+}
+
+describe('migrateBroadcastState', () => {
+  it('moves shadow TEXT into fields.BROADCAST_INPUT for event_broadcast', () => {
+    const result = migrateBroadcastState(oldFormatBroadcastState('launch'))
+    const block = result.blocks.blocks[0]
+    expect(block.fields?.BROADCAST_INPUT).toBe('launch')
+    expect(block.inputs).toBeUndefined()
+  })
+
+  it('preserves the default message1 text', () => {
+    const result = migrateBroadcastState(oldFormatBroadcastState('message1'))
+    expect(result.blocks.blocks[0].fields?.BROADCAST_INPUT).toBe('message1')
+  })
+
+  it('migrates broadcast blocks inside a next chain', () => {
+    const state = {
+      blocks: {
+        languageVersion: 0,
+        blocks: [{
+          type: 'event_whenflagclicked',
+          next: {
+            block: {
+              type: 'event_broadcast',
+              inputs: { BROADCAST_INPUT: { shadow: { type: 'text', fields: { TEXT: 'go' } } } },
+            },
+          },
+        }],
+      },
+    }
+    const result = migrateBroadcastState(state)
+    const broadcast = result.blocks.blocks[0].next.block
+    expect(broadcast.fields?.BROADCAST_INPUT).toBe('go')
+    expect(broadcast.inputs).toBeUndefined()
+  })
+
+  it('does not overwrite an already-migrated field', () => {
+    const state = {
+      blocks: {
+        languageVersion: 0,
+        blocks: [{
+          type: 'event_broadcast',
+          fields: { BROADCAST_INPUT: 'existing' },
+          inputs: { BROADCAST_INPUT: { shadow: { type: 'text', fields: { TEXT: 'shadow' } } } },
+        }],
+      },
+    }
+    const result = migrateBroadcastState(state)
+    expect(result.blocks.blocks[0].fields.BROADCAST_INPUT).toBe('existing')
+  })
+
+  it('returns state unchanged when blocks array is absent', () => {
+    const state = { something: 'else' }
+    expect(migrateBroadcastState(state)).toBe(state)
+  })
+
+  it('migrates event_broadcastandwait as well', () => {
+    const state = {
+      blocks: {
+        languageVersion: 0,
+        blocks: [{
+          type: 'event_broadcastandwait',
+          inputs: { BROADCAST_INPUT: { shadow: { type: 'text', fields: { TEXT: 'done' } } } },
+        }],
+      },
+    }
+    const result = migrateBroadcastState(state)
+    expect(result.blocks.blocks[0].fields?.BROADCAST_INPUT).toBe('done')
+  })
+})
+
 describe('broadcast message matching', () => {
   // Replicate the comparison logic used in the event_broadcast handler.
   function broadcastMatches(broadcastBlock, receiverHat) {

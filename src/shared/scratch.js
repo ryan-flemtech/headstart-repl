@@ -1255,5 +1255,30 @@ export function saveWorkspace(Blockly, workspace) {
 }
 
 export function loadWorkspace(Blockly, workspace, state) {
-  Blockly.serialization.workspaces.load(state, workspace)
+  Blockly.serialization.workspaces.load(migrateBroadcastState(state), workspace)
+}
+
+// Converts old input_value+shadow format for broadcast blocks to the new field_input format.
+// Needed for workspaces saved before the broadcast block definition changed.
+function migrateBroadcastState(state) {
+  if (!state?.blocks?.blocks) return state
+  const clone = JSON.parse(JSON.stringify(state))
+  for (const block of clone.blocks.blocks) migrateBroadcastBlock(block)
+  return clone
+}
+
+function migrateBroadcastBlock(block) {
+  if (!block) return
+  if (block.type === 'event_broadcast' || block.type === 'event_broadcastandwait') {
+    const text = block.inputs?.BROADCAST_INPUT?.shadow?.fields?.TEXT
+    if (text != null && block.fields?.BROADCAST_INPUT == null) {
+      block.fields = { ...(block.fields ?? {}), BROADCAST_INPUT: String(text) }
+      delete block.inputs.BROADCAST_INPUT
+      if (!Object.keys(block.inputs).length) delete block.inputs
+    }
+  }
+  if (block.next?.block) migrateBroadcastBlock(block.next.block)
+  for (const inp of Object.values(block.inputs ?? {})) {
+    if (inp?.block) migrateBroadcastBlock(inp.block)
+  }
 }
