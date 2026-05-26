@@ -5,7 +5,7 @@ import { useIdentity } from '../hooks/useIdentity'
 import { initPyodide, runPython, stopPython, provideInput, isPyodideReady } from '../../shared/pyodide'
 import { buildIframeSrc, waitForIframeText } from '../../shared/iframe'
 import { evaluateCheck, evaluateCheckWithCode, getFirstFailedCheckHint, getIncorrectCheckHint } from '../../shared/checks'
-import { flattenTasks, findGroupForTask, findTaskById } from '../../shared/taskUtils'
+import { flattenTasks, findTaskById } from '../../shared/taskUtils'
 import TopBar from '../components/TopBar'
 import NameEntry from '../components/NameEntry'
 import WaitingRoom from '../components/WaitingRoom'
@@ -23,6 +23,7 @@ import LiveActivityToast from '../components/LiveActivityToast'
 import SplitPane from '../../shared/SplitPane'
 import { resolveAssetsPath } from '../../shared/assetPaths'
 import { loadSavedCode, loadSavedFile, saveCode, saveFile } from '../studentStorage'
+import { selectHtmlTaskFiles, selectPythonTaskCode, selectScratchInitialProject } from '../studentTaskContent'
 
 const TASK_TRANSITION_MS = 380
 
@@ -463,16 +464,6 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.students?.[identity?.anonymousId]?.displayName])
 
-  function canCarryFrom(carryFromId, currentTaskId) {
-    if (!carryFromId) return false
-    const sourceTask = flattenTasks(lesson.tasks).find(t => t.id === carryFromId)
-    if (!sourceTask) return false
-    if (sourceTask.taskType === 'quiz' || sourceTask.taskType === 'information') return false
-    const sourceGroup = findGroupForTask(lesson.tasks, carryFromId)
-    const currentGroup = findGroupForTask(lesson.tasks, currentTaskId)
-    return sourceGroup?.id === currentGroup?.id
-  }
-
   function loadTaskContent(taskId) {
     const activeIdentity = effectiveIdentity
     if (!lesson || !activeIdentity) return
@@ -487,34 +478,23 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
       return
     }
     if (lesson.type === 'python') {
-      // In solo mode, restore own saved work if available
-      if (phase === 'solo') {
-        const ownSaved = loadSavedCode(lessonId, taskId, activeIdentity.anonymousId)
-        if (ownSaved != null) { setCode(ownSaved.code ?? ''); return }
-      }
-      // Carry-through > starterCode > empty
-      let initial = task.starterCode ?? ''
-      if (canCarryFrom(task.carryCodeFrom, taskId)) {
-        const saved = loadSavedCode(lessonId, task.carryCodeFrom, activeIdentity.anonymousId)
-        if (saved?.code) initial = saved.code
-      }
-      setCode(initial)
+      setCode(selectPythonTaskCode({
+        tasks: lesson.tasks,
+        task,
+        taskId,
+        phase,
+        readSavedCode: sourceTaskId => loadSavedCode(lessonId, sourceTaskId, activeIdentity.anonymousId),
+      }))
     } else if (lesson.type === 'scratch') {
       setFiles([])
       setActiveFile('')
     } else {
-      const taskFiles = (task.starterFiles ?? []).map(f => {
-        // In solo mode, prefer own saved file for this task
-        if (phase === 'solo') {
-          const ownSaved = loadSavedFile(lessonId, taskId, f.name, activeIdentity.anonymousId)
-          if (ownSaved != null) return { ...f, content: ownSaved }
-        }
-        let content = f.content
-        if (canCarryFrom(task.carryCodeFrom, taskId)) {
-          const saved = loadSavedFile(lessonId, task.carryCodeFrom, f.name, activeIdentity.anonymousId)
-          if (saved != null) content = saved
-        }
-        return { ...f, content }
+      const taskFiles = selectHtmlTaskFiles({
+        tasks: lesson.tasks,
+        task,
+        taskId,
+        phase,
+        readSavedFile: (sourceTaskId, filename) => loadSavedFile(lessonId, sourceTaskId, filename, activeIdentity.anonymousId),
       })
       setFiles(taskFiles)
       setActiveFile(task.entryFile ?? taskFiles[0]?.name ?? '')
@@ -1224,13 +1204,11 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
               showResult={false}
             />
           ) : lesson.type === 'scratch' ? (() => {
-            const saved = loadSavedCode(lessonId, viewingTaskId ?? currentTaskId, identity?.anonymousId)
-            let initialProject = saved?.state ?? null
-            if (!initialProject && task?.carryBlocksFrom) {
-              const carried = loadSavedCode(lessonId, task.carryBlocksFrom, identity?.anonymousId)
-              initialProject = carried?.state ?? null
-            }
-            if (!initialProject) initialProject = task?.starterBlocks ?? null
+            const initialProject = selectScratchInitialProject({
+              task,
+              taskId: viewingTaskId ?? currentTaskId,
+              readSavedCode: sourceTaskId => loadSavedCode(lessonId, sourceTaskId, identity?.anonymousId),
+            })
             return (
               <>
                 {!isViewingPrev && !isSandbox && !isForcedTeacherLive && (

@@ -25,8 +25,8 @@ Implemented on 26 May 2026 in [`feature/implement-suggestions`](https://github.c
 
 Still to do:
 
-- Continue decomposing `StudentView.jsx` beyond its extracted storage helper, particularly task-content selection and narrowly scoped live/session helpers.
-- Further reduce `TeacherView.jsx` orchestration density by extracting presentational controls.
+- Continue decomposing `StudentView.jsx` beyond its extracted storage and task-content helpers, particularly narrowly scoped live/session helpers.
+- Further reduce `TeacherView.jsx` orchestration density through any remaining stable presentational boundaries.
 - Separate `ScratchWorkspace.jsx` presentation concerns and gradually split stable categories in `src/shared/scratch.js`, backed by characterization tests.
 - Move repeated static inline styling into existing CSS classes and standardise already-equivalent presentational primitives.
 - Add focused component coverage for view states and boundary calls before making deeper `StudentView` or `TeacherView` changes.
@@ -47,6 +47,14 @@ Implemented on 26 May 2026 in [`codex/refactor-teacher-sandbox-content`](https:/
 - Extracted sandbox starter/configured/live content selection from `TeacherView.jsx` into pure `src/app/teacherSandboxContent.js` helpers.
 - Added characterization coverage for Python, HTML, and Scratch sandbox precedence and defensive cloning/parsing.
 - Updated `CODEBASE_MAP.md` and `TESTING.md` for the new helper and tests.
+
+## Progress Update - PR #75
+
+Implemented on 26 May 2026 in [`codex/refactor-teacher-presentation-controls`](https://github.com/Headstart-Coding-Launchpad/editor/pull/75):
+
+- Extracted teacher task navigation, presentation/share links, and session actions into `TeacherSessionControls`.
+- Moved its static popover/control styling into the established CSS layer.
+- Added focused component coverage for navigation, share callbacks, and state-specific actions.
 
 ## Guiding Rules
 
