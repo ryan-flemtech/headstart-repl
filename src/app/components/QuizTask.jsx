@@ -317,8 +317,18 @@ function FillBlankQuiz({ task, selectedAnswer, onSelectAnswer, submitted, checkP
   const [draggingTile, setDraggingTile] = useState(null)
   const [dragOverBlank, setDragOverBlank] = useState(null)
 
+  const distractors = task?.distractors ?? []
+
+  // Unified pool: correct answer tiles + distractor tiles, both normalised to { id, text }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const shuffledAnswers = useMemo(() => [...blanks].sort((a, b) => stableHash(a.answer) - stableHash(b.answer)), [JSON.stringify(blanks)])
+  const tilePool = useMemo(() => {
+    const all = [
+      ...blanks.map(b => ({ id: b.id, text: b.answer })),
+      ...distractors.map(d => ({ id: d.id, text: d.text })),
+    ]
+    return all.sort((a, b) => stableHash(a.text) - stableHash(b.text))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(blanks), JSON.stringify(distractors)])
 
   const state = useMemo(() => {
     if (selectedAnswer && typeof selectedAnswer === 'object' && !Array.isArray(selectedAnswer)) return selectedAnswer
@@ -349,11 +359,11 @@ function FillBlankQuiz({ task, selectedAnswer, onSelectAnswer, submitted, checkP
     }
   }
 
-  function handleDragStart(event, blankId) {
+  function handleDragStart(event, tileId) {
     if (blocked) return
-    writeDraggedTileId(event, blankId)
-    setLiftedDragImage(event, blanks.find(b => b.id === blankId)?.answer ?? '')
-    setDraggingTile(blankId)
+    writeDraggedTileId(event, tileId)
+    setLiftedDragImage(event, tilePool.find(t => t.id === tileId)?.text ?? '')
+    setDraggingTile(tileId)
   }
 
   function handleDragEnd() {
@@ -431,7 +441,7 @@ function FillBlankQuiz({ task, selectedAnswer, onSelectAnswer, submitted, checkP
 
             const { blankId } = seg
             const placedTileId = state[blankId]
-            const placedText = blanks.find(b => b.id === placedTileId)?.answer
+            const placedText = tilePool.find(t => t.id === placedTileId)?.text
             const canReceive = mode === 'drag' && draggingTile && draggingTile !== placedTileId
 
             if (mode === 'type') {
@@ -475,22 +485,22 @@ function FillBlankQuiz({ task, selectedAnswer, onSelectAnswer, submitted, checkP
           <div style={sm.answerPool} onDragOver={handlePoolDragOver} onDrop={handlePoolDrop}>
             <div style={sm.poolLabel}>Answer bank</div>
             <div style={sm.poolTiles}>
-              {shuffledAnswers.filter(b => !placedIds.has(b.id)).map(b => (
+              {tilePool.filter(t => !placedIds.has(t.id)).map(t => (
                 <button
-                  key={b.id}
+                  key={t.id}
                   type="button"
-                  style={{ ...sm.tile, ...(draggingTile === b.id ? sm.tileSelected : {}) }}
+                  style={{ ...sm.tile, ...(draggingTile === t.id ? sm.tileSelected : {}) }}
                   draggable={!blocked}
-                  onDragStart={event => handleDragStart(event, b.id)}
+                  onDragStart={event => handleDragStart(event, t.id)}
                   onDragEnd={handleDragEnd}
                   disabled={blocked}
                 >
-                  <span style={draggingTile === b.id ? sm.selectedTileMarkdown : undefined}>
-                    <InlineMarkdown content={b.answer} />
+                  <span style={draggingTile === t.id ? sm.selectedTileMarkdown : undefined}>
+                    <InlineMarkdown content={t.text} />
                   </span>
                 </button>
               ))}
-              {shuffledAnswers.filter(b => !placedIds.has(b.id)).length === 0 && !checkPassed && (
+              {tilePool.filter(t => !placedIds.has(t.id)).length === 0 && !checkPassed && (
                 <span style={sm.poolEmpty}>All answers placed</span>
               )}
             </div>

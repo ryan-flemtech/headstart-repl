@@ -400,8 +400,11 @@ Student fills blanks in a sentence by dragging tiles (`mode: "drag"`) or typing 
 | `text` | Yes | string | Sentence with `___` marking each blank position. |
 | `mode` | No | string | `"drag"` (default) or `"type"`. |
 | `blanks` | Yes | array | One entry per `___` in `text`, in order. |
+| `distractors` | No | array | Extra tiles shown in the answer bank that are not the correct answer for any blank. Drag mode only; ignored in type mode. |
 
 Blank object: `{ id: string, answer: string }`.
+
+Distractor object: `{ id: string, text: string }`. Markdown supported in `text`.
 
 ### Short Answer
 
