@@ -1,0 +1,383 @@
+import React from 'react'
+import { MarkdownFieldEditor } from '../ExplainerEditor'
+import { s } from './styles'
+
+const SCRATCH_TOOLBOX_GROUPS = [
+  {
+    name: 'Events',
+    colour: '#FFAB19',
+    blocks: [
+      ['event_whenflagclicked', 'when green flag clicked'],
+      ['event_whenkeypressed', 'when key pressed'],
+      ['event_whenthisspriteclicked', 'when sprite clicked'],
+      ['event_whenbackdropswitchesto', 'when backdrop switches to'],
+      ['event_broadcast', 'broadcast'],
+      ['event_broadcastandwait', 'broadcast and wait'],
+      ['event_whenbroadcastreceived', 'when I receive'],
+    ],
+  },
+  {
+    name: 'Motion',
+    colour: '#4C97FF',
+    blocks: [
+      ['motion_movesteps', 'move steps'],
+      ['motion_turnright', 'turn right'],
+      ['motion_turnleft', 'turn left'],
+      ['motion_pointindirection', 'point in direction'],
+      ['motion_gotoxy', 'go to x/y'],
+      ['motion_goto', 'go to'],
+      ['motion_glidesecstoxy', 'glide to x/y'],
+      ['motion_glideto', 'glide to'],
+      ['motion_ifonedge_bounce', 'if on edge, bounce'],
+      ['motion_setx', 'set x'],
+      ['motion_sety', 'set y'],
+      ['motion_changexby', 'change x'],
+      ['motion_changeyby', 'change y'],
+      ['motion_setrotationstyle', 'set rotation style'],
+    ],
+  },
+  {
+    name: 'Looks',
+    colour: '#9966FF',
+    blocks: [
+      ['looks_sayforsecs', 'say for seconds'],
+      ['looks_say', 'say'],
+      ['looks_think', 'think'],
+      ['looks_thinkforsecs', 'think for seconds'],
+      ['looks_show', 'show'],
+      ['looks_hide', 'hide'],
+      ['looks_setsizeto', 'set size'],
+      ['looks_changesizeby', 'change size'],
+      ['looks_switchcostumeto', 'switch costume to'],
+      ['looks_nextcostume', 'next costume'],
+      ['looks_costumenumber', 'costume number'],
+      ['looks_switchbackdropto', 'switch backdrop to'],
+      ['looks_nextbackdrop', 'next backdrop'],
+    ],
+  },
+  {
+    name: 'Control',
+    colour: '#FFAB19',
+    blocks: [
+      ['control_wait', 'wait'],
+      ['control_repeat', 'repeat'],
+      ['control_forever', 'forever'],
+      ['control_if', 'if then'],
+      ['control_if_else', 'if then else'],
+      ['control_stop', 'stop all'],
+    ],
+  },
+  {
+    name: 'Sensing',
+    colour: '#5CB1D6',
+    blocks: [
+      ['sensing_askandwait', 'ask and wait'],
+      ['sensing_answer', 'answer'],
+      ['sensing_keypressed', 'key pressed?'],
+      ['sensing_mousedown', 'mouse down?'],
+      ['sensing_touchingedge', 'touching edge?'],
+    ],
+  },
+  {
+    name: 'Operators',
+    colour: '#59C059',
+    blocks: [
+      ['operator_equals', 'equals'],
+      ['operator_gt', 'greater than'],
+      ['operator_lt', 'less than'],
+      ['operator_and', 'and'],
+      ['operator_or', 'or'],
+      ['operator_not', 'not'],
+      ['operator_add', 'add'],
+      ['operator_subtract', 'subtract'],
+      ['operator_join', 'join'],
+    ],
+  },
+  {
+    name: 'Variables',
+    colour: '#FF8C1A',
+    blocks: [
+      ['data_variable', 'variable'],
+      ['data_setvariableto', 'set variable'],
+      ['data_changevariableby', 'change variable'],
+    ],
+  },
+  {
+    name: 'Sound',
+    colour: '#CF63CF',
+    blocks: [
+      ['sound_play', 'start sound'],
+      ['sound_playuntildone', 'play sound until done'],
+      ['sound_stopallsounds', 'stop all sounds'],
+    ],
+  },
+]
+
+const SCRATCH_BLOCK_OPTIONS = SCRATCH_TOOLBOX_GROUPS.flatMap(group => group.blocks)
+const SCRATCH_ALL_BLOCK_TYPES = SCRATCH_BLOCK_OPTIONS.map(([type]) => type)
+
+function buildScratchToolboxXml(selectedTypes) {
+  const selected = new Set(selectedTypes)
+  const categories = SCRATCH_TOOLBOX_GROUPS.map(group => {
+    const blocks = group.blocks
+      .filter(([type]) => selected.has(type))
+      .map(([type]) => `<block type="${type}"/>`)
+      .join('')
+
+    if (!blocks) return ''
+    return `<category name="${group.name}" colour="${group.colour}">${blocks}</category>`
+  }).join('')
+
+  return `<xml>${categories}</xml>`
+}
+
+function parseScratchToolboxXml(toolbox) {
+  if (!toolbox) return SCRATCH_ALL_BLOCK_TYPES
+  if (typeof DOMParser === 'undefined') return []
+
+  try {
+    const parsed = new DOMParser().parseFromString(toolbox, 'text/xml')
+    if (parsed.querySelector('parsererror')) return []
+    return Array.from(parsed.querySelectorAll('block'))
+      .map(block => block.getAttribute('type'))
+      .filter(Boolean)
+  } catch {
+    return []
+  }
+}
+
+export function ScratchToolboxPicker({ toolbox, onChange }) {
+  const usesAllBlocks = !toolbox
+  const selectedTypes = new Set(parseScratchToolboxXml(toolbox))
+
+  function setSelected(nextSelected) {
+    onChange(buildScratchToolboxXml(nextSelected))
+  }
+
+  function toggleBlock(type, checked) {
+    const next = new Set(selectedTypes)
+    if (checked) next.add(type)
+    else next.delete(type)
+    setSelected(next)
+  }
+
+  function toggleGroup(group, checked) {
+    const next = new Set(selectedTypes)
+    for (const [type] of group.blocks) {
+      if (checked) next.add(type)
+      else next.delete(type)
+    }
+    setSelected(next)
+  }
+
+  return (
+    <div style={s.toolboxPicker}>
+      <label style={s.toolboxAllRow}>
+        <input
+          type="checkbox"
+          checked={usesAllBlocks}
+          onChange={e => onChange(e.target.checked ? '' : buildScratchToolboxXml([]))}
+        />
+        <span>All blocks</span>
+      </label>
+
+      <div style={usesAllBlocks ? s.toolboxDisabled : s.toolboxGroups}>
+        {SCRATCH_TOOLBOX_GROUPS.map(group => {
+          const groupTypes = group.blocks.map(([type]) => type)
+          const checkedCount = groupTypes.filter(type => selectedTypes.has(type)).length
+          const groupChecked = checkedCount === groupTypes.length
+
+          return (
+            <div key={group.name} style={s.toolboxGroup}>
+              <label style={s.toolboxGroupHeader}>
+                <input
+                  type="checkbox"
+                  checked={groupChecked}
+                  disabled={usesAllBlocks}
+                  onChange={e => toggleGroup(group, e.target.checked)}
+                />
+                <span style={{ ...s.toolboxGroupSwatch, background: group.colour }} />
+                <span>{group.name}</span>
+              </label>
+              <div style={s.toolboxBlockGrid}>
+                {group.blocks.map(([type, label]) => (
+                  <label key={type} style={s.toolboxBlockItem}>
+                    <input
+                      type="checkbox"
+                      checked={usesAllBlocks || selectedTypes.has(type)}
+                      disabled={usesAllBlocks}
+                      onChange={e => toggleBlock(type, e.target.checked)}
+                    />
+                    <span>{label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function ScratchCheckListEditor({ checks, onChange, sprites }) {
+  function updateCheck(index, updated) {
+    onChange(checks.map((c, i) => i === index ? updated : c))
+  }
+  function removeCheck(index) {
+    onChange(checks.filter((_, i) => i !== index))
+  }
+  function addCheck() {
+    onChange([...checks, { type: 'block_used', evaluation: 'manual', opcode: 'motion_movesteps' }])
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+      {checks.map((check, index) => (
+        <div key={index} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+          {checks.length > 1 && (
+            <span style={{ ...s.checkIndexLabel, paddingTop: 10 }}>#{index + 1}</span>
+          )}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <ScratchCheckEditor
+              check={check}
+              onChange={updated => updateCheck(index, updated)}
+              sprites={sprites}
+            />
+          </div>
+          {checks.length > 1 && (
+            <button type="button" style={{ ...s.removeCheckBtn, marginTop: 8 }} onClick={() => removeCheck(index)} title="Remove check">×</button>
+          )}
+        </div>
+      ))}
+      <button type="button" className="btn-ghost" style={s.addCheckBtn} onClick={addCheck}>
+        + Add check
+      </button>
+    </div>
+  )
+}
+
+function ScratchCheckEditor({ check, onChange, sprites = [{ id: 'sprite1', name: 'Sprite 1' }] }) {
+  const type = check.type ?? 'block_used'
+
+  function changeType(nextType) {
+    if (nextType === 'sprite_property') {
+      onChange({
+        type: 'sprite_property',
+        evaluation: 'after_run',
+        spriteName: sprites[0]?.name ?? 'Sprite 1',
+        property: 'x',
+        operator: 'greater_than',
+        value: 50,
+        ...(check.hint ? { hint: check.hint } : {}),
+      })
+      return
+    }
+
+    if (nextType === 'variable_equals') {
+      onChange({
+        type: 'variable_equals',
+        evaluation: 'manual',
+        variableName: 'score',
+        value: 10,
+        ...(check.hint ? { hint: check.hint } : {}),
+      })
+      return
+    }
+
+    onChange({ type: 'block_used', evaluation: 'manual', opcode: 'motion_movesteps', ...(check.hint ? { hint: check.hint } : {}) })
+  }
+
+  return (
+    <div style={s.scratchCheckEditor}>
+      <select style={s.select} value={type} onChange={e => changeType(e.target.value)}>
+        <option value="block_used">block_used</option>
+        <option value="sprite_property">sprite_property</option>
+        <option value="variable_equals">variable_equals</option>
+      </select>
+
+      <select
+        style={s.select}
+        value={check.evaluation ?? (type === 'block_used' ? 'manual' : 'after_run')}
+        onChange={e => onChange({ ...check, evaluation: e.target.value })}
+      >
+        <option value="manual">manual</option>
+        <option value="after_run">after run</option>
+      </select>
+
+      {type === 'block_used' ? (
+        <select
+          style={s.select}
+          value={check.opcode ?? ''}
+          onChange={e => onChange({ ...check, opcode: e.target.value })}
+        >
+          {SCRATCH_BLOCK_OPTIONS.map(([value, label]) => (
+            <option key={value} value={value}>{label}</option>
+          ))}
+        </select>
+      ) : type === 'variable_equals' ? (
+        <>
+          <input
+            style={s.input}
+            value={check.variableName ?? 'score'}
+            onChange={e => onChange({ ...check, variableName: e.target.value })}
+            placeholder="Variable name"
+          />
+          <input
+            style={s.input}
+            value={check.value ?? ''}
+            onChange={e => onChange({ ...check, value: e.target.value })}
+            placeholder="Expected value"
+          />
+        </>
+      ) : (
+        <>
+          <select
+            style={s.select}
+            value={check.spriteName ?? sprites[0]?.name ?? 'Sprite 1'}
+            onChange={e => onChange({ ...check, spriteName: e.target.value })}
+          >
+            {sprites.map(sp => <option key={sp.id} value={sp.name}>{sp.name}</option>)}
+          </select>
+          <select
+            style={s.select}
+            value={check.property ?? 'x'}
+            onChange={e => onChange({ ...check, property: e.target.value })}
+          >
+            <option value="x">x</option>
+            <option value="y">y</option>
+            <option value="size">size</option>
+            <option value="direction">direction</option>
+            <option value="visible">visible</option>
+          </select>
+          <select
+            style={s.select}
+            value={check.operator ?? 'equals'}
+            onChange={e => onChange({ ...check, operator: e.target.value })}
+          >
+            <option value="equals">equals</option>
+            <option value="greater_than">greater_than</option>
+            <option value="less_than">less_than</option>
+          </select>
+          <input
+            style={s.input}
+            value={check.value ?? ''}
+            onChange={e => onChange({ ...check, value: e.target.value })}
+            placeholder="Expected value"
+          />
+        </>
+      )}
+      <MarkdownFieldEditor
+        height={118}
+        minHeight={104}
+        ariaLabel="Scratch check hint Markdown editor views"
+        value={check.hint ?? ''}
+        onChange={value => onChange({ ...check, hint: value })}
+        placeholder="Suggestion shown in the completion banner when this check fails..."
+        lessonType="scratch"
+      />
+    </div>
+  )
+}
+
+export { ScratchCheckListEditor, ScratchCheckEditor, buildScratchToolboxXml, parseScratchToolboxXml }

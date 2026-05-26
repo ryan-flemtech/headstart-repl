@@ -100,10 +100,20 @@ Referenced from AGENTS.md. Use this for navigation before opening files.
 |---|---|
 | `LessonMetaPanel.jsx` | Lesson-level metadata: id, type, title, description, level, assets, sandbox config modals |
 | `TaskList.jsx` | Left sidebar: task/group tree with drag-reorder, selection, creation, validation summary |
-| `TaskEditor.jsx` | Monolithic task editor (all task types, quiz builders, check editors, sprite/backdrop managers, Scratch starter/complete tabs) |
+| `TaskEditor.jsx` | Task editor composition root: imports sub-modules, re-exports `ScratchToolboxPicker`, `SpriteManager`, `BackdropManager` |
 | `ExplainerEditor.jsx` | Markdown editor with Edit/Preview tabs; live rendering via MarkdownRenderer |
 | `FileManager.jsx` | HTML file list: add/delete/type-change, entry file picker, HTML+CSS+JS template generator |
 | `BuilderOutputPanel.jsx` | Output panel with check results, retro typing animation, and `input()` prompt for builder |
+
+### Task Editor Sub-modules (`src/builder/components/task-editor/`)
+
+| File | Role |
+|---|---|
+| `styles.js` | Shared inline style object `s` and `CODE_FONT_STYLE` used across all task-editor sub-modules |
+| `TaskEditorFields.jsx` | Shared primitives: `Field`, `QuizTypeIcon`, `TaskFormatIcon`, `CodeWorkspaceTabs`, `Modal`, `CarryThroughPicker`, `SpriteManager`, `CostumeManager`, `BackdropManager` |
+| `QuizEditors.jsx` | Quiz-type builders: `QuizTypePicker`, `MatchPairsBuilder`, `FillBlankBuilder`, `ShortAnswerBuilder`, `QuizOptionsBuilder` |
+| `CheckEditors.jsx` | Check utilities and editors: `subjectOpFromType`, `typeFromSubjectOp`, `getOperatorOptions`, `makeCheckSkeleton`, `CheckValueEditor`, `CheckListEditor` |
+| `ScratchEditors.jsx` | Scratch toolbox data, `buildScratchToolboxXml`, `parseScratchToolboxXml`, `ScratchToolboxPicker`, `ScratchCheckListEditor`, `ScratchCheckEditor` |
 
 ---
 
