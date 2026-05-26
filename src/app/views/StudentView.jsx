@@ -231,7 +231,7 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
   useEffect(() => {
     if (lessonProp != null) {
       setLesson(lessonProp)
-      setCurrentTaskId(flattenTasks(lessonProp.tasks)[0]?.id ?? 1)
+      setCurrentTaskId(initialTaskId ?? flattenTasks(lessonProp.tasks)[0]?.id ?? 1)
       setLessonLoading(false)
       return
     }
