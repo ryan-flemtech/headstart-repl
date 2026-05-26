@@ -496,32 +496,34 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
         </div>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontFamily: 'var(--font-body)', fontWeight: 600, fontSize: '0.88rem', color: 'var(--colour-text)' }}>
-            {isInformation && (task.informationType ?? 'standard') === 'recap' ? 'Right pane (Markdown)' : 'Explainer (Markdown)'}
-          </span>
-          <label style={s.checkToggle}>
-            <input
-              type="checkbox"
-              checked={task.explainer !== null && task.explainer !== undefined}
-              onChange={e => set('explainer', e.target.checked ? '' : null)}
+      {(task.informationType ?? 'standard') !== 'introduction' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontFamily: 'var(--font-body)', fontWeight: 600, fontSize: '0.88rem', color: 'var(--colour-text)' }}>
+              {isInformation && (task.informationType ?? 'standard') === 'recap' ? 'Right pane (Markdown)' : 'Explainer (Markdown)'}
+            </span>
+            <label style={s.checkToggle}>
+              <input
+                type="checkbox"
+                checked={task.explainer !== null && task.explainer !== undefined}
+                onChange={e => set('explainer', e.target.checked ? '' : null)}
+              />
+              Enable
+            </label>
+          </div>
+          {task.explainer !== null && task.explainer !== undefined && (
+            <ExplainerEditor
+              title={task.title}
+              value={task.explainer}
+              onChange={v => set('explainer', v)}
+              lessonType={lesson.type}
+              inlineCodeLanguages={explainerInlineCodeLanguages}
+              assets={lesson.assets ?? []}
+              assetsPath={lesson.assetsPath ? resolveAssetsPath(lesson.assetsPath) : ''}
             />
-            Enable
-          </label>
+          )}
         </div>
-        {task.explainer !== null && task.explainer !== undefined && (
-          <ExplainerEditor
-            title={task.title}
-            value={task.explainer}
-            onChange={v => set('explainer', v)}
-            lessonType={lesson.type}
-            inlineCodeLanguages={explainerInlineCodeLanguages}
-            assets={lesson.assets ?? []}
-            assetsPath={lesson.assetsPath ? resolveAssetsPath(lesson.assetsPath) : ''}
-          />
-        )}
-      </div>
+      )}
 
       {isInformation && (
         <div style={s.previewPanel}>
