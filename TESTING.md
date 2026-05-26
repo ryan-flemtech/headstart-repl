@@ -34,6 +34,7 @@ Testing strategy, tool choices, and conventions. Read this before writing or mod
 | `src/shared/workspaceData.js` | Scratch state parsing/cloning and decoded HTML file conversion |
 | `src/builder/lessonUtils.js` | Lesson validation messages and exported task JSON normalisation |
 | `src/app/studentStorage.js` | Exact localStorage key formats plus saved task/file snapshot reads and writes |
+| `src/app/teacherSandboxContent.js` | Teacher sandbox draft/live/configured/task fallback selection and defensive cloning |
 | `src/app/teacherLivePayload.js` | Decoded teacher-live payload construction from a student snapshot |
 
 **Placement:** `src/shared/__tests__/checks.test.js`, `src/shared/__tests__/taskUtils.test.js`, etc.
