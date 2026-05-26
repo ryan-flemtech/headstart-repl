@@ -1,7 +1,7 @@
 import React from 'react'
-import AssetBrowser from '../../shared/AssetBrowser'
-import { useAssets } from '../../shared/useAssets'
-import { SPRITE_TYPES } from '../../app/components/ScratchWorkspace'
+import AssetBrowser from '../../../shared/AssetBrowser'
+import { useAssets } from '../../../shared/useAssets'
+import { SPRITE_TYPES } from '../../../app/components/ScratchWorkspace'
 import { s } from './styles'
 
 function CodeWorkspaceTabs({ activeTab, onChange, starterLabel = 'Starter code', testLabel = 'Complete code', rightAction = null }) {
