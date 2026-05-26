@@ -35,6 +35,7 @@ Referenced from AGENTS.md. Use this for navigation before opening files.
 |---|---|
 | `studentStorage.js` | Student task/file localStorage key construction and saved-work persistence helpers |
 | `studentTaskContent.js` | Pure student task-content selection and carry-through precedence helpers |
+| `studentLiveDisplay.js` | Pure student teacher-live/view display selection and live HTML file conversion helpers |
 | `teacherSandboxContent.js` | Pure teacher sandbox starter/configured content selection and fallback rules |
 | `teacherLivePayload.js` | Pure student-to-teacherLive broadcast payload construction |
 
