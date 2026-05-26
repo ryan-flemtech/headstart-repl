@@ -432,18 +432,47 @@ export default function BuilderView({ lesson, dirty, onUpdate, onNew, onMarkSave
     input.click()
   }
 
-  function handleAddTask() {
+  function topLevelInsertPosition() {
     const flat = flattenTasks(lesson.tasks)
-    const prevTask = flat[flat.length - 1] ?? null
+    const defaultPrev = flat[flat.length - 1] ?? null
+    if (selectedTaskId != null) {
+      const topIdx = lesson.tasks.findIndex(item => item.type !== 'group' && item.id === selectedTaskId)
+      if (topIdx >= 0) return { index: topIdx + 1, prevTask: lesson.tasks[topIdx] }
+      const groupIdx = lesson.tasks.findIndex(
+        item => item.type === 'group' && (item.subtasks ?? []).some(s => s.id === selectedTaskId)
+      )
+      if (groupIdx >= 0) {
+        const group = lesson.tasks[groupIdx]
+        return {
+          index: groupIdx + 1,
+          prevTask: (group.subtasks ?? []).find(s => s.id === selectedTaskId) ?? defaultPrev,
+        }
+      }
+    }
+    if (selectedGroupId != null) {
+      const groupIdx = lesson.tasks.findIndex(item => item.type === 'group' && item.id === selectedGroupId)
+      if (groupIdx >= 0) {
+        const group = lesson.tasks[groupIdx]
+        return { index: groupIdx + 1, prevTask: (group.subtasks ?? []).at(-1) ?? defaultPrev }
+      }
+    }
+    return { index: lesson.tasks.length, prevTask: defaultPrev }
+  }
+
+  function handleAddTask() {
+    const { index, prevTask } = topLevelInsertPosition()
     const newId = nextId()
     const newTask = { id: newId, title: '', explainer: '', ...defaultTypeFields(prevTask) }
-    handleLessonUpdate(prev => ({ ...prev, tasks: [...prev.tasks, newTask] }))
+    handleLessonUpdate(prev => {
+      const next = [...prev.tasks]
+      next.splice(index, 0, newTask)
+      return { ...prev, tasks: next }
+    })
     selectTask(newId)
   }
 
   function handleAddGroup() {
-    const flat = flattenTasks(lesson.tasks)
-    const prevTask = flat[flat.length - 1] ?? null
+    const { index, prevTask } = topLevelInsertPosition()
     const newId = nextId()
     const groupId = `g-${Date.now()}`
     const firstSubtask = {
@@ -458,7 +487,11 @@ export default function BuilderView({ lesson, dirty, onUpdate, onNew, onMarkSave
       title: 'New Group',
       subtasks: [firstSubtask],
     }
-    handleLessonUpdate(prev => ({ ...prev, tasks: [...prev.tasks, newGroup] }))
+    handleLessonUpdate(prev => {
+      const next = [...prev.tasks]
+      next.splice(index, 0, newGroup)
+      return { ...prev, tasks: next }
+    })
     selectGroup(groupId)
   }
 
@@ -466,20 +499,25 @@ export default function BuilderView({ lesson, dirty, onUpdate, onNew, onMarkSave
     const group = lesson.tasks.find(t => t.type === 'group' && t.id === groupId)
     if (!group) return
     const newId = nextId()
-    const prevSubtask = group.subtasks?.[group.subtasks.length - 1] ?? null
+    const subtasks = group.subtasks ?? []
+    const selectedSubtaskIdx = selectedTaskId != null
+      ? subtasks.findIndex(s => s.id === selectedTaskId)
+      : -1
+    const insertIndex = selectedSubtaskIdx >= 0 ? selectedSubtaskIdx + 1 : subtasks.length
+    const prevSubtask = selectedSubtaskIdx >= 0 ? subtasks[selectedSubtaskIdx] : (subtasks[subtasks.length - 1] ?? null)
     const newSubtask = {
       id: newId,
-      title: `${group.title} - ${(group.subtasks?.length ?? 0) + 1}`,
+      title: `${group.title} - ${subtasks.length + 1}`,
       explainer: '',
       ...defaultTypeFields(prevSubtask),
     }
     handleLessonUpdate(prev => ({
       ...prev,
-      tasks: prev.tasks.map(t =>
-        t.type === 'group' && t.id === groupId
-          ? { ...t, subtasks: [...(t.subtasks ?? []), newSubtask] }
-          : t
-      ),
+      tasks: prev.tasks.map(t => {
+        if (t.type !== 'group' || t.id !== groupId) return t
+        const subs = t.subtasks ?? []
+        return { ...t, subtasks: [...subs.slice(0, insertIndex), newSubtask, ...subs.slice(insertIndex)] }
+      }),
     }))
     selectTask(newId)
   }
