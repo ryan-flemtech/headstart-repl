@@ -13,6 +13,7 @@ import StudentGrid from '../components/StudentGrid'
 import QuizTask from '../components/QuizTask'
 import LiveActivityToast from '../components/LiveActivityToast'
 import TeacherTimers from '../components/TeacherTimers'
+import TeacherSessionControls from '../components/TeacherSessionControls'
 import { resolveAssetsPath } from '../../shared/assetPaths'
 import { cloneFiles, cloneScratchState } from '../../shared/workspaceData'
 import { buildStudentLivePayload } from '../teacherLivePayload'
@@ -297,106 +298,29 @@ export default function TeacherView({ lessonId }) {
         lessonLevel={lesson.level}
         isSandbox={isSandbox}
         right={
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            {!isInSandbox && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <button
-                  className="btn-ghost"
-                  style={{ fontSize: 13, padding: '4px 10px' }}
-                  disabled={displayIndex <= 0}
-                  onClick={() => {
-                    if (displayIndex > 0) handlePreviewTask(flatTasks[displayIndex - 1].id)
-                  }}
-                >
-                  ← Prev
-                </button>
-                <span style={{ fontSize: 13, opacity: 0.85, minWidth: 70, textAlign: 'center', fontFamily: 'var(--font-body)' }}>
-                  Task {displayIndex + 1} / {flatTasks.length}
-                </span>
-                <button
-                  className="btn-ghost"
-                  style={{ fontSize: 13, padding: '4px 10px' }}
-                  disabled={displayIndex >= flatTasks.length - 1}
-                  onClick={() => {
-                    if (displayIndex < flatTasks.length - 1) handlePreviewTask(flatTasks[displayIndex + 1].id)
-                  }}
-                >
-                  Next →
-                </button>
-              </div>
-            )}
-            <span style={{ fontSize: 13, opacity: 0.85 }}>
-              {session ? `Session: ${session.state}` : 'No session'}
-            </span>
-            <button
-              className="btn-ghost"
-              style={{ fontSize: 13, padding: '5px 12px' }}
-              onClick={handleOpenPresentationWindow}
-            >
-              Presentation Window
-            </button>
-            <div style={{ position: 'relative' }}>
-              <button
-                className="btn-ghost"
-                style={{ fontSize: 13, padding: '5px 12px' }}
-                onClick={() => setShowSharePanel(v => !v)}
-              >
-                Share Links
-              </button>
-              {showSharePanel && (
-                <>
-                  <div style={s.shareOverlay} onClick={() => setShowSharePanel(false)} />
-                  <div style={s.sharePanel}>
-                    <span style={s.sharePanelTitle}>Share lesson links</span>
-                    {(['live', 'solo']).map(type => {
-                      const links = getLessonLinks()
-                      return (
-                        <div key={type} style={s.shareLinkRow}>
-                          <div style={s.shareLinkInfo}>
-                            <span style={s.shareLinkType}>
-                              {type === 'live' ? 'Live (with teacher)' : 'Solo (practice)'}
-                            </span>
-                            <span style={s.shareLinkUrl}>{links[type]}</span>
-                          </div>
-                          <button
-                            className="btn-secondary"
-                            style={s.shareCopyBtn}
-                            onClick={() => handleCopyLink(type)}
-                          >
-                            {copiedLink === type ? 'Copied!' : 'Copy'}
-                          </button>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </>
-              )}
-            </div>
-            {session?.state === 'waiting' && (
-              <button className="btn-primary" style={{ fontSize: 13, padding: '5px 12px' }} onClick={startSession}>
-                Start Session
-              </button>
-            )}
-            {(session?.state === 'active' || session?.state === 'sandbox') && (
-              <button
-                className={session?.isPaused ? 'btn-paused' : 'btn-ghost'}
-                style={{ fontSize: 13, padding: '5px 12px' }}
-                onClick={() => setPaused(!session?.isPaused)}
-              >
-                {session?.isPaused ? 'Resume Coding' : 'Pause Coding'}
-              </button>
-            )}
-            {(session?.state === 'active' || session?.state === 'sandbox') && (
-              <button className="btn-danger" style={{ fontSize: 13, padding: '5px 12px' }} onClick={() => setShowEndModal(true)}>
-                End Session
-              </button>
-            )}
-            {session?.state === 'ended' && (
-              <button className="btn-primary" style={{ fontSize: 13, padding: '5px 12px' }} onClick={restartSession}>
-                Restart Session
-              </button>
-            )}
-          </div>
+          <TeacherSessionControls
+            session={session}
+            isInSandbox={isInSandbox}
+            displayIndex={displayIndex}
+            taskCount={flatTasks.length}
+            links={getLessonLinks()}
+            copiedLink={copiedLink}
+            showSharePanel={showSharePanel}
+            onPreviousTask={() => {
+              if (displayIndex > 0) handlePreviewTask(flatTasks[displayIndex - 1].id)
+            }}
+            onNextTask={() => {
+              if (displayIndex < flatTasks.length - 1) handlePreviewTask(flatTasks[displayIndex + 1].id)
+            }}
+            onOpenPresentationWindow={handleOpenPresentationWindow}
+            onToggleSharePanel={() => setShowSharePanel(v => !v)}
+            onCloseSharePanel={() => setShowSharePanel(false)}
+            onCopyLink={handleCopyLink}
+            onStartSession={startSession}
+            onTogglePaused={() => setPaused(!session?.isPaused)}
+            onEndSession={() => setShowEndModal(true)}
+            onRestartSession={restartSession}
+          />
         }
       />
       <TeacherTimers session={session} task={currentTask} tasks={lesson.tasks} />
@@ -659,66 +583,6 @@ const s = {
     fontSize: '1.1rem',
     padding: '10px 16px',
     letterSpacing: '0.04em',
-    flexShrink: 0,
-  },
-  shareOverlay: {
-    position: 'fixed',
-    inset: 0,
-    zIndex: 99,
-  },
-  sharePanel: {
-    position: 'absolute',
-    top: 'calc(100% + 8px)',
-    right: 0,
-    background: '#fff',
-    borderRadius: 12,
-    boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
-    padding: '14px 16px',
-    zIndex: 100,
-    width: 360,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 10,
-  },
-  sharePanelTitle: {
-    fontFamily: 'var(--font-title)',
-    fontWeight: 700,
-    fontSize: '0.85rem',
-    color: 'var(--colour-primary)',
-  },
-  shareLinkRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 10,
-    padding: '10px 12px',
-    background: '#f9fafb',
-    borderRadius: 8,
-    border: '1px solid #e5e7eb',
-  },
-  shareLinkInfo: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 2,
-    minWidth: 0,
-  },
-  shareLinkType: {
-    fontFamily: 'var(--font-body)',
-    fontWeight: 600,
-    fontSize: '0.82rem',
-    color: 'var(--colour-text)',
-  },
-  shareLinkUrl: {
-    fontFamily: 'var(--font-code)',
-    fontSize: '0.7rem',
-    color: '#6b7280',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-  },
-  shareCopyBtn: {
-    fontSize: 12,
-    padding: '6px 14px',
     flexShrink: 0,
   },
   page: {

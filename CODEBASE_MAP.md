@@ -64,6 +64,7 @@ Referenced from AGENTS.md. Use this for navigation before opening files.
 | `StudentModal.jsx` | Full-width modal: student workspace view + teacher actions (Go Live, Remote Reset, Rename, Remove) |
 | `LiveActivityToast.jsx` | Transient live-view notice for editor copy, paste, and click activity |
 | `TeacherTimers.jsx` | Timer strip for elapsed lesson time, planned duration, and active-task countdown |
+| `TeacherSessionControls.jsx` | Teacher top-bar task navigation, presentation/share links, and session action controls |
 | `InformationTask.jsx` | Read-only information/introduction task rendering for lesson flow |
 | `CollapsiblePanelControls.jsx` | Shared collapse/expand tab controls for classroom and builder panels |
 

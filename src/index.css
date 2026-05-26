@@ -471,6 +471,114 @@ select {
   animation: teacherTimerExpired 1s ease-in-out infinite;
 }
 
+/* Teacher session actions and lesson-link popover */
+.teacher-session-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.teacher-session-controls__navigation {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.teacher-session-controls__nav-btn {
+  font-size: 13px;
+  padding: 4px 10px;
+}
+
+.teacher-session-controls__task {
+  min-width: 70px;
+  text-align: center;
+  font-family: var(--font-body);
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+.teacher-session-controls__status {
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+.teacher-session-controls__action {
+  font-size: 13px;
+  padding: 5px 12px;
+}
+
+.teacher-share {
+  position: relative;
+}
+
+.teacher-share__overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99;
+}
+
+.teacher-share__panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 360px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+}
+
+.teacher-share__title {
+  font-family: var(--font-title);
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--colour-primary);
+}
+
+.teacher-share__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f9fafb;
+}
+
+.teacher-share__info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.teacher-share__type {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.82rem;
+  color: var(--colour-text);
+}
+
+.teacher-share__url {
+  overflow: hidden;
+  font-family: var(--font-code);
+  font-size: 0.7rem;
+  color: #6b7280;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.teacher-share__copy-btn {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  font-size: 12px;
+}
+
 /* Task transition animation */
 @keyframes taskSlideFromRight {
   from {
