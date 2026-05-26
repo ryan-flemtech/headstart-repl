@@ -44,13 +44,18 @@ export function updateTaskInTasks(tasks, updatedTask) {
 }
 
 // Ensure the titles of all subtasks in all groups match their group's title and index.
-// e.g. "Group Title - 1", "Group Title - 2", etc.
+// Subtasks with _customTitle:true are skipped — their title was manually set.
+// The "N" counter only increments for non-custom subtasks, so:
+//   "Group - 1" / "My Custom Name" / "Group - 2"
 export function updateSubtaskTitles(tasks) {
   if (!tasks) return []
   return tasks.map(item => {
     if (item.type === 'group') {
-      const subtasks = (item.subtasks ?? []).map((subtask, index) => {
-        const expectedTitle = item.title ? `${item.title} - ${index + 1}` : subtask.title
+      let defaultCount = 0
+      const subtasks = (item.subtasks ?? []).map(subtask => {
+        if (subtask._customTitle) return subtask
+        defaultCount++
+        const expectedTitle = item.title ? `${item.title} - ${defaultCount}` : subtask.title
         if (subtask.title !== expectedTitle) {
           return { ...subtask, title: expectedTitle }
         }

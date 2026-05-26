@@ -399,9 +399,25 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
     <div style={s.wrap}>
       {parentGroup ? (
         <Field label="Task title">
-          <div style={{ ...s.input, background: '#f8f5ff', color: '#6b7280', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ flex: 1 }}>{task.title}</span>
-            <span style={{ fontSize: '0.78rem', color: 'var(--colour-primary)', opacity: 0.7 }}>auto-named from group</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <input
+              style={{ ...s.input, flex: 1 }}
+              value={task.title}
+              onChange={e => set('title', e.target.value)}
+              placeholder={`${parentGroup.title} - N`}
+            />
+            {task._customTitle ? (
+              <button
+                type="button"
+                style={s.resetTitleBtn}
+                title="Reset to auto-generated name"
+                onClick={() => onUpdate({ ...task, title: '', _customTitle: undefined })}
+              >
+                reset
+              </button>
+            ) : (
+              <span style={s.autoTitleBadge}>auto</span>
+            )}
           </div>
         </Field>
       ) : (
@@ -2825,6 +2841,25 @@ const s = {
     color: 'var(--colour-text)',
     outline: 'none',
     width: '100%',
+  },
+  autoTitleBadge: {
+    fontSize: '0.75rem',
+    fontFamily: 'var(--font-body)',
+    color: 'var(--colour-primary)',
+    opacity: 0.6,
+    flexShrink: 0,
+    userSelect: 'none',
+  },
+  resetTitleBtn: {
+    fontSize: '0.75rem',
+    fontFamily: 'var(--font-body)',
+    color: 'var(--colour-primary)',
+    background: 'transparent',
+    border: '1px solid #c4b5fd',
+    borderRadius: 4,
+    padding: '3px 7px',
+    cursor: 'pointer',
+    flexShrink: 0,
   },
   select: {
     padding: '7px 10px',

@@ -198,4 +198,44 @@ describe('updateSubtaskTitles', () => {
     const [result] = updateSubtaskTitles([untitledGroup])
     expect(result.subtasks[0].title).toBe('Keep Me')
   })
+
+  it('leaves subtasks with _customTitle unchanged', () => {
+    const g = {
+      id: 'g5', type: 'group', title: 'Task',
+      subtasks: [{ id: 'c1', title: 'My Custom Name', _customTitle: true }],
+    }
+    const [result] = updateSubtaskTitles([g])
+    expect(result.subtasks[0].title).toBe('My Custom Name')
+    expect(result.subtasks[0]).toBe(g.subtasks[0])
+  })
+
+  it('numbers default subtasks skipping custom ones', () => {
+    const g = {
+      id: 'g6', type: 'group', title: 'Task',
+      subtasks: [
+        { id: 'd1', title: 'Task - 1' },
+        { id: 'd2', title: 'My Name', _customTitle: true },
+        { id: 'd3', title: 'Task - 2' },
+      ],
+    }
+    const [result] = updateSubtaskTitles([g])
+    expect(result.subtasks[0].title).toBe('Task - 1')
+    expect(result.subtasks[1].title).toBe('My Name')
+    expect(result.subtasks[2].title).toBe('Task - 2')
+  })
+
+  it('renumbers default subtasks correctly after a group rename', () => {
+    const g = {
+      id: 'g7', type: 'group', title: 'NewName',
+      subtasks: [
+        { id: 'e1', title: 'OldName - 1' },
+        { id: 'e2', title: 'Custom', _customTitle: true },
+        { id: 'e3', title: 'OldName - 2' },
+      ],
+    }
+    const [result] = updateSubtaskTitles([g])
+    expect(result.subtasks[0].title).toBe('NewName - 1')
+    expect(result.subtasks[1].title).toBe('Custom')
+    expect(result.subtasks[2].title).toBe('NewName - 2')
+  })
 })

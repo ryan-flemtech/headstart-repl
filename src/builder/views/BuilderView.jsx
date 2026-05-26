@@ -206,7 +206,7 @@ function normalizeTasksForExport(tasks) {
       return exported
     }
 
-    const { _checkTested, hints: _hints, ...rest } = task
+    const { _checkTested, _customTitle, hints: _hints, ...rest } = task
     const exported = { ...rest, id: idMap[task.id] }
 
     if (exported.carryCodeFrom != null) exported.carryCodeFrom = idMap[exported.carryCodeFrom] ?? exported.carryCodeFrom
@@ -678,17 +678,10 @@ export default function BuilderView({ lesson, dirty, onUpdate, onNew, onMarkSave
             <GroupEditor
               group={selectedGroup}
               onUpdate={updatedGroup => {
-                const retitled = {
-                  ...updatedGroup,
-                  subtasks: (updatedGroup.subtasks ?? []).map((t, i) => ({
-                    ...t,
-                    title: updatedGroup.title ? `${updatedGroup.title} - ${i + 1}` : t.title,
-                  })),
-                }
-                onUpdate(prev => ({
+                handleLessonUpdate(prev => ({
                   ...prev,
                   tasks: prev.tasks.map(t =>
-                    t.type === 'group' && t.id === retitled.id ? retitled : t
+                    t.type === 'group' && t.id === updatedGroup.id ? updatedGroup : t
                   ),
                 }))
               }}
@@ -700,9 +693,19 @@ export default function BuilderView({ lesson, dirty, onUpdate, onNew, onMarkSave
               lesson={lessonForEditor}
               parentGroup={selectedTaskGroup}
               onUpdate={updated => {
-                onUpdate(prev => ({
+                let finalUpdated = updated
+                if (selectedTaskGroup) {
+                  if ('_customTitle' in updated && !updated._customTitle) {
+                    // Explicit reset — clear flag so updateSubtaskTitles regenerates title
+                    const { _customTitle, ...withoutFlag } = finalUpdated
+                    finalUpdated = withoutFlag
+                  } else if (updated.title !== selectedTask.title) {
+                    finalUpdated = { ...updated, _customTitle: true }
+                  }
+                }
+                handleLessonUpdate(prev => ({
                   ...prev,
-                  tasks: updateTaskInTasks(prev.tasks, updated),
+                  tasks: updateTaskInTasks(prev.tasks, finalUpdated),
                 }))
               }}
             />
