@@ -53,6 +53,7 @@ Referenced from AGENTS.md. Use this for navigation before opening files.
 | `StudentCard.jsx` | Compact card: name, online/run/check badges, code/output/quiz snippet, expand button |
 | `StudentModal.jsx` | Full-width modal: student workspace view + teacher actions (Go Live, Remote Reset, Rename, Remove) |
 | `LiveActivityToast.jsx` | Transient live-view notice for editor copy, paste, and click activity |
+| `TeacherTimers.jsx` | Timer strip for elapsed lesson time, planned duration, and active-task countdown |
 
 ---
 
@@ -104,7 +105,7 @@ Referenced from AGENTS.md. Use this for navigation before opening files.
 | `pyodide.js` | Pyodide Web Worker manager: `initPyodide()`, `runPython()`, `stopPython()`, `provideInput()`, `isPyodideReady()` |
 | `pyodide.worker.js` | Web Worker: Pyodide loader, AST-based async `input()` transform, stdout/stderr event streaming |
 | `scratch.js` | Custom Scratch interpreter: 62 block definitions, multi-sprite state, broadcast, sounds, check evaluation |
-| `taskUtils.js` | `flattenTasks()`, `getProgressItems()`, `updateSubtaskTitles()` — group/subtask management |
+| `taskUtils.js` | Task flattening/group helpers plus estimated-duration total and formatting |
 | `useIsMobile.js` | `useIsMobile(breakpoint=640) → boolean` — media query hook for responsive layout |
 
 ---

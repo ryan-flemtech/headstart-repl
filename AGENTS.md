@@ -132,7 +132,7 @@ Both apps import from `src/shared/`. Never duplicate this logic.
 | `pyodide.js` | `initPyodide()`, `runPython(code, {onOutput?, onInputRequired?})`, `stopPython()`, `provideInput(value)` |
 | `pyodide.worker.js` | Web Worker: Pyodide loader, async `input()` AST transform, stdout/stderr streaming |
 | `scratch.js` | Block definitions, interpreter, `createRunContext()`, `createSpriteState()`, `createRunSignal()` |
-| `taskUtils.js` | `flattenTasks(tasks)`, `getProgressItems(tasks)`, `updateSubtaskTitles(tasks)` |
+| `taskUtils.js` | `flattenTasks(tasks)`, duration total/format helpers, `getProgressItems(tasks)`, `updateSubtaskTitles(tasks)` |
 | `useIsMobile.js` | `useIsMobile(breakpoint=640) → boolean` |
 
 ---
@@ -148,6 +148,9 @@ Both apps import from `src/shared/`. Never duplicate this logic.
       "state": "waiting | active | sandbox | ended",
       "currentTaskId": 1,
       "createdAt": 1234567890,
+      "startedAt": "1234567890 | null",
+      "currentTaskStartedAt": "1234567890 | null",
+      "endedAt": "1234567890 | null",
       "isPaused": false,
       "activeStudentView": "{anonymousId} | null",
       "teacherLive": {
@@ -198,7 +201,7 @@ Both apps import from `src/shared/`. Never duplicate this logic.
 
 ### Write rules
 
-- Teacher writes: `state`, `currentTaskId`, `isPaused`, `activeStudentView`, `teacherLive`, `sandboxCode`, `sandboxCodePushedAt`, `sandboxFiles`, `sandboxFilesUpdatedAt`, any student's `displayName`, student node removal
+- Teacher writes: `state`, `currentTaskId`, `startedAt`, `currentTaskStartedAt`, `endedAt`, `isPaused`, `activeStudentView`, `teacherLive`, `sandboxCode`, `sandboxCodePushedAt`, `sandboxFiles`, `sandboxFilesUpdatedAt`, any student's `displayName`, student node removal
 - Teacher — remote reset: `remoteResetAction` + `remoteResetPushedAt` on individual student node
 - Student (on run): own `currentCode`/`currentFiles`, `currentOutput`, `lastRunStatus`, `checkPassed`, `lastRunAt`
 - Student (when watched — Python): `currentCode` per keystroke, `currentOutput` line by line during run, `currentSelection`/`currentActivity` editor interactions
@@ -288,6 +291,12 @@ No room IDs. One session per lesson. `?teacher=true` is the only auth mechanism.
 - Opens via `?teacher=true&present=true` presentation window
 - Broadcast code views stream selection/cursor and copy, paste, and click notices
 - `onDisconnect` clears `teacherLive` automatically
+
+### Teacher timers
+- A task may define `estimatedMinutes` as a positive integer; the builder displays their lesson-wide total
+- Starting a session sets `startedAt` and `currentTaskStartedAt`
+- Moving the class to a task or returning from sandbox restarts `currentTaskStartedAt`
+- Teacher view shows lesson elapsed time and a countdown for timed active tasks; expired task timers flash
 
 ### Remote reset
 - Teacher writes `remoteResetAction` ("starter" or "complete") + `remoteResetPushedAt` to student node

@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { formatEstimatedMinutes, getTotalEstimatedMinutes } from '../../shared/taskUtils'
 
 function taskIconType(task) {
   if (task.taskType === 'information') return 'information'
@@ -102,6 +103,7 @@ export default function TaskList({
   })
   const [dragState, setDragState] = useState(null)
   const [dropTarget, setDropTarget] = useState(null)
+  const totalEstimatedMinutes = getTotalEstimatedMinutes(tasks)
 
   function toggleGroup(groupId) {
     setExpandedGroups(prev => ({ ...prev, [groupId]: !prev[groupId] }))
@@ -198,7 +200,10 @@ export default function TaskList({
   return (
     <div style={s.wrap}>
       <div style={s.header}>
-        <span style={s.label}>Tasks</span>
+        <div style={s.headerTitle}>
+          <span style={s.label}>Tasks</span>
+          <span style={s.totalTime}>Total: {formatEstimatedMinutes(totalEstimatedMinutes)}</span>
+        </div>
         <div style={{ display: 'flex', gap: 4 }}>
           <button className="btn-primary" style={s.addBtn} onClick={onAdd} title="Add standalone task">
             + Task
@@ -373,6 +378,8 @@ const s = {
     flexShrink: 0,
   },
   label: { fontFamily: 'var(--font-title)', fontWeight: 700, fontSize: '0.85rem', letterSpacing: '0.04em' },
+  headerTitle: { display: 'flex', flexDirection: 'column', gap: 2 },
+  totalTime: { fontFamily: 'var(--font-body)', fontWeight: 600, fontSize: '0.7rem', opacity: 0.84 },
   addBtn: { fontSize: 11, padding: '4px 8px' },
   addGroupBtn: {
     fontSize: 11,

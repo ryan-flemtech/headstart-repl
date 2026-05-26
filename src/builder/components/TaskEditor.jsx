@@ -431,6 +431,21 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
         </Field>
       )}
 
+      <Field label="Estimated time (minutes)">
+        <input
+          style={s.input}
+          type="number"
+          min="1"
+          step="1"
+          value={task.estimatedMinutes ?? ''}
+          onChange={e => {
+            const value = e.target.value
+            set('estimatedMinutes', value === '' ? undefined : Math.max(1, Number.parseInt(value, 10) || 1))
+          }}
+          placeholder="e.g. 10"
+        />
+      </Field>
+
       <Field label="Task format">
         <div style={s.taskFormatGrid}>
           {[
