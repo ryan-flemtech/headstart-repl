@@ -9,7 +9,8 @@
       "Bash(pip *)",
       "Bash(python *)",
       "PowerShell(*)",
-      "Bash(gh pr *)"
+      "Bash(gh pr *)",
+      "Bash(ls *)"
     ]
   },
   "defaultMode": "acceptEdits"

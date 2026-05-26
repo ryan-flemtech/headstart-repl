@@ -4,6 +4,15 @@ Quick-reference guide for Claude Code and Codex sessions. Read this at the start
 
 For full detail: **SPEC.md**. For file roles: **CODEBASE_MAP.md**. For lesson JSON: **LESSON_SCHEMA.md**. For feature list: **FEATURES.md**.
 
+## Session Start Checklist
+
+Do this at the start of every session, before writing any code:
+
+- [ ] Read **CODEBASE_MAP.md** to orientate on the current file structure
+- [ ] Run `gh pr list` — check for open PRs before starting new work
+- [ ] Confirm you are on the correct branch (`git branch`)
+- [ ] Run `npm test` — the suite must pass before touching anything
+
 ---
 
 ## Project Summary
@@ -32,12 +41,34 @@ Both are static React apps deployed to GitHub Pages. No backend server exists or
 | Code editor | CodeMirror 6 |
 | Markdown | react-markdown + rehype-highlight |
 | Styling | CSS custom properties in a shared global stylesheet (`src/index.css`) |
+| Env vars | `.env` lives **one level above the repo root** (`../`); loaded via `envDir: '../'` in `vite.config.js` |
 
 Do not add any other major dependencies without confirming with the user.
 
 ---
 
+## Hard Constraints
+
+These rules are absolute — do not deviate regardless of context:
+
+- Do not add a backend server or API
+- Do not add authentication beyond `?teacher=true` — note this means anyone with the URL pattern can act as teacher; do not add features that assume otherwise
+- Do not use `sessionStorage` for the Anonymous ID — use `localStorage`
+- Do not write student code to Firebase per keystroke unless `activeStudentView` matches
+- Do not re-render the iframe per keystroke during live view — only on Run
+- Do not hardcode student limits
+- Do not add pip install support
+- Do not add file I/O support
+- Do not deviate from Firebase data model or localStorage key formats
+- Do not duplicate Pyodide, iframe, CodeMirror, checks, or Markdown logic — always use shared modules
+- Do not store Firebase file keys with raw dots — always encode with `encodeFileKey`
+- Do not add dependencies without confirming with the user
+
+---
+
 ## Repository Structure
+
+> Illustrative overview only — see **CODEBASE_MAP.md** for the authoritative file list.
 
 ```
 /
@@ -215,8 +246,7 @@ No room IDs. One session per lesson. `?teacher=true` is the only auth mechanism.
 | `active` | Live lesson — teacher controls current task |
 | `sandbox` | Freeform mode — no task, no checks |
 | `ended` | Session finished |
-
-`isPaused: true` overlays any state to freeze student navigation without ending the session.
+| *(any + `isPaused: true`)* | Freezes student navigation without changing state — overlays any of the above |
 
 ---
 
@@ -270,23 +300,7 @@ No room IDs. One session per lesson. `?teacher=true` is the only auth mechanism.
 ### File key encoding (Firebase)
 - Always use `encodeFileKey`/`decodeFileKey` from `useSession.js` when reading/writing `currentFiles` or `sandboxFiles`
 - App state and localStorage use raw filenames with real dots
-
----
-
-## What Not To Do
-
-- Do not add a backend server or API
-- Do not add authentication beyond `?teacher=true`
-- Do not use `sessionStorage` for the Anonymous ID — use `localStorage`
-- Do not write student code to Firebase per keystroke unless `activeStudentView` matches
-- Do not re-render the iframe per keystroke during live view — only on Run
-- Do not hardcode student limits
-- Do not add pip install support
-- Do not add file I/O support
-- Do not deviate from Firebase data model or localStorage key formats
-- Do not duplicate Pyodide, iframe, CodeMirror, checks, or Markdown logic — always use shared modules
-- Do not store Firebase file keys with raw dots — always encode with `encodeFileKey`
-- Do not add dependencies without confirming with the user
+- *(Rule also stated in the Firebase Data Model section above — both locations are intentional reminders)*
 
 ---
 
@@ -321,12 +335,6 @@ Do not merge the PR — leave it open for review.
 
 ### Responding to PR review comments
 
-When a commit is made in response to a PR review comment, always post a follow-up reply on that PR comment thread explaining what was changed and which commit addresses it:
-
-```bash
-gh pr comment <pr-number> --body "Addressed in <commit-sha>: <brief explanation of what was changed>"
-```
-
 When asked to handle or address a comment on a pull request, always reply directly to that comment thread — even before starting work — to acknowledge what will be done. Once the commit is made, post a follow-up reply on the same thread explaining what was changed and which commit addresses it:
 
 ```bash
@@ -334,13 +342,21 @@ When asked to handle or address a comment on a pull request, always reply direct
 gh api repos/{owner}/{repo}/pulls/comments/{comment_id}/replies \
   --method POST --field body="Addressed in <commit-sha>: <brief explanation of what was changed>"
 
-# Or post a general PR comment
+# Or post a general PR comment (use when replying to a top-level review, not a line comment)
 gh pr comment <pr-number> --body "Addressed in <commit-sha>: <brief explanation of what was changed>"
 ```
 
+### Worktrees and environment variables
+
+The `.env` file lives **one level above the repo root** (i.e. `../` relative to any worktree), not inside the repo. This means all worktrees automatically share the same env vars without any copying or symlinking.
+
+- **Do not create, copy, or write a `.env` file inside a worktree or the main repo directory.**
+- If a worktree cannot find env vars, check that `vite.config.js` still has `envDir: '../'` — do not change this.
+- The `../.env` file is gitignored at the parent level and is not committed anywhere.
+
 ### Closing the worktree after submitting a PR
 
-After gh pr create completes successfully, check out the branch in the main working directory (git checkout <branch>), then exit and remove the worktree using the ExitWorktree tool. This allows testing with the local environment before the PR is merged.
+After `gh pr create` completes successfully, exit and remove the worktree using the ExitWorktree tool (or, if running in a terminal, `git worktree remove <path>`). This keeps the repo tidy and signals that the branch is in review.
 
 ---
 
@@ -371,7 +387,10 @@ Read **TESTING.md** for full detail on tool choices, layer definitions, coverage
 - Pyodide / Web Worker: mock the `pyodide.js` manager interface with `vi.mock`; never import the worker directly in tests
 - `react-router-dom`: mock `useNavigate`, `useParams`, `useSearchParams` as needed per component
 
-**When adding a new source file:**
+**Which test layer to use:**
+- Pure functions → unit test
+- React components or hooks → component test
+- Critical user journeys that don't require Firebase → E2E test only
 - If it exports pure functions → add a unit test file in the matching `__tests__/` directory
 - If it is a React component or hook → add a component test file
 - If it changes a critical user journey → consider whether an E2E test needs updating
@@ -399,6 +418,8 @@ Read **TESTING.md** for full detail on tool choices, layer definitions, coverage
 ## Doc Hygiene
 
 After any significant change, update the relevant section of SPEC.md, LESSON_SCHEMA.md, or this file before closing the task. Update CODEBASE_MAP.md when files are added, moved, or removed.
+
+**"Significant change" means:** a new component, hook, or module is created; a Firebase field is added or removed; a URL parameter changes; a behaviour listed in Key Behaviours changes; or any section of this file becomes inaccurate.
 
 When a library or CDN module is added, removed, or upgraded to a new major version, update **LICENSES.md** with the package name, version, and license. Check the license in the package's `package.json` or repository — pay particular attention to copyleft licenses (AGPL, GPL) before adding anything new.
 
