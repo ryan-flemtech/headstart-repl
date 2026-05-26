@@ -16,7 +16,8 @@ export default function StudentCard({ student, lesson, lessonId, session, onRena
   const isSubmitMode = currentTask?.interactionMode === 'submit'
   const isQuiz = currentTask?.taskType === 'quiz'
   const isInformation = currentTask?.taskType === 'information'
-  const quizAnswerText = isQuiz ? getQuizOptionText(currentTask, student.currentAnswer) : ''
+  const isShortAnswer = isQuiz && currentTask?.quizType === 'short_answer'
+  const quizAnswerText = isQuiz && !isShortAnswer ? getQuizOptionText(currentTask, student.currentAnswer) : ''
 
   const statusColour =
     student.lastRunStatus === 'success'   ? '#22c55e' :
@@ -104,14 +105,16 @@ export default function StudentCard({ student, lesson, lessonId, session, onRena
       ) : isQuiz ? (
         <div style={s.quizAnswer}>
           {student.currentAnswer
-            ? (
-              <>
-                <span style={s.quizAnswerId}>{student.currentAnswer}</span>
-                <span style={s.quizAnswerText}>
-                  {quizAnswerText ? <InlineMarkdown content={quizAnswerText} /> : 'Selected answer'}
-                </span>
-              </>
-            )
+            ? isShortAnswer
+              ? <span style={s.shortAnswerText}>{student.currentAnswer}</span>
+              : (
+                <>
+                  <span style={s.quizAnswerId}>{student.currentAnswer}</span>
+                  <span style={s.quizAnswerText}>
+                    {quizAnswerText ? <InlineMarkdown content={quizAnswerText} /> : 'Selected answer'}
+                  </span>
+                </>
+              )
             : <span style={{ color: '#9ca3af', fontSize: 12 }}>No answer yet</span>}
         </div>
       ) : lesson?.type === 'python' ? (
@@ -325,6 +328,18 @@ const s = {
     lineHeight: 1.3,
     color: 'var(--colour-text)',
     fontWeight: 600,
+  },
+  shortAnswerText: {
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.8rem',
+    lineHeight: 1.4,
+    color: 'var(--colour-text)',
+    fontWeight: 500,
+    overflow: 'hidden',
+    display: '-webkit-box',
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: 'vertical',
+    fontStyle: 'italic',
   },
   expandBtn: {
     fontSize: 12,

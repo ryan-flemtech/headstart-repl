@@ -408,7 +408,10 @@ Distractor object: `{ id: string, text: string }`. Markdown supported in `text`.
 
 ### Short Answer
 
-Student types a free-text answer checked against a pattern.
+Student types a free-text answer. The `check` field is optional:
+
+- **With a check**: the answer is evaluated automatically and the task passes when the check succeeds.
+- **Without a check** (open-ended): any submitted answer completes the task. The teacher can review what each student wrote in the student grid and modal.
 
 ```json
 {
@@ -421,6 +424,18 @@ Student types a free-text answer checked against a pattern.
     "type": "answer_contains",
     "value": "Central Processing Unit"
   }
+}
+```
+
+Open-ended example (no correct answer — teacher review only):
+
+```json
+{
+  "id": 7,
+  "taskType": "quiz",
+  "quizType": "short_answer",
+  "title": "What did you find hardest?",
+  "explainer": "Write one thing you found difficult in today's lesson."
 }
 ```
 

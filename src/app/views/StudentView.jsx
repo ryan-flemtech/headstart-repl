@@ -909,7 +909,9 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
         ? passedOverride
         : task?.check
           ? evaluateCheck(task.check, answer, { answer: typeof answer === 'string' ? answer : '' })
-          : false
+          : task?.quizType === 'short_answer'
+            ? !!(typeof answer === 'string' ? answer.trim() : false)
+            : false
     const suggestion = passed ? '' : getQuizSuggestion(task, answer)
 
     setSelectedAnswer(answer)

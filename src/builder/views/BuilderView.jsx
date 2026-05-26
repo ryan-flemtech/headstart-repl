@@ -69,8 +69,8 @@ function validateLesson(lesson) {
           errors.push(`Task ${n} is a fill-in-the-blank quiz but has an empty answer.`)
         }
       } else if (quizType === 'short_answer') {
-        if (!task.check?.type?.startsWith('answer_') || !task.check.value?.trim()) {
-          errors.push(`Task ${n} is a short-answer quiz but has no completion check value.`)
+        if (task.check != null && (!task.check.type?.startsWith('answer_') || !task.check.value?.trim())) {
+          errors.push(`Task ${n} is a short-answer quiz with a check enabled but no check value.`)
         }
       }
     } else if (type === 'html') {
