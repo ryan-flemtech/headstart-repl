@@ -1,0 +1,111 @@
+import { describe, expect, it, vi } from 'vitest'
+import {
+  canCarryTaskContent,
+  selectHtmlTaskFiles,
+  selectPythonTaskCode,
+  selectScratchInitialProject,
+} from '../studentTaskContent'
+
+const groupedTasks = [{
+  id: 'group-1',
+  type: 'group',
+  subtasks: [
+    { id: 1, starterCode: 'first' },
+    { id: 2, starterCode: 'second', carryCodeFrom: 1 },
+    { id: 3, taskType: 'quiz' },
+  ],
+}]
+
+describe('canCarryTaskContent', () => {
+  it('preserves carry-through for runnable tasks in the same group or both outside groups', () => {
+    expect(canCarryTaskContent(groupedTasks, 1, 2)).toBe(true)
+    expect(canCarryTaskContent(groupedTasks, 3, 2)).toBe(false)
+    expect(canCarryTaskContent([{ id: 1 }, { id: 2 }], 1, 2)).toBe(true)
+    expect(canCarryTaskContent([
+      { id: 'first-group', type: 'group', subtasks: [{ id: 1 }] },
+      { id: 'second-group', type: 'group', subtasks: [{ id: 2 }] },
+    ], 1, 2)).toBe(false)
+    expect(canCarryTaskContent(groupedTasks, 99, 2)).toBe(false)
+  })
+})
+
+describe('selectPythonTaskCode', () => {
+  const task = groupedTasks[0].subtasks[1]
+
+  it('prefers own solo work before carried or starter code', () => {
+    const readSavedCode = vi.fn(id => id === 2 ? { code: 'own code' } : { code: 'carried code' })
+    expect(selectPythonTaskCode({ tasks: groupedTasks, task, taskId: 2, phase: 'solo', readSavedCode })).toBe('own code')
+    expect(readSavedCode).toHaveBeenCalledTimes(1)
+  })
+
+  it('uses non-empty carried code and otherwise retains starter code', () => {
+    expect(selectPythonTaskCode({
+      tasks: groupedTasks,
+      task,
+      taskId: 2,
+      phase: 'lesson',
+      readSavedCode: () => ({ code: 'carried code' }),
+    })).toBe('carried code')
+    expect(selectPythonTaskCode({
+      tasks: groupedTasks,
+      task,
+      taskId: 2,
+      phase: 'lesson',
+      readSavedCode: () => ({ code: '' }),
+    })).toBe('second')
+  })
+})
+
+describe('selectHtmlTaskFiles', () => {
+  const htmlTasks = [{
+    id: 'html-group',
+    type: 'group',
+    subtasks: [
+      { id: 1 },
+      {
+        id: 2,
+        carryCodeFrom: 1,
+        starterFiles: [
+          { name: 'index.html', content: 'starter html' },
+          { name: 'style.css', content: 'starter css' },
+        ],
+      },
+    ],
+  }]
+  const task = htmlTasks[0].subtasks[1]
+
+  it('selects saved files independently and does not mutate starter files', () => {
+    const files = selectHtmlTaskFiles({
+      tasks: htmlTasks,
+      task,
+      taskId: 2,
+      phase: 'solo',
+      readSavedFile: (id, name) => id === 2 && name === 'index.html' ? 'own html' : id === 1 ? 'carried css' : null,
+    })
+
+    expect(files).toEqual([
+      { name: 'index.html', content: 'own html' },
+      { name: 'style.css', content: 'carried css' },
+    ])
+    expect(task.starterFiles[0].content).toBe('starter html')
+  })
+})
+
+describe('selectScratchInitialProject', () => {
+  const starterBlocks = { selected: 'starter' }
+  const task = { carryBlocksFrom: 1, starterBlocks }
+
+  it('falls back from saved task blocks to carried blocks and starter blocks', () => {
+    expect(selectScratchInitialProject({
+      task,
+      taskId: 2,
+      readSavedCode: id => id === 2 ? { state: { selected: 'own' } } : { state: { selected: 'carry' } },
+    })).toEqual({ selected: 'own' })
+    expect(selectScratchInitialProject({
+      task,
+      taskId: 2,
+      readSavedCode: id => id === 1 ? { state: { selected: 'carry' } } : null,
+    })).toEqual({ selected: 'carry' })
+    expect(selectScratchInitialProject({ task, taskId: 2, readSavedCode: () => null })).toBe(starterBlocks)
+  })
+})

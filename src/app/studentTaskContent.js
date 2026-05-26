@@ -1,0 +1,51 @@
+import { findGroupForTask, findTaskById } from '../shared/taskUtils'
+
+export function canCarryTaskContent(tasks, carryFromId, currentTaskId) {
+  if (!carryFromId) return false
+  const sourceTask = findTaskById(tasks, carryFromId)
+  if (!sourceTask || sourceTask.taskType === 'quiz' || sourceTask.taskType === 'information') return false
+  const sourceGroup = findGroupForTask(tasks, carryFromId)
+  const currentGroup = findGroupForTask(tasks, currentTaskId)
+  return sourceGroup?.id === currentGroup?.id
+}
+
+export function selectPythonTaskCode({ tasks, task, taskId, phase, readSavedCode }) {
+  if (phase === 'solo') {
+    const ownSaved = readSavedCode(taskId)
+    if (ownSaved != null) return ownSaved.code ?? ''
+  }
+
+  let initial = task.starterCode ?? ''
+  if (canCarryTaskContent(tasks, task.carryCodeFrom, taskId)) {
+    const carried = readSavedCode(task.carryCodeFrom)
+    if (carried?.code) initial = carried.code
+  }
+  return initial
+}
+
+export function selectHtmlTaskFiles({ tasks, task, taskId, phase, readSavedFile }) {
+  return (task.starterFiles ?? []).map(file => {
+    if (phase === 'solo') {
+      const ownSaved = readSavedFile(taskId, file.name)
+      if (ownSaved != null) return { ...file, content: ownSaved }
+    }
+
+    let content = file.content
+    if (canCarryTaskContent(tasks, task.carryCodeFrom, taskId)) {
+      const carried = readSavedFile(task.carryCodeFrom, file.name)
+      if (carried != null) content = carried
+    }
+    return { ...file, content }
+  })
+}
+
+export function selectScratchInitialProject({ task, taskId, readSavedCode }) {
+  const saved = readSavedCode(taskId)
+  let initialProject = saved?.state ?? null
+  if (!initialProject && task?.carryBlocksFrom) {
+    const carried = readSavedCode(task.carryBlocksFrom)
+    initialProject = carried?.state ?? null
+  }
+  if (!initialProject) initialProject = task?.starterBlocks ?? null
+  return initialProject
+}
