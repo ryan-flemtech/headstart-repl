@@ -632,12 +632,11 @@ const s = {
     fontFamily: 'var(--font-body)',
     fontSize: '1.35rem',
     fontWeight: 600,
+    transition: 'background 0.12s, border-color 0.12s, box-shadow 0.12s',
   },
   optionActive: {
-    boxShadow: '0 6px 18px rgba(17, 24, 39, 0.18)',
-    transform: 'scale(1.035)',
+    boxShadow: 'inset 0 0 0 3px rgba(255, 255, 255, 0.5), 0 6px 18px rgba(17, 24, 39, 0.18)',
     zIndex: 2,
-    fontSize: '1.55rem',
   },
   optionId: {
     width: 42,
