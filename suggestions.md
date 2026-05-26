@@ -25,12 +25,20 @@ Implemented on 26 May 2026 in [`feature/implement-suggestions`](https://github.c
 
 Still to do:
 
-- Split `TaskEditor.jsx` into focused task-type/editor modules after adding targeted coverage for the moved component clusters and mapping utilities.
 - Continue decomposing `StudentView.jsx` beyond its extracted storage helper, particularly task-content selection and narrowly scoped live/session helpers.
 - Further reduce `TeacherView.jsx` orchestration density by extracting sandbox content selection and presentational controls.
 - Separate `ScratchWorkspace.jsx` presentation concerns and gradually split stable categories in `src/shared/scratch.js`, backed by characterization tests.
 - Move repeated static inline styling into existing CSS classes and standardise already-equivalent presentational primitives.
 - Add focused component coverage for view states and boundary calls before making deeper `StudentView` or `TeacherView` changes.
+
+## Progress Update - PR #73
+
+Implemented on 26 May 2026 in [`refactor/split-task-editor`](https://github.com/Headstart-Coding-Launchpad/editor/pull/73):
+
+- Split `TaskEditor.jsx` into focused task-editor sub-modules for fields, quiz editors, check editors, Scratch editors, and shared styles.
+- Preserved top-level `TaskEditor.jsx` exports used by existing builder callers.
+- Added characterization tests for check type/operator mappings, check skeleton construction, and Scratch toolbox XML parsing.
+- Updated `CODEBASE_MAP.md` for the extracted task-editor directory.
 
 ## Guiding Rules
 
@@ -201,11 +209,10 @@ Completed in PR #66:
 
 Remaining sequence:
 
-1. Split `TaskEditor.jsx` using its existing internal component boundaries.
-2. Consolidate static styling for builder components moved during that split.
-3. Continue pure/helper and presentational extraction from `TeacherView.jsx`, then `StudentView.jsx`.
-4. Refactor Scratch presentation/runtime modules in small, test-backed pieces.
-5. Add further characterization coverage alongside each structural change.
+1. Consolidate static styling for builder components moved during the TaskEditor split.
+2. Continue pure/helper and presentational extraction from `TeacherView.jsx`, then `StudentView.jsx`.
+3. Refactor Scratch presentation/runtime modules in small, test-backed pieces.
+4. Add further characterization coverage alongside each structural change.
 
 ## Explicit Non-Goals
 

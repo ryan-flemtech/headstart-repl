@@ -14,8 +14,16 @@ import QuizTask from '../components/QuizTask'
 import LiveActivityToast from '../components/LiveActivityToast'
 import TeacherTimers from '../components/TeacherTimers'
 import { resolveAssetsPath } from '../../shared/assetPaths'
-import { cloneFiles, cloneScratchState, decodeSessionFiles, parseScratchState } from '../../shared/workspaceData'
+import { cloneFiles, cloneScratchState } from '../../shared/workspaceData'
 import { buildStudentLivePayload } from '../teacherLivePayload'
+import {
+  getSandboxConfiguredCode,
+  getSandboxConfiguredFiles,
+  getSandboxConfiguredScratch,
+  getSandboxStarterCode,
+  getSandboxStarterFiles,
+  getSandboxStarterScratch,
+} from '../teacherSandboxContent'
 
 export default function TeacherView({ lessonId }) {
   const navigate = useNavigate()
@@ -90,52 +98,6 @@ export default function TeacherView({ lessonId }) {
     }
   }
 
-  function getSandboxStarterCode({ preferDraft = true } = {}) {
-    const task = flattenTasks(lesson?.tasks ?? []).find(t => t.id === currentTaskId)
-    if (preferDraft && sandboxDraftRef.current.code != null) return sandboxDraftRef.current.code
-    if (session?.state === 'sandbox' && session.sandboxCode != null) return session.sandboxCode
-    if (lesson?.sandboxStarter != null) return lesson.sandboxStarter
-    if (code) return code
-    return task?.starterCode ?? ''
-  }
-
-  function getSandboxStarterFiles({ preferDraft = true } = {}) {
-    const task = flattenTasks(lesson?.tasks ?? []).find(t => t.id === currentTaskId)
-    if (preferDraft && sandboxDraftRef.current.files?.length > 0) return cloneFiles(sandboxDraftRef.current.files)
-    const liveFiles = session?.state === 'sandbox' ? decodeSessionFiles(session.sandboxFiles, decodeFileKey) : []
-    if (liveFiles.length > 0) return cloneFiles(liveFiles)
-    if (lesson?.sandboxStarterFiles?.length > 0) return cloneFiles(lesson.sandboxStarterFiles)
-    if (files.length > 0) return cloneFiles(files)
-    return cloneFiles(task?.starterFiles ?? [])
-  }
-
-  function getSandboxStarterScratch({ preferDraft = true } = {}) {
-    const task = flattenTasks(lesson?.tasks ?? []).find(t => t.id === currentTaskId)
-    if (preferDraft && sandboxDraftRef.current.scratchState) return cloneScratchState(sandboxDraftRef.current.scratchState)
-    if (session?.state === 'sandbox' && session.sandboxCode != null) {
-      return parseScratchState(session.sandboxCode)
-    }
-    if (scratchState) return scratchState
-    return task?.starterBlocks ?? null
-  }
-
-  function getSandboxConfiguredCode() {
-    const task = flattenTasks(lesson?.tasks ?? []).find(t => t.id === currentTaskId)
-    return lesson?.sandboxStarter ?? task?.starterCode ?? ''
-  }
-
-  function getSandboxConfiguredFiles() {
-    const task = flattenTasks(lesson?.tasks ?? []).find(t => t.id === currentTaskId)
-    if (lesson?.sandboxStarterFiles?.length > 0) return cloneFiles(lesson.sandboxStarterFiles)
-    return cloneFiles(task?.starterFiles ?? [])
-  }
-
-  function getSandboxConfiguredScratch() {
-    const task = flattenTasks(lesson?.tasks ?? []).find(t => t.id === currentTaskId)
-    if (lesson?.sandboxStarter != null) return parseScratchState(lesson.sandboxStarter)
-    return cloneScratchState(task?.starterBlocks ?? null)
-  }
-
   // Load task content when displayed task changes (preview or session task)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -148,11 +110,20 @@ export default function TeacherView({ lessonId }) {
   useEffect(() => {
     if (!lesson || sandboxStaging || session?.state !== 'sandbox') return
     if (lesson.type === 'python') {
-      setCode(getSandboxStarterCode())
+      setCode(getSandboxStarterCode({
+        lesson, taskId: currentTaskId, session,
+        draftCode: sandboxDraftRef.current.code, currentCode: code,
+      }))
     } else if (lesson.type === 'scratch') {
-      setScratchState(getSandboxStarterScratch())
+      setScratchState(getSandboxStarterScratch({
+        lesson, taskId: currentTaskId, session,
+        draftState: sandboxDraftRef.current.scratchState, currentState: scratchState,
+      }))
     } else {
-      const starterFiles = getSandboxStarterFiles()
+      const starterFiles = getSandboxStarterFiles({
+        lesson, taskId: currentTaskId, session,
+        draftFiles: sandboxDraftRef.current.files, currentFiles: files, decodeFileKey,
+      })
       setFiles(starterFiles)
       setActiveFile(starterFiles[0]?.name ?? '')
     }
@@ -182,11 +153,20 @@ export default function TeacherView({ lessonId }) {
   function handleEnterSandbox() {
     setPreviewTaskId(null)
     if (lesson.type === 'python') {
-      setCode(getSandboxStarterCode())
+      setCode(getSandboxStarterCode({
+        lesson, taskId: currentTaskId, session,
+        draftCode: sandboxDraftRef.current.code, currentCode: code,
+      }))
     } else if (lesson.type === 'scratch') {
-      setScratchState(getSandboxStarterScratch())
+      setScratchState(getSandboxStarterScratch({
+        lesson, taskId: currentTaskId, session,
+        draftState: sandboxDraftRef.current.scratchState, currentState: scratchState,
+      }))
     } else {
-      const starterFiles = getSandboxStarterFiles()
+      const starterFiles = getSandboxStarterFiles({
+        lesson, taskId: currentTaskId, session,
+        draftFiles: sandboxDraftRef.current.files, currentFiles: files, decodeFileKey,
+      })
       setFiles(starterFiles)
       setActiveFile(starterFiles[0]?.name ?? '')
     }
@@ -219,17 +199,17 @@ export default function TeacherView({ lessonId }) {
 
   async function handleResetSandboxStarter() {
     if (lesson.type === 'python') {
-      const starterCode = getSandboxConfiguredCode()
+      const starterCode = getSandboxConfiguredCode({ lesson, taskId: currentTaskId })
       sandboxDraftRef.current.code = starterCode
       setCode(starterCode)
       if (isSandbox) await pushSandboxCode(starterCode)
     } else if (lesson.type === 'scratch') {
-      const starterScratch = getSandboxConfiguredScratch()
+      const starterScratch = getSandboxConfiguredScratch({ lesson, taskId: currentTaskId })
       sandboxDraftRef.current.scratchState = cloneScratchState(starterScratch)
       setScratchState(starterScratch)
       if (isSandbox) await pushSandboxCode(JSON.stringify(starterScratch ?? {}))
     } else {
-      const starterFiles = getSandboxConfiguredFiles()
+      const starterFiles = getSandboxConfiguredFiles({ lesson, taskId: currentTaskId })
       sandboxDraftRef.current.files = cloneFiles(starterFiles)
       setFiles(starterFiles)
       setActiveFile(starterFiles[0]?.name ?? '')
