@@ -627,9 +627,14 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
     }
     if (!identity) return
     const currentTask = findTaskById(lesson?.tasks, currentTaskId)
-    if (phase === 'solo' && taskId > currentTaskId) {
-      const canAdvance = !currentTask?.check || currentTask?.taskType === 'information' || checkPassed
-      if (!canAdvance || taskId > currentTaskId + 1) return
+    if (phase === 'solo') {
+      const tasks = flattenTasks(lesson?.tasks ?? [])
+      const targetIdx = tasks.findIndex(t => t.id === taskId)
+      const currIdx = tasks.findIndex(t => t.id === currentTaskId)
+      if (targetIdx > currIdx) {
+        const canAdvance = !currentTask?.check || currentTask?.taskType === 'information' || checkPassed
+        if (!canAdvance || targetIdx > currIdx + 1) return
+      }
     }
     // Persist current editing state before leaving the task
     if (currentTask?.taskType === 'quiz' || currentTask?.taskType === 'information') {
@@ -994,6 +999,7 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
 
   const forcedTeacherTaskId = session?.teacherLive?.taskId ?? currentTaskId
   const flatTasks = flattenTasks(lesson.tasks)
+  const currentIndex = flatTasks.findIndex(t => t.id === currentTaskId)
   const isTeacherLiveViewer = !teacherPresentation
     && (phase === 'lesson' || phase === 'sandbox')
     && session?.teacherLive?.active
@@ -1064,17 +1070,17 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
       <button
         className="btn-ghost"
         style={styles.presentationBtn}
-        disabled={currentTaskId <= 1}
-        onClick={() => handleSoloNavigate(currentTaskId - 1)}
+        disabled={currentIndex <= 0}
+        onClick={() => handleSoloNavigate(flatTasks[currentIndex - 1]?.id)}
       >
         Previous
       </button>
-      <span style={styles.presentationTaskLabel}>Task {currentTaskId} / {flatTasks.length}</span>
+      <span style={styles.presentationTaskLabel}>Task {currentIndex + 1} / {flatTasks.length}</span>
       <button
         className="btn-ghost"
         style={styles.presentationBtn}
-        disabled={currentTaskId >= flatTasks.length}
-        onClick={() => handleSoloNavigate(currentTaskId + 1)}
+        disabled={currentIndex >= flatTasks.length - 1}
+        onClick={() => handleSoloNavigate(flatTasks[currentIndex + 1]?.id)}
       >
         Next
       </button>
@@ -1093,7 +1099,11 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
         currentTaskId={currentTaskId}
         viewingTaskId={viewingTaskId}
         isSolo={isSolo}
-        canSelectTask={id => !isSolo || id <= currentTaskId || (id === currentTaskId + 1 && canAdvanceSolo)}
+        canSelectTask={id => {
+          if (!isSolo) return true
+          const idIdx = flatTasks.findIndex(t => t.id === id)
+          return idIdx <= currentIndex || (idIdx === currentIndex + 1 && canAdvanceSolo)
+        }}
         onDotClick={id => {
           if (isSolo) {
             if (id !== currentTaskId) handleSoloNavigate(id)
@@ -1389,19 +1399,19 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
               <button
                 className="btn-secondary"
                 style={styles.soloNavBtn}
-                disabled={currentTaskId <= 1}
-                onClick={() => handleSoloNavigate(currentTaskId - 1)}
+                disabled={currentIndex <= 0}
+                onClick={() => handleSoloNavigate(flatTasks[currentIndex - 1]?.id)}
               >
                 ← Previous
               </button>
               <span style={styles.soloNavLabel}>
-                Task {currentTaskId} of {flatTasks.length}
+                Task {currentIndex + 1} of {flatTasks.length}
               </span>
               <button
                 className="btn-secondary"
                 style={styles.soloNavBtn}
-                disabled={currentTaskId >= flatTasks.length}
-                onClick={() => handleSoloNavigate(currentTaskId + 1)}
+                disabled={currentIndex >= flatTasks.length - 1}
+                onClick={() => handleSoloNavigate(flatTasks[currentIndex + 1]?.id)}
               >
                 Next →
               </button>
@@ -1415,24 +1425,24 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
           <button
             className="btn-secondary"
             style={styles.soloNavBtn}
-            disabled={currentTaskId <= 1}
-            onClick={() => handleSoloNavigate(currentTaskId - 1)}
+            disabled={currentIndex <= 0}
+            onClick={() => handleSoloNavigate(flatTasks[currentIndex - 1]?.id)}
           >
             Previous
           </button>
           <span style={styles.soloNavLabel}>
-            Task {currentTaskId} of {flatTasks.length}
+            Task {currentIndex + 1} of {flatTasks.length}
           </span>
           <button
-            className={`btn-secondary${checkPassed && currentTaskId < flatTasks.length ? ' btn-next-success' : ''}`}
+            className={`btn-secondary${checkPassed && currentIndex < flatTasks.length - 1 ? ' btn-next-success' : ''}`}
             style={{
               ...styles.soloNavBtn,
-              ...(canAdvanceSolo && currentTaskId < flatTasks.length
+              ...(canAdvanceSolo && currentIndex < flatTasks.length - 1
                 ? { fontSize: 18, padding: '14px 36px' }
                 : {}),
             }}
-            disabled={currentTaskId >= flatTasks.length || !canAdvanceSolo}
-            onClick={() => handleSoloNavigate(currentTaskId + 1)}
+            disabled={currentIndex >= flatTasks.length - 1 || !canAdvanceSolo}
+            onClick={() => handleSoloNavigate(flatTasks[currentIndex + 1]?.id)}
             title={!canAdvanceSolo ? 'Pass the completion check before moving on' : 'Next task'}
           >
             Next
