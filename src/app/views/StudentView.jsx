@@ -1150,7 +1150,7 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
   )
 
   return (
-    <div style={styles.page}>
+    <div style={{ ...styles.page, background: isForcedTeacherLive ? '#dde0e5' : '#f5f5f5' }}>
       {isPaused && (
         <div style={styles.pauseOverlay}>
           <span style={styles.pauseIcon}>⏸</span>
@@ -1170,9 +1170,10 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
 
       {isForcedTeacherLive && (
         <div style={styles.teacherLiveBanner}>
+          <span className="live-dot" />
           {isPresentationStudentViewer || isStudentGoLiveViewer
-            ? `Other Student view — ${session.teacherLive.sourceStudentName ?? 'A student'}'s screen is being shared.`
-            : 'Teacher live view is active. Your own work is still saved and will return when live view stops.'}
+            ? `Watching ${session.teacherLive.sourceStudentName ?? 'a student'}'s screen — your work is saved`
+            : 'Watching teacher — your own work is saved and will return when live view ends'}
         </div>
       )}
 
@@ -1200,7 +1201,7 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
             <ExplainerPanel title={task.title} content={task.explainer} />
           )}
 
-        <div style={editorAreaStyle}>
+        <div style={editorAreaStyle} className={isForcedTeacherLive ? 'live-view-active' : undefined}>
           {(task?.check || isAutoEvaluatedQuiz) && displayCheckAttempted && (
             <CheckFeedbackBanner
               passed={displayCheckPassed}
@@ -1551,15 +1552,18 @@ const styles = {
     minHeight: 0,
   },
   teacherLiveBanner: {
-    background: '#fef3c7',
-    color: '#92400e',
-    borderBottom: '1px solid #fcd34d',
+    background: 'var(--colour-primary)',
+    color: '#fff',
     fontFamily: 'var(--font-body)',
-    fontWeight: 600,
-    fontSize: '0.9rem',
-    padding: '8px 16px',
-    textAlign: 'center',
+    fontWeight: 700,
+    fontSize: '1.15rem',
+    padding: '16px 20px',
     flexShrink: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    letterSpacing: '0.01em',
   },
   presentationControls: {
     display: 'flex',
