@@ -1,7 +1,7 @@
 import React from 'react'
 import StudentView from '../../app/views/StudentView'
 
-export default function PreviewView({ lesson, onClose }) {
+export default function PreviewView({ lesson, onClose, initialTaskId = null }) {
   return (
     <div style={s.page}>
       <div style={s.banner}>
@@ -11,7 +11,7 @@ export default function PreviewView({ lesson, onClose }) {
         </button>
       </div>
       <div style={s.studentWrap}>
-        <StudentView lesson={lesson} soloMode />
+        <StudentView lesson={lesson} soloMode initialTaskId={initialTaskId} />
       </div>
     </div>
   )

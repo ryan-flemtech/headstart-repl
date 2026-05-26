@@ -97,7 +97,7 @@ function TaskSlideTransition({ transitionKey, children, style }) {
   )
 }
 
-export default function StudentView({ lessonId: lessonIdProp, soloMode = false, lesson: lessonProp = null, teacherPresentation = false }) {
+export default function StudentView({ lessonId: lessonIdProp, soloMode = false, lesson: lessonProp = null, teacherPresentation = false, initialTaskId = null }) {
   const lessonId = lessonIdProp ?? lessonProp?.id ?? 'preview'
   const {
     session, loading: sessionLoading, registerPresence, joinSession,
@@ -110,7 +110,7 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
   const [lesson, setLesson]             = useState(null)
   const [lessonLoading, setLessonLoading] = useState(true)
   const [phase, setPhase]               = useState('loading') // loading | waiting | name-entry | lesson | sandbox | solo | ended
-  const [currentTaskId, setCurrentTaskId] = useState(1)
+  const [currentTaskId, setCurrentTaskId] = useState(initialTaskId ?? 1)
   const [viewingTaskId, setViewingTaskId] = useState(null) // null = current task
   const [code, setCode]                 = useState('')
   const [files, setFiles]               = useState([])
