@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { getQuizOptionText } from './QuizTask'
 import { InlineMarkdown } from '../../shared/markdown'
+import { findTaskById } from '../../shared/taskUtils'
 
 export default function StudentCard({ student, lesson, lessonId, session, onRename, onRemove, onExpand }) {
   const [editing, setEditing] = useState(false)
@@ -12,19 +13,25 @@ export default function StudentCard({ student, lesson, lessonId, session, onRena
     setEditing(false)
   }
 
-  const currentTask = lesson?.tasks?.find(t => t.id === session?.currentTaskId)
+  const currentTask = findTaskById(lesson?.tasks, session?.currentTaskId)
   const isSubmitMode = currentTask?.interactionMode === 'submit'
   const isQuiz = currentTask?.taskType === 'quiz'
   const isInformation = currentTask?.taskType === 'information'
-  const isShortAnswer = isQuiz && currentTask?.quizType === 'short_answer'
-  const quizAnswerText = isQuiz && !isShortAnswer ? getQuizOptionText(currentTask, student.currentAnswer) : ''
+  const quizType = isQuiz ? (currentTask?.quizType ?? 'multiple_choice') : null
+  const isShortAnswer = quizType === 'short_answer'
+  const isMatchOrFillBlank = quizType === 'match' || quizType === 'fill_blank'
+  const quizAnswerText = isQuiz && !isShortAnswer && !isMatchOrFillBlank ? getQuizOptionText(currentTask, student.currentAnswer) : ''
+  const quizSubmitted = isQuiz && student.lastRunStatus === 'submitted'
 
   const statusColour =
+    quizSubmitted && student.checkPassed === true  ? '#22c55e' :
+    quizSubmitted && student.checkPassed === false  ? '#ef4444' :
     student.lastRunStatus === 'success'   ? '#22c55e' :
     student.lastRunStatus === 'error'     ? '#ef4444' :
     student.lastRunStatus === 'submitted' ? '#3b82f6' : '#9ca3af'
 
-  const hasCheck = currentTask?.check != null
+  // For match/fill_blank quizzes, checkPassed comes from internal quiz logic rather than task.check
+  const hasCheck = currentTask?.check != null || (isQuiz && quizSubmitted && student.checkPassed != null)
   const checkAttempted = student.lastRunStatus != null
   const checkPassed = hasCheck && student.checkPassed === true
   const checkFailed = hasCheck && checkAttempted && !checkPassed
@@ -38,6 +45,8 @@ export default function StudentCard({ student, lesson, lessonId, session, onRena
     ? 'presence-badge presence-badge--waiting'
     : student.online ? 'presence-badge presence-badge--online' : 'presence-badge presence-badge--offline'
   const presenceLabel = isWaiting ? 'Waiting' : student.online ? 'Online' : 'Offline'
+
+  const hasAnswer = student.currentAnswer != null && student.currentAnswer !== ''
 
   return (
     <div style={{ ...s.card, ...checkCardStyle }} className="card">
@@ -104,18 +113,28 @@ export default function StudentCard({ student, lesson, lessonId, session, onRena
         </div>
       ) : isQuiz ? (
         <div style={s.quizAnswer}>
-          {student.currentAnswer
-            ? isShortAnswer
-              ? <span style={s.shortAnswerText}>{student.currentAnswer}</span>
-              : (
-                <>
-                  <span style={s.quizAnswerId}>{student.currentAnswer}</span>
-                  <span style={s.quizAnswerText}>
-                    {quizAnswerText ? <InlineMarkdown content={quizAnswerText} /> : 'Selected answer'}
-                  </span>
-                </>
-              )
-            : <span style={{ color: '#9ca3af', fontSize: 12 }}>No answer yet</span>}
+          {hasAnswer ? (
+            isShortAnswer ? (
+              <span style={s.shortAnswerText}>{student.currentAnswer}</span>
+            ) : isMatchOrFillBlank ? (
+              <span style={s.matchSummaryText}>
+                {student.checkPassed === true
+                  ? '✓ All correct'
+                  : student.checkPassed === false
+                  ? '✗ Some incorrect'
+                  : 'Answered'}
+              </span>
+            ) : (
+              <>
+                <span style={s.quizAnswerId}>{student.currentAnswer}</span>
+                <span style={s.quizAnswerText}>
+                  {quizAnswerText ? <InlineMarkdown content={quizAnswerText} /> : 'Selected answer'}
+                </span>
+              </>
+            )
+          ) : (
+            <span style={{ color: '#9ca3af', fontSize: 12 }}>No answer yet</span>
+          )}
         </div>
       ) : lesson?.type === 'python' ? (
         isSubmitMode ? (
@@ -340,6 +359,13 @@ const s = {
     WebkitLineClamp: 2,
     WebkitBoxOrient: 'vertical',
     fontStyle: 'italic',
+  },
+  matchSummaryText: {
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.8rem',
+    lineHeight: 1.4,
+    color: 'var(--colour-text)',
+    fontWeight: 600,
   },
   expandBtn: {
     fontSize: 12,

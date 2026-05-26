@@ -88,9 +88,10 @@ export default function QuizTask({
   disabled = false,
   showQuestion = false,
   showResult = true,
+  showCorrectAnswer = false,
 }) {
   const quizType = task?.quizType ?? 'multiple_choice'
-  const props = { task, selectedAnswer, onSelectAnswer, submitted, checkPassed, disabled, showQuestion, showResult }
+  const props = { task, selectedAnswer, onSelectAnswer, submitted, checkPassed, disabled, showQuestion, showResult, showCorrectAnswer }
 
   if (quizType === 'match') return <MatchQuiz {...props} />
   if (quizType === 'fill_blank') return <FillBlankQuiz {...props} />
@@ -98,8 +99,10 @@ export default function QuizTask({
   return <MultipleChoiceQuiz {...props} />
 }
 
-function MultipleChoiceQuiz({ task, selectedAnswer, onSelectAnswer, submitted, checkPassed, disabled, showQuestion, showResult }) {
+function MultipleChoiceQuiz({ task, selectedAnswer, onSelectAnswer, submitted, checkPassed, disabled, showQuestion, showResult, showCorrectAnswer }) {
   const options = task?.options ?? []
+  const correctId = task?.check?.type === 'answer_equals' ? task.check.value : null
+  const revealAnswers = showCorrectAnswer && submitted && disabled && correctId
 
   return (
     <div style={s.wrap}>
@@ -107,7 +110,14 @@ function MultipleChoiceQuiz({ task, selectedAnswer, onSelectAnswer, submitted, c
       <div style={s.options} role="radiogroup" aria-label={task?.title ?? 'Quiz options'}>
         {options.map((option, index) => {
           const active = selectedAnswer === option.id
+          const isCorrect = revealAnswers && option.id === correctId
+          const isWrong = revealAnswers && active && option.id !== correctId
           const colour = OPTION_COLOURS[index % OPTION_COLOURS.length]
+
+          const bg = isCorrect ? '#16a34a' : isWrong ? '#dc2626' : active ? colour.active : colour.background
+          const border = isCorrect ? '#16a34a' : isWrong ? '#dc2626' : colour.border
+          const textColour = isCorrect || isWrong || active ? '#fff' : colour.text
+
           return (
             <button
               key={option.id}
@@ -116,19 +126,19 @@ function MultipleChoiceQuiz({ task, selectedAnswer, onSelectAnswer, submitted, c
               aria-checked={active}
               style={{
                 ...s.option,
-                background: active ? colour.active : colour.background,
-                borderColor: colour.border,
-                color: active ? '#fff' : colour.text,
-                ...(active ? s.optionActive : {}),
+                background: bg,
+                borderColor: border,
+                color: textColour,
+                ...((active || isCorrect || isWrong) ? s.optionActive : {}),
               }}
               onClick={() => onSelectAnswer?.(option.id)}
               disabled={disabled}
             >
-              <span style={{ ...s.optionId, background: active ? 'rgba(255,255,255,0.22)' : colour.active, color: '#fff' }}>
+              <span style={{ ...s.optionId, background: active || isCorrect || isWrong ? 'rgba(255,255,255,0.22)' : colour.active, color: '#fff' }}>
                 {option.id}
               </span>
               <span style={s.optionText}>
-                <span style={active ? s.markdownOnDark : undefined}>
+                <span style={active || isCorrect || isWrong ? s.markdownOnDark : undefined}>
                   <InlineMarkdown content={option.text} />
                 </span>
               </span>
@@ -136,6 +146,11 @@ function MultipleChoiceQuiz({ task, selectedAnswer, onSelectAnswer, submitted, c
           )
         })}
       </div>
+      {revealAnswers && !checkPassed && (
+        <div style={s.correctAnswerNote}>
+          Correct answer: <strong>{options.find(o => o.id === correctId)?.text ?? correctId}</strong>
+        </div>
+      )}
       {showResult && submitted && (
         <CheckFeedbackBanner
           passed={checkPassed}
@@ -159,8 +174,9 @@ function checkPassedFromTask(task, selectedAnswer) {
 
 // ─── Match ────────────────────────────────────────────────────────────────────
 
-function MatchQuiz({ task, selectedAnswer, onSelectAnswer, submitted, checkPassed, disabled, showQuestion, showResult }) {
+function MatchQuiz({ task, selectedAnswer, onSelectAnswer, submitted, checkPassed, disabled, showQuestion, showResult, showCorrectAnswer }) {
   const pairs = task?.pairs ?? []
+  const revealAnswers = showCorrectAnswer && submitted && disabled
   const [draggingTile, setDraggingTile] = useState(null)
   const [dragOverSlot, setDragOverSlot] = useState(null)
 
@@ -169,6 +185,9 @@ function MatchQuiz({ task, selectedAnswer, onSelectAnswer, submitted, checkPasse
 
   const state = useMemo(() => {
     if (selectedAnswer && typeof selectedAnswer === 'object' && !Array.isArray(selectedAnswer)) return selectedAnswer
+    if (typeof selectedAnswer === 'string' && selectedAnswer) {
+      try { const parsed = JSON.parse(selectedAnswer); if (parsed && typeof parsed === 'object') return parsed } catch {}
+    }
     return {}
   }, [selectedAnswer])
 
@@ -243,6 +262,9 @@ function MatchQuiz({ task, selectedAnswer, onSelectAnswer, submitted, checkPasse
             const placedPair = placedId ? pairs.find(p => p.id === placedId) : null
             const isOccupied = !!placedId
             const canReceive = draggingTile && draggingTile !== placedId
+            const isSlotCorrect = revealAnswers && placedId === pair.id
+            const isSlotWrong = revealAnswers && isOccupied && placedId !== pair.id
+            const correctPair = revealAnswers && !isSlotCorrect ? pair : null
 
             return (
               <div key={pair.id} style={sm.matchRow}>
@@ -252,23 +274,32 @@ function MatchQuiz({ task, selectedAnswer, onSelectAnswer, submitted, checkPasse
                   </span>
                 </div>
                 <div style={sm.matchArrow}>→</div>
-                <div
-                  style={{
-                    ...sm.slot,
-                    ...(isOccupied ? sm.slotFilled : sm.slotEmpty),
-                    ...(canReceive && dragOverSlot === pair.id && !blocked ? sm.slotHighlight : {}),
-                    cursor: blocked ? 'default' : isOccupied ? 'grab' : 'copy',
-                  }}
-                  onDragOver={event => handleSlotDragOver(event, pair.id)}
-                  onDragLeave={() => setDragOverSlot(null)}
-                  onDrop={event => handleSlotDrop(event, pair.id)}
-                  draggable={isOccupied && !blocked}
-                  onDragStart={event => isOccupied && handleDragStart(event, placedId)}
-                  onDragEnd={handleDragEnd}
-                >
-                  {placedPair?.answer
-                    ? <InlineMarkdown content={placedPair.answer} />
-                    : (canReceive && !blocked ? 'Drop here' : '—')}
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div
+                    style={{
+                      ...sm.slot,
+                      ...(isOccupied ? sm.slotFilled : sm.slotEmpty),
+                      ...(isSlotCorrect ? sm.slotCorrect : {}),
+                      ...(isSlotWrong ? sm.slotWrong : {}),
+                      ...(canReceive && dragOverSlot === pair.id && !blocked ? sm.slotHighlight : {}),
+                      cursor: blocked ? 'default' : isOccupied ? 'grab' : 'copy',
+                    }}
+                    onDragOver={event => handleSlotDragOver(event, pair.id)}
+                    onDragLeave={() => setDragOverSlot(null)}
+                    onDrop={event => handleSlotDrop(event, pair.id)}
+                    draggable={isOccupied && !blocked}
+                    onDragStart={event => isOccupied && handleDragStart(event, placedId)}
+                    onDragEnd={handleDragEnd}
+                  >
+                    {placedPair?.answer
+                      ? <InlineMarkdown content={placedPair.answer} />
+                      : (canReceive && !blocked ? 'Drop here' : '—')}
+                  </div>
+                  {correctPair && (
+                    <div style={sm.correctAnswerHint}>
+                      ✓ Correct: <InlineMarkdown content={correctPair.answer} />
+                    </div>
+                  )}
                 </div>
               </div>
             )
@@ -310,9 +341,10 @@ function MatchQuiz({ task, selectedAnswer, onSelectAnswer, submitted, checkPasse
 
 // ─── Fill in the Blank ────────────────────────────────────────────────────────
 
-function FillBlankQuiz({ task, selectedAnswer, onSelectAnswer, submitted, checkPassed, disabled, showQuestion, showResult }) {
+function FillBlankQuiz({ task, selectedAnswer, onSelectAnswer, submitted, checkPassed, disabled, showQuestion, showResult, showCorrectAnswer }) {
   const blanks = task?.blanks ?? []
   const mode = task?.mode ?? 'drag'
+  const revealAnswers = showCorrectAnswer && submitted && disabled
   const text = task?.text ?? ''
   const [draggingTile, setDraggingTile] = useState(null)
   const [dragOverBlank, setDragOverBlank] = useState(null)
@@ -332,6 +364,9 @@ function FillBlankQuiz({ task, selectedAnswer, onSelectAnswer, submitted, checkP
 
   const state = useMemo(() => {
     if (selectedAnswer && typeof selectedAnswer === 'object' && !Array.isArray(selectedAnswer)) return selectedAnswer
+    if (typeof selectedAnswer === 'string' && selectedAnswer) {
+      try { const parsed = JSON.parse(selectedAnswer); if (parsed && typeof parsed === 'object') return parsed } catch {}
+    }
     return {}
   }, [selectedAnswer])
 
@@ -440,15 +475,27 @@ function FillBlankQuiz({ task, selectedAnswer, onSelectAnswer, submitted, checkP
             }
 
             const { blankId } = seg
+            const blank = blanks.find(b => b.id === blankId)
             const placedTileId = state[blankId]
             const placedText = tilePool.find(t => t.id === placedTileId)?.text
             const canReceive = mode === 'drag' && draggingTile && draggingTile !== placedTileId
+
+            const isBlankCorrect = revealAnswers && placedTileId && (
+              mode === 'drag'
+                ? placedTileId === blankId
+                : String(placedTileId ?? '').trim().toLowerCase() === String(blank?.answer ?? '').trim().toLowerCase()
+            )
+            const isBlankWrong = revealAnswers && placedTileId && !isBlankCorrect
 
             if (mode === 'type') {
               return (
                 <input
                   key={i}
-                  style={sm.fillInput}
+                  style={{
+                    ...sm.fillInput,
+                    ...(isBlankCorrect ? sm.fillInputCorrect : {}),
+                    ...(isBlankWrong ? sm.fillInputWrong : {}),
+                  }}
                   value={state[blankId] ?? ''}
                   onChange={e => handleTypeChange(blankId, e.target.value)}
                   disabled={blocked}
@@ -463,6 +510,8 @@ function FillBlankQuiz({ task, selectedAnswer, onSelectAnswer, submitted, checkP
                 style={{
                   ...sm.fillBlank,
                   ...(placedTileId ? sm.fillBlankFilled : sm.fillBlankEmpty),
+                  ...(isBlankCorrect ? sm.fillBlankCorrect : {}),
+                  ...(isBlankWrong ? sm.fillBlankWrong : {}),
                   ...(canReceive && dragOverBlank === blankId && !blocked ? sm.fillBlankHighlight : {}),
                   cursor: blocked ? 'default' : placedTileId ? 'grab' : 'copy',
                 }}
@@ -472,6 +521,7 @@ function FillBlankQuiz({ task, selectedAnswer, onSelectAnswer, submitted, checkP
                 draggable={!!placedTileId && !blocked}
                 onDragStart={event => placedTileId && handleDragStart(event, placedTileId)}
                 onDragEnd={handleDragEnd}
+                title={isBlankWrong && blank ? `Correct: ${blank.answer}` : undefined}
               >
                 {placedText
                   ? <span style={sm.fillBlankMarkdown}><InlineMarkdown content={placedText} /></span>
@@ -658,6 +708,16 @@ const s = {
     '--colour-text': '#ffffff',
     '--colour-primary-dark': '#ffffff',
   },
+  correctAnswerNote: {
+    padding: '8px 12px',
+    borderRadius: 6,
+    background: '#dcfce7',
+    border: '1px solid #16a34a',
+    color: '#15803d',
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.88rem',
+    fontWeight: 600,
+  },
 }
 
 const sm = {
@@ -726,6 +786,27 @@ const sm = {
     color: 'var(--colour-primary)',
     boxShadow: '0 0 0 4px rgba(98, 34, 204, 0.14), inset 0 0 0 2px rgba(251, 165, 4, 0.55)',
     transform: 'scale(1.03)',
+  },
+  slotCorrect: {
+    borderColor: '#16a34a',
+    borderStyle: 'solid',
+    background: '#dcfce7',
+    color: '#15803d',
+  },
+  slotWrong: {
+    borderColor: '#dc2626',
+    borderStyle: 'solid',
+    background: '#fee2e2',
+    color: '#b91c1c',
+  },
+  correctAnswerHint: {
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.78rem',
+    color: '#15803d',
+    background: '#dcfce7',
+    border: '1px solid #bbf7d0',
+    borderRadius: 5,
+    padding: '3px 8px',
   },
   answerPool: {
     display: 'flex',
@@ -841,6 +922,18 @@ const sm = {
     boxShadow: '0 0 0 4px rgba(98, 34, 204, 0.14), inset 0 0 0 2px rgba(251, 165, 4, 0.55)',
     transform: 'scale(1.05)',
   },
+  fillBlankCorrect: {
+    borderColor: '#16a34a',
+    borderStyle: 'solid',
+    background: '#dcfce7',
+    color: '#15803d',
+  },
+  fillBlankWrong: {
+    borderColor: '#dc2626',
+    borderStyle: 'solid',
+    background: '#fee2e2',
+    color: '#b91c1c',
+  },
   fillInput: {
     display: 'inline-block',
     minWidth: 90,
@@ -856,6 +949,16 @@ const sm = {
     margin: '0 2px',
     verticalAlign: 'middle',
     outline: 'none',
+  },
+  fillInputCorrect: {
+    borderColor: '#16a34a',
+    background: '#dcfce7',
+    color: '#15803d',
+  },
+  fillInputWrong: {
+    borderColor: '#dc2626',
+    background: '#fee2e2',
+    color: '#b91c1c',
   },
   // Short answer
   shortAnswerWrap: {
