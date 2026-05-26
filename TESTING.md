@@ -62,6 +62,7 @@ Testing strategy, tool choices, and conventions. Read this before writing or mod
 | `src/app/components/InformationTask.jsx` | Information/introduction content and duration rendering |
 | `src/app/components/LiveActivityToast.jsx` | Activity notification rendering and expiry behaviour |
 | `src/app/components/TeacherTimers.jsx` | Elapsed/countdown rendering and expired task state |
+| `src/app/components/TeacherSessionControls.jsx` | Navigation, share-link callbacks, and state-specific teacher session actions |
 | `src/shared/markdown.jsx` | `MarkdownRenderer` renders headings, tables, code fences, callouts; `InlineMarkdown` renders inline-only |
 | `src/builder/App.jsx` | Shows restore prompt when localStorage has saved lesson; auto-saves on lesson change; `beforeunload` fires when dirty |
 
@@ -139,7 +140,7 @@ global.URL.revokeObjectURL = vi.fn()
 
 ## Coverage Thresholds
 
-Set in `vitest.config.js`. Current thresholds reflect the initial test scope (pure functions + selected simple components). `QuizTask`, `InformationTask`, `TeacherTimers`, and pure builder validation/export logic now have focused coverage; large orchestration surfaces including `StudentView`, `TeacherView`, `useSession`, and builder UI views still require incremental coverage before raising thresholds.
+Set in `vitest.config.js`. Current thresholds reflect the initial test scope (pure functions + selected simple components). `QuizTask`, `InformationTask`, `TeacherTimers`, `TeacherSessionControls`, and pure builder validation/export logic now have focused coverage; large orchestration surfaces including `StudentView`, `TeacherView`, `useSession`, and builder UI views still require incremental coverage before raising thresholds.
 
 | Phase | When to raise to | Prerequisite |
 |---|---|---|

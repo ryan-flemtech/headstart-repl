@@ -26,7 +26,7 @@ Implemented on 26 May 2026 in [`feature/implement-suggestions`](https://github.c
 Still to do:
 
 - Continue decomposing `StudentView.jsx` beyond its extracted storage helper, particularly task-content selection and narrowly scoped live/session helpers.
-- Further reduce `TeacherView.jsx` orchestration density by extracting sandbox content selection and presentational controls.
+- Further reduce `TeacherView.jsx` orchestration density by extracting presentational controls.
 - Separate `ScratchWorkspace.jsx` presentation concerns and gradually split stable categories in `src/shared/scratch.js`, backed by characterization tests.
 - Move repeated static inline styling into existing CSS classes and standardise already-equivalent presentational primitives.
 - Add focused component coverage for view states and boundary calls before making deeper `StudentView` or `TeacherView` changes.
@@ -39,6 +39,14 @@ Implemented on 26 May 2026 in [`refactor/split-task-editor`](https://github.com/
 - Preserved top-level `TaskEditor.jsx` exports used by existing builder callers.
 - Added characterization tests for check type/operator mappings, check skeleton construction, and Scratch toolbox XML parsing.
 - Updated `CODEBASE_MAP.md` for the extracted task-editor directory.
+
+## Progress Update - PR #74
+
+Implemented on 26 May 2026 in [`codex/refactor-teacher-sandbox-content`](https://github.com/Headstart-Coding-Launchpad/editor/pull/74):
+
+- Extracted sandbox starter/configured/live content selection from `TeacherView.jsx` into pure `src/app/teacherSandboxContent.js` helpers.
+- Added characterization coverage for Python, HTML, and Scratch sandbox precedence and defensive cloning/parsing.
+- Updated `CODEBASE_MAP.md` and `TESTING.md` for the new helper and tests.
 
 ## Guiding Rules
 
