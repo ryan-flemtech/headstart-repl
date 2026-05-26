@@ -2287,6 +2287,18 @@ function CarryThroughPicker({ task, lesson, onUpdate, isScratch, isPython }) {
     onUpdate({ ...task, ...updates })
   }
 
+  function handleNewStarterCode() {
+    const updates = { [carryField]: null }
+    if (isPython) {
+      updates.starterCode = ''
+    } else if (isScratch) {
+      updates.starterBlocks = null
+    } else {
+      updates.starterFiles = (task.starterFiles ?? []).map(f => ({ ...f, content: '' }))
+    }
+    onUpdate({ ...task, ...updates })
+  }
+
   function handleOther() {
     const defaultTask = otherTasks.find(t => t.id !== prevTask?.id) ?? otherTasks[0]
     if (defaultTask) copyCompleteCode(defaultTask)
@@ -2321,7 +2333,7 @@ function CarryThroughPicker({ task, lesson, onUpdate, isScratch, isPython }) {
             type="radio"
             name={radioName}
             checked={mode === 'new'}
-            onChange={() => onUpdate({ ...task, [carryField]: null })}
+            onChange={handleNewStarterCode}
             style={s.optionChoiceInput}
           />
           <span style={s.optionChoiceTitle}>New starter code</span>
