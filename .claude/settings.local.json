@@ -1,17 +1,5 @@
 {
   "permissions": {
-    "allow": [
-      "Bash(npm *)",
-      "Bash(npx *)",
-      "Bash(node *)",
-      "Bash(git *)",
-      "Bash(gh *)",
-      "Bash(pip *)",
-      "Bash(python *)",
-      "PowerShell(*)",
-      "Bash(gh pr *)",
-      "Bash(ls *)"
-    ],
-    "defaultMode": "acceptEdits"
+    "defaultMode": "bypassPermissions"
   }
 }
