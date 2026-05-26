@@ -36,6 +36,14 @@ export const headstartTheme = EditorView.theme({
   '.cm-activeLineGutter': { backgroundColor: '#e8daf8' },
   '.cm-selectionBackground, ::selection': { backgroundColor: '#e9d5ff' },
   '.cm-focused .cm-selectionBackground': { backgroundColor: '#e9d5ff' },
+  '.cm-remoteSelection': { backgroundColor: 'rgba(250, 204, 21, 0.42)' },
+  '.cm-remoteCursor': {
+    borderLeft: '2px solid #f59e0b',
+    marginLeft: '-1px',
+    height: '1.25em',
+    display: 'inline-block',
+    verticalAlign: 'text-bottom',
+  },
   '.cm-cursor': { borderLeftColor: '#6222CC', borderLeftWidth: '2px' },
   '.cm-matchingBracket': { backgroundColor: '#e9d5ff', outline: 'none' },
   '.cm-tooltip.cm-tooltip-autocomplete': {

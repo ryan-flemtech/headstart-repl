@@ -351,6 +351,8 @@ Submit mode accepts only: `code_contains`, `code_does_not_contain`, `code_equals
         "checkPassed": true,
         "checkAttempted": true,
         "checkSuggestion": "hint text",
+        "selection": { "from": 0, "to": 5, "file": "index.html" },
+        "activity": { "type": "copy | paste | click", "at": 1234567890, "file": "index.html" },
         "answer": "b",
         "updatedAt": 1234567890
       },
@@ -367,6 +369,9 @@ Submit mode accepts only: `code_contains`, `code_does_not_contain`, `code_equals
           "currentFiles": { "index__dot__html": "..." },
           "currentOutput": "hello\n",
           "currentAnswer": "b",
+          "currentActiveFile": "index.html",
+          "currentSelection": { "from": 0, "to": 5, "file": "index.html" },
+          "currentActivity": { "type": "copy | paste | click", "at": 1234567890, "file": "index.html" },
           "lastRunStatus": "success | error | null",
           "checkPassed": true,
           "lastRunAt": 1234567890,
@@ -388,8 +393,8 @@ Submit mode accepts only: `code_contains`, `code_does_not_contain`, `code_equals
 | Teacher | `state`, `currentTaskId`, `isPaused`, `activeStudentView`, `teacherLive`, `sandboxCode`, `sandboxCodePushedAt`, `sandboxFiles`, `sandboxFilesUpdatedAt`, any student's `displayName` |
 | Teacher — student management | Remove student node; push `remoteResetAction` + `remoteResetPushedAt` to individual student |
 | Student — on run | `currentCode`/`currentFiles`, `currentOutput`, `lastRunStatus`, `checkPassed`, `lastRunAt` |
-| Student — when watched (Python) | `currentCode` per keystroke; `currentOutput` line by line during run |
-| Student — when watched (HTML) | `currentFiles` per active-tab keystroke |
+| Student — when watched (Python) | `currentCode` per keystroke; `currentOutput` line by line during run; `currentSelection` and `currentActivity` editor interactions |
+| Student — when watched (HTML) | `currentFiles` per active-tab keystroke; `currentActiveFile`, `currentSelection`, and `currentActivity` editor interactions |
 | Student — quiz | `currentAnswer` on submit |
 | System on join | `displayName`, `joinedAt`, `online: true` with `onDisconnect` to remove `online` key |
 
@@ -520,7 +525,9 @@ Both left and right panels are collapsible. Layout adapts on mobile.
 ## 27. StudentModal
 
 Default: last-run snapshot (code, output/iframe/quiz/Scratch stage)  
-"Go Live": one-time fetch then `activeStudentView` set → student streams per keystroke  
+"Go Live": one-time fetch then `activeStudentView` set → student streams per keystroke
+
+Live code view paints the student's selection/cursor and briefly reports copy, paste, and editor-click activity.
 Close by any means (button, outside click, Escape, tab close) clears `activeStudentView` immediately.
 
 Teacher actions: Rename, Remove Student, Go Live / Stop Live, Reset to Starter, Reset to Complete.
@@ -533,6 +540,7 @@ Separate from `activeStudentView`. Broadcasts to **all** students simultaneously
 - Presentation window acts as a StudentView watching `teacherLive`
 - All students get `isForcedTeacherLive = true` → their editors replaced with the broadcast view
 - Source can be teacher's own work or a pinned student's stream
+- Broadcast code views include streamed selection/cursor plus copy, paste, and editor-click activity notices
 - `onDisconnect` clears `teacherLive` automatically; only one broadcast at a time
 
 ## 29. Remote Reset

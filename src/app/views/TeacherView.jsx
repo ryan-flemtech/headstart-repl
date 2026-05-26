@@ -11,6 +11,7 @@ import ExplainerPanel from '../components/ExplainerPanel'
 import InformationTask from '../components/InformationTask'
 import StudentGrid from '../components/StudentGrid'
 import QuizTask from '../components/QuizTask'
+import LiveActivityToast from '../components/LiveActivityToast'
 
 function resolveAssetsPath(rawPath) {
   if (!rawPath) return ''
@@ -75,6 +76,7 @@ export default function TeacherView({ lessonId }) {
   const [showSharePanel, setShowSharePanel] = useState(false)
   const [copiedLink, setCopiedLink] = useState(null) // 'live' | 'solo' | null
   const [activeCompleteFile, setActiveCompleteFile] = useState('')
+  const [editorActivity, setEditorActivity] = useState(null)
   const sandboxDraftRef = useRef({ code: null, files: null, scratchState: null })
 
   // Load lesson JSON
@@ -304,6 +306,8 @@ export default function TeacherView({ lessonId }) {
       runStatus: student.lastRunStatus ?? null,
       checkPassed: !!student.checkPassed,
       checkAttempted: student.checkPassed != null || student.lastRunStatus != null,
+      selection: student.currentSelection ?? null,
+      activity: student.currentActivity ?? null,
     }
   }
 
@@ -467,6 +471,7 @@ export default function TeacherView({ lessonId }) {
           </div>
         }
       />
+      <LiveActivityToast activity={editorActivity} showClicks={false} />
 
 
 
@@ -577,6 +582,7 @@ export default function TeacherView({ lessonId }) {
                   setCode(value)
                   if (isInSandbox) sandboxDraftRef.current.code = value
                 }}
+                onActivity={setEditorActivity}
                 readOnly={showingComplete || !isInSandbox}
                 pyodideStatus="idle"
                 editorStyle={isInSandbox ? undefined : s.attachedCodeEditor}
@@ -621,6 +627,7 @@ export default function TeacherView({ lessonId }) {
                       return next
                     })
                   }
+                  onActivity={setEditorActivity}
                   readOnly={showingComplete || !isInSandbox}
                   assetsPath={resolveAssetsPath(lesson.assetsPath) || undefined}
                   assets={lesson.assets}

@@ -162,6 +162,8 @@ Both apps import from `src/shared/`. Never duplicate this logic.
         "output": "...",
         "runStatus": "success | error | stopped | submitted | null",
         "checkPassed": true,
+        "selection": { "from": 0, "to": 5, "file": "index.html" },
+        "activity": { "type": "copy | paste | click", "at": 1234567890, "file": "index.html" },
         "updatedAt": 1234567890
       },
       "sandboxCode": "string | null",
@@ -177,6 +179,9 @@ Both apps import from `src/shared/`. Never duplicate this logic.
           "currentFiles": { "index__dot__html": "..." },
           "currentOutput": "string",
           "currentAnswer": "b",
+          "currentActiveFile": "index.html",
+          "currentSelection": { "from": 0, "to": 5, "file": "index.html" },
+          "currentActivity": { "type": "copy | paste | click", "at": 1234567890, "file": "index.html" },
           "lastRunStatus": "success | error | null",
           "checkPassed": true,
           "lastRunAt": 1234567890,
@@ -196,8 +201,8 @@ Both apps import from `src/shared/`. Never duplicate this logic.
 - Teacher writes: `state`, `currentTaskId`, `isPaused`, `activeStudentView`, `teacherLive`, `sandboxCode`, `sandboxCodePushedAt`, `sandboxFiles`, `sandboxFilesUpdatedAt`, any student's `displayName`, student node removal
 - Teacher — remote reset: `remoteResetAction` + `remoteResetPushedAt` on individual student node
 - Student (on run): own `currentCode`/`currentFiles`, `currentOutput`, `lastRunStatus`, `checkPassed`, `lastRunAt`
-- Student (when watched — Python): `currentCode` per keystroke, `currentOutput` line by line during run
-- Student (when watched — HTML): `currentFiles` per active-tab keystroke
+- Student (when watched — Python): `currentCode` per keystroke, `currentOutput` line by line during run, `currentSelection`/`currentActivity` editor interactions
+- Student (when watched — HTML): `currentFiles` per active-tab keystroke, `currentActiveFile`/`currentSelection`/`currentActivity` editor interactions
 - Student (quiz): `currentAnswer` on submit
 - Firebase v1 security rules are open read/write — do not add authentication logic
 
@@ -273,6 +278,7 @@ No room IDs. One session per lesson. `?teacher=true` is the only auth mechanism.
 - Default expanded view shows last-run snapshot only — no streaming
 - Streaming activates only when teacher clicks "Go Live"
 - On "Go Live": one-time fetch first, then set `activeStudentView`
+- While live, the teacher sees the student's selected text/cursor and short copy, paste, and click notices
 - Closing modal by ANY means (button, click outside, Escape, tab close) must clear `activeStudentView`
 - Firebase `onDisconnect` clears `activeStudentView` on unexpected tab close
 - Only one student streams at a time
@@ -280,6 +286,7 @@ No room IDs. One session per lesson. `?teacher=true` is the only auth mechanism.
 ### Teacher live broadcast (teacherLive)
 - Separate from `activeStudentView` — broadcasts teacher's or a student's screen to ALL students
 - Opens via `?teacher=true&present=true` presentation window
+- Broadcast code views stream selection/cursor and copy, paste, and click notices
 - `onDisconnect` clears `teacherLive` automatically
 
 ### Remote reset

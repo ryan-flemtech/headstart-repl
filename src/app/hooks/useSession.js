@@ -94,6 +94,9 @@ export function useSession(lessonId) {
       updates[`students/${anonymousId}/currentCode`]    = ''
       updates[`students/${anonymousId}/currentFiles`]   = null
       updates[`students/${anonymousId}/currentAnswer`]  = null
+      updates[`students/${anonymousId}/currentSelection`] = null
+      updates[`students/${anonymousId}/currentActivity`] = null
+      updates[`students/${anonymousId}/currentActiveFile`] = null
     }
     await update(ref(db, `sessions/${lessonId}`), updates)
   }
@@ -235,6 +238,16 @@ export function useSession(lessonId) {
     await set(ref(db, `sessions/${lessonId}/students/${anonymousId}/currentOutput`), output)
   }
 
+  async function writeStudentInteraction(anonymousId, { selection, activity, activeFile } = {}) {
+    const updates = {}
+    if (selection !== undefined) updates.currentSelection = selection
+    if (activity !== undefined) updates.currentActivity = activity
+    if (activeFile !== undefined) updates.currentActiveFile = activeFile
+    if (Object.keys(updates).length > 0) {
+      await update(ref(db, `sessions/${lessonId}/students/${anonymousId}`), updates)
+    }
+  }
+
   return {
     session,
     loading,
@@ -244,6 +257,6 @@ export function useSession(lessonId) {
     setTaskId, enterSandbox, exitSandbox, pushSandboxCode, pushSandboxFiles,
     setPaused, setActiveStudentView, setTeacherLive, updateTeacherLive, renameStudent, removeStudent, pushResetToStudent,
     // student
-    registerPresence, joinSession, writeStudentRun, writeStudentCode, writeStudentFiles, writeStudentOutput,
+    registerPresence, joinSession, writeStudentRun, writeStudentCode, writeStudentFiles, writeStudentOutput, writeStudentInteraction,
   }
 }

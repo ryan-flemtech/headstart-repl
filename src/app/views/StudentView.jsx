@@ -19,6 +19,7 @@ import CollapsibleIframePreview from '../components/CollapsibleIframePreview'
 import ScratchWorkspace from '../components/ScratchWorkspace'
 import QuizTask from '../components/QuizTask'
 import CheckFeedbackBanner from '../components/CheckFeedbackBanner'
+import LiveActivityToast from '../components/LiveActivityToast'
 import SplitPane from '../../shared/SplitPane'
 
 // Returns a full absolute URL for the assets base so blob-URL iframes can load
@@ -101,7 +102,7 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
   const lessonId = lessonIdProp ?? lessonProp?.id ?? 'preview'
   const {
     session, loading: sessionLoading, registerPresence, joinSession,
-    writeStudentRun, writeStudentCode, writeStudentFiles, writeStudentOutput,
+    writeStudentRun, writeStudentCode, writeStudentFiles, writeStudentOutput, writeStudentInteraction,
     setTaskId, setTeacherLive, updateTeacherLive, removeStudent,
   } = useSession(lessonId)
   const { identity, loaded: identityLoaded, createIdentity, updateTimestamp, updateDisplayName } = useIdentity()
@@ -130,6 +131,8 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
   const [selectedAnswer, setSelectedAnswer] = useState('')
   const [scratchSandboxProject, setScratchSandboxProject] = useState(null)
   const [scratchExternalState, setScratchExternalState] = useState(null)
+  const [editorSelection, setEditorSelection] = useState(null)
+  const [editorActivity, setEditorActivity] = useState(null)
   const isMobile = useIsMobile()
   const iframeRef = useRef(null)
   const appendOutputRef = useRef(null)
@@ -152,6 +155,10 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
   lessonRef.current = lesson
   const activeStudentViewRef = useRef(session?.activeStudentView)
   activeStudentViewRef.current = session?.activeStudentView
+  const editorSelectionRef = useRef(editorSelection)
+  editorSelectionRef.current = editorSelection
+  const editorActivityRef = useRef(editorActivity)
+  editorActivityRef.current = editorActivity
 
   function currentTeacherLivePayload(extra = {}) {
     const filesMap = Object.fromEntries(filesRef.current.map(f => [f.name, f.content]))
@@ -172,6 +179,8 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
       checkPassed,
       checkAttempted,
       checkSuggestion,
+      selection: editorSelectionRef.current,
+      activity: editorActivityRef.current,
       ...extra,
     }
   }
@@ -586,6 +595,10 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
       const saved = loadSavedCode(lessonId, currentTaskId, identity.anonymousId)
       if (saved?.state) writeStudentCode(identity.anonymousId, JSON.stringify(saved.state))
     }
+    writeStudentInteraction(identity.anonymousId, {
+      selection: editorSelectionRef.current,
+      activeFile: lesson.type === 'html' ? activeFile : undefined,
+    })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.activeStudentView])
 
@@ -785,6 +798,42 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
     }
     if (session?.activeStudentView === identity?.anonymousId) {
       writeStudentCode(identity.anonymousId, newCode)
+    }
+  }
+
+  function handleEditorSelection(selection, filename = null) {
+    const nextSelection = {
+      ...selection,
+      ...(filename ? { file: filename } : {}),
+    }
+    editorSelectionRef.current = nextSelection
+    setEditorSelection(nextSelection)
+    if (canPublishTeacherLive()) publishTeacherLive({ selection: nextSelection })
+    if (!teacherPresentation && session?.activeStudentView === identity?.anonymousId) {
+      writeStudentInteraction(identity.anonymousId, { selection: nextSelection })
+    }
+  }
+
+  function handleEditorActivity(activity, filename = null) {
+    const nextActivity = {
+      ...activity,
+      ...(filename ? { file: filename } : {}),
+    }
+    editorActivityRef.current = nextActivity
+    setEditorActivity(nextActivity)
+    if (canPublishTeacherLive()) publishTeacherLive({ activity: nextActivity })
+    if (!teacherPresentation && session?.activeStudentView === identity?.anonymousId) {
+      writeStudentInteraction(identity.anonymousId, { activity: nextActivity })
+    }
+  }
+
+  function handleFileTabChange(filename) {
+    setActiveFile(filename)
+    editorSelectionRef.current = null
+    setEditorSelection(null)
+    if (canPublishTeacherLive()) publishTeacherLive({ activeFile: filename, selection: null })
+    if (!teacherPresentation && session?.activeStudentView === identity?.anonymousId) {
+      writeStudentInteraction(identity.anonymousId, { selection: null, activeFile: filename })
     }
   }
 
@@ -1027,6 +1076,8 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
   const displayCheckPassed = isForcedTeacherLive ? !!session.teacherLive.checkPassed : checkPassed
   const displayCheckAttempted = isForcedTeacherLive ? !!session.teacherLive.checkAttempted : checkAttempted
   const displayCheckSuggestion = isForcedTeacherLive ? (session.teacherLive.checkSuggestion ?? '') : checkSuggestion
+  const displaySelection = isForcedTeacherLive ? (session.teacherLive.selection ?? null) : null
+  const displayActivity = isForcedTeacherLive ? (session.teacherLive.activity ?? null) : editorActivity
   const isQuizTask = task?.taskType === 'quiz'
   const isAutoEvaluatedQuiz = isQuizTask && (task?.quizType === 'match' || task?.quizType === 'fill_blank')
   const isInformationTask = task?.taskType === 'information'
@@ -1134,6 +1185,7 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
         isSolo={teacherPresentation ? undefined : isSolo}
         right={topBarRight}
       />
+      <LiveActivityToast activity={displayActivity} showClicks={isForcedTeacherLive} />
 
       {isForcedTeacherLive && (
         <div style={styles.teacherLiveBanner}>
@@ -1264,6 +1316,9 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
                 code={isForcedTeacherLive ? displayCode : isViewingPrev ? (loadSavedCode(lessonId, viewingTaskId, identity?.anonymousId)?.code ?? '') : code}
                 readOnly={isViewingPrev || isForcedTeacherLive}
                 onChange={isViewingPrev || isForcedTeacherLive ? undefined : handleCodeChange}
+                onSelectionChange={isViewingPrev || isForcedTeacherLive ? undefined : handleEditorSelection}
+                onActivity={isViewingPrev || isForcedTeacherLive ? undefined : handleEditorActivity}
+                remoteSelection={isForcedTeacherLive ? displaySelection : null}
                 pyodideStatus={pyodideStatus}
               />
               {!isViewingPrev && !isForcedTeacherLive && (
@@ -1323,8 +1378,11 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
                 <HtmlEditor
                   files={displayFiles}
                   activeFile={displayActiveFile}
-                  onTabChange={isForcedTeacherLive ? undefined : setActiveFile}
+                  onTabChange={isForcedTeacherLive ? undefined : handleFileTabChange}
                   onFileChange={isViewingPrev || isForcedTeacherLive ? undefined : handleFileChange}
+                  onSelectionChange={isViewingPrev || isForcedTeacherLive ? undefined : handleEditorSelection}
+                  onActivity={isViewingPrev || isForcedTeacherLive ? undefined : handleEditorActivity}
+                  remoteSelection={isForcedTeacherLive && displaySelection?.file === displayActiveFile ? displaySelection : null}
                   readOnly={isViewingPrev || isForcedTeacherLive}
                   assetsPath={resolveAssetsPath(lesson.assetsPath) || undefined}
                   assets={lesson.assets}
@@ -1371,8 +1429,11 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
                   <HtmlEditor
                     files={displayFiles}
                     activeFile={displayActiveFile}
-                    onTabChange={isForcedTeacherLive ? undefined : setActiveFile}
+                    onTabChange={isForcedTeacherLive ? undefined : handleFileTabChange}
                     onFileChange={isViewingPrev || isForcedTeacherLive ? undefined : handleFileChange}
+                    onSelectionChange={isViewingPrev || isForcedTeacherLive ? undefined : handleEditorSelection}
+                    onActivity={isViewingPrev || isForcedTeacherLive ? undefined : handleEditorActivity}
+                    remoteSelection={isForcedTeacherLive && displaySelection?.file === displayActiveFile ? displaySelection : null}
                     readOnly={isViewingPrev || isForcedTeacherLive}
                     assetsPath={resolveAssetsPath(lesson.assetsPath) || undefined}
                     assets={lesson.assets}

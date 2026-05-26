@@ -7,6 +7,7 @@ import { buildIframeSrc } from '../../shared/iframe'
 import { decodeFileKey } from '../hooks/useSession'
 import QuizTask from './QuizTask'
 import ExplainerPanel from './ExplainerPanel'
+import LiveActivityToast from './LiveActivityToast'
 
 function resolveAssetsPath(rawPath) {
   if (!rawPath) return ''
@@ -54,6 +55,15 @@ export default function StudentModal({ student, lesson, session, isLive, isLiveF
 
   const [activeFile, setActiveFile] = useState(task?.entryFile ?? files[0]?.name ?? '')
   const activeFileObj = files.find(f => f.name === activeFile) ?? files[0]
+  const remoteSelection = !isLive || (!isPython && student.currentSelection?.file !== activeFile)
+    ? null
+    : student.currentSelection
+
+  useEffect(() => {
+    const liveFile = student.currentActiveFile ?? student.currentSelection?.file ?? student.currentActivity?.file
+    if (!isLive || !liveFile || !files.some(file => file.name === liveFile)) return
+    setActiveFile(liveFile)
+  }, [isLive, student.currentActiveFile, student.currentSelection?.file, student.currentActivity?.file])
 
   const hasComplete = isQuiz
     ? false
@@ -89,6 +99,7 @@ export default function StudentModal({ student, lesson, session, isLive, isLiveF
       aria-modal="true"
     >
       <div style={s.modal}>
+        {isLive && <LiveActivityToast activity={student.currentActivity} style={{ top: 86 }} />}
         {/* Modal header */}
         <div style={s.header}>
           <div style={s.headerLeft}>
@@ -196,10 +207,11 @@ export default function StudentModal({ student, lesson, session, isLive, isLiveF
           ) : isPython ? (
             <>
               <div style={s.editorWrap}>
-                <CodeEditor
-                  value={student.currentCode ?? ''}
+                 <CodeEditor
+                   value={student.currentCode ?? ''}
                   language="python"
                   readOnly
+                  remoteSelection={remoteSelection}
                   style={{ height: '100%' }}
                 />
               </div>
@@ -249,11 +261,12 @@ export default function StudentModal({ student, lesson, session, isLive, isLiveF
                 )}
                 <div style={s.editorWrap}>
                   {activeFileObj && (
-                    <CodeEditor
-                      key={activeFileObj.name}
-                      value={activeFileObj.content}
+                     <CodeEditor
+                       key={activeFileObj.name}
+                       value={activeFileObj.content}
                       language={activeFileObj.type}
                       readOnly
+                      remoteSelection={remoteSelection}
                       style={{ height: '100%' }}
                     />
                   )}

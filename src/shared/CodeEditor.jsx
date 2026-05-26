@@ -4,8 +4,8 @@
  * Creates a single EditorView and updates it imperatively to avoid full re-mounts.
  */
 import React, { useEffect, useRef } from 'react'
-import { EditorState } from '@codemirror/state'
-import { EditorView } from '@codemirror/view'
+import { EditorState, StateEffect, StateField } from '@codemirror/state'
+import { Decoration, EditorView, WidgetType } from '@codemirror/view'
 import {
   createBaseExtensions,
   readOnlyCompartment,
@@ -15,11 +15,58 @@ import {
   getTabSize,
 } from './codemirror'
 
-export function CodeEditor({ value = '', language = 'python', readOnly = false, onChange, style }) {
+const setRemoteSelection = StateEffect.define()
+
+class RemoteCursorWidget extends WidgetType {
+  toDOM() {
+    const marker = document.createElement('span')
+    marker.className = 'cm-remoteCursor'
+    marker.setAttribute('aria-hidden', 'true')
+    return marker
+  }
+}
+
+const remoteSelectionField = StateField.define({
+  create() {
+    return Decoration.none
+  },
+  update(markers, transaction) {
+    markers = markers.map(transaction.changes)
+    for (const effect of transaction.effects) {
+      if (!effect.is(setRemoteSelection)) continue
+      const selection = effect.value
+      if (!selection) return Decoration.none
+      const max = transaction.state.doc.length
+      const from = Math.min(Math.max(selection.from ?? 0, 0), max)
+      const to = Math.min(Math.max(selection.to ?? from, 0), max)
+      if (from === to) {
+        return Decoration.set([Decoration.widget({ widget: new RemoteCursorWidget(), side: 1 }).range(from)])
+      }
+      return Decoration.set([Decoration.mark({ class: 'cm-remoteSelection' }).range(Math.min(from, to), Math.max(from, to))])
+    }
+    return markers
+  },
+  provide: field => EditorView.decorations.from(field),
+})
+
+export function CodeEditor({
+  value = '',
+  language = 'python',
+  readOnly = false,
+  onChange,
+  onSelectionChange,
+  onActivity,
+  remoteSelection = null,
+  style,
+}) {
   const containerRef = useRef(null)
   const viewRef      = useRef(null)
   const onChangeRef  = useRef(onChange)
+  const onSelectionChangeRef = useRef(onSelectionChange)
+  const onActivityRef = useRef(onActivity)
   onChangeRef.current = onChange
+  onSelectionChangeRef.current = onSelectionChange
+  onActivityRef.current = onActivity
 
   // Mount the editor once
   useEffect(() => {
@@ -30,10 +77,20 @@ export function CodeEditor({ value = '', language = 'python', readOnly = false, 
         doc: value,
         extensions: [
           ...createBaseExtensions(language, readOnly),
+          remoteSelectionField,
           EditorView.updateListener.of(update => {
             if (update.docChanged) {
               onChangeRef.current?.(update.state.doc.toString())
             }
+            if (update.docChanged || update.selectionSet) {
+              const selection = update.state.selection.main
+              onSelectionChangeRef.current?.({ from: selection.from, to: selection.to })
+            }
+          }),
+          EditorView.domEventHandlers({
+            copy: () => { onActivityRef.current?.({ type: 'copy', at: Date.now() }); return false },
+            paste: () => { onActivityRef.current?.({ type: 'paste', at: Date.now() }); return false },
+            mousedown: () => { onActivityRef.current?.({ type: 'click', at: Date.now() }); return false },
           }),
         ],
       }),
@@ -80,6 +137,12 @@ export function CodeEditor({ value = '', language = 'python', readOnly = false, 
       })
     }
   }, [value])
+
+  useEffect(() => {
+    const view = viewRef.current
+    if (!view) return
+    view.dispatch({ effects: setRemoteSelection.of(remoteSelection) })
+  }, [remoteSelection])
 
   return (
     <div

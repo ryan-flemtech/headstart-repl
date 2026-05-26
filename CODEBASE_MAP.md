@@ -52,6 +52,7 @@ Referenced from AGENTS.md. Use this for navigation before opening files.
 | `StudentGrid.jsx` | Grid of StudentCards with collapse toggle and check conditions display |
 | `StudentCard.jsx` | Compact card: name, online/run/check badges, code/output/quiz snippet, expand button |
 | `StudentModal.jsx` | Full-width modal: student workspace view + teacher actions (Go Live, Remote Reset, Rename, Remove) |
+| `LiveActivityToast.jsx` | Transient live-view notice for editor copy, paste, and click activity |
 
 ---
 
