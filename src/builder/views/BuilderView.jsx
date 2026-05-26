@@ -127,7 +127,7 @@ function validateLesson(lesson) {
       if (checksArr.some(c => c.type === 'variable_array_nth_item' && (c.index == null || c.index === '' || Number(c.index) < 0))) {
         errors.push(`Task ${n} has an array N-th item check but no valid index`)
       }
-      if (checksArr.some(c => !['code_no_error', 'output_not_empty', 'element_exists', 'element_attribute', 'element_style_property', 'variable_exists'].includes(c.type) && !c.value && c.value !== 0)) {
+      if (checksArr.some(c => !['code_no_error', 'output_not_empty', 'output_empty', 'element_exists', 'element_attribute', 'element_style_property', 'variable_exists'].includes(c.type) && !c.value && c.value !== 0)) {
         errors.push(`Task ${n} has a check enabled but no check value`)
       }
     }
@@ -155,7 +155,7 @@ function validateLesson(lesson) {
       ? quizHasCheckValue(task)
       : type === 'scratch'
       ? !!task.check
-      : normalizeChecks(task.check).some(c => c.type === 'code_no_error' || c.type === 'output_not_empty' || c.type === 'element_exists' || c.type === 'element_attribute' || c.type === 'element_style_property' || c.type === 'variable_exists' || c.value)
+      : normalizeChecks(task.check).some(c => c.type === 'code_no_error' || c.type === 'output_not_empty' || c.type === 'output_empty' || c.type === 'element_exists' || c.type === 'element_attribute' || c.type === 'element_style_property' || c.type === 'variable_exists' || c.value)
     if (checkHasValue && !task._checkTested)
       warnings.push(`Task ${n} has a completion check that hasn't been tested — run the task to verify it`)
   })

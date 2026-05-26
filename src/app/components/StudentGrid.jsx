@@ -11,6 +11,7 @@ function formatCheck(check) {
     if (c.type === 'output_equals') return `Equals: "${c.value}"`
     if (c.type === 'output_line_count') return `${c.value} line${c.value === 1 ? '' : 's'}`
     if (c.type === 'output_not_empty') return 'Output is not empty'
+    if (c.type === 'output_empty') return 'Output is empty'
     return `${c.type}: ${c.value}`
   }).join(' · ')
 }

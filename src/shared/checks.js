@@ -14,6 +14,7 @@ export const CHECK_TYPES = {
     'output_matches_regex',
     'output_line_count',
     'output_not_empty',
+    'output_empty',
     'element_exists',
     'element_count',
     'element_value',
@@ -65,6 +66,10 @@ export function evaluateSingleCheck(check, output, context = {}) {
 
   if (check.type === 'output_not_empty') {
     return normalizeOutput(output).length > 0
+  }
+
+  if (check.type === 'output_empty') {
+    return normalizeOutput(output).length === 0
   }
 
   if (check.type === 'element_exists') {

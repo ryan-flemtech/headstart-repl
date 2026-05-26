@@ -196,6 +196,7 @@ export default function BuilderOutputPanel({
 function checkHint(result) {
   if (result.type === 'code_no_error') return 'because the code errored.'
   if (result.type === 'output_not_empty') return 'because the output is empty.'
+  if (result.type === 'output_empty') return 'because the output is not empty.'
   if (result.type === 'code_contains') return <>— the code does not contain (<code style={s.code}>{result.value}</code>).</>
   if (result.type === 'code_does_not_contain') return <>— the code contains (<code style={s.code}>{result.value}</code>) but shouldn't.</>
   if (result.type === 'code_equals') return <>— the code does not exactly match the expected value.</>
