@@ -8,19 +8,8 @@ import { decodeFileKey } from '../hooks/useSession'
 import QuizTask from './QuizTask'
 import ExplainerPanel from './ExplainerPanel'
 import LiveActivityToast from './LiveActivityToast'
-
-function resolveAssetsPath(rawPath) {
-  if (!rawPath) return ''
-  const base = import.meta.env.BASE_URL.replace(/\/$/, '')
-  const encoded = rawPath.split('/').map(s => (s ? encodeURIComponent(s) : s)).join('/')
-  return window.location.origin + base + encoded
-}
-
-function parseScratchState(raw) {
-  if (!raw) return null
-  if (typeof raw === 'object') return raw
-  try { return JSON.parse(raw) } catch { return null }
-}
+import { resolveAssetsPath } from '../../shared/assetPaths'
+import { decodeSessionFiles, parseScratchState } from '../../shared/workspaceData'
 
 function parseSpriteState(raw) {
   if (!raw) return null
@@ -38,12 +27,7 @@ export default function StudentModal({ student, lesson, session, isLive, isLiveF
 
   const isPython  = lesson?.type === 'python'
   const isScratch = lesson?.type === 'scratch'
-  const files     = student.currentFiles
-    ? Object.entries(student.currentFiles).map(([key, content]) => {
-        const name = decodeFileKey(key)
-        return { name, content, type: name.endsWith('.css') ? 'css' : name.endsWith('.js') ? 'javascript' : 'html' }
-      })
-    : []
+  const files = decodeSessionFiles(student.currentFiles, decodeFileKey, 'html')
   const task      = lesson?.tasks?.find(t => t.id === session?.currentTaskId)
   const isQuiz    = task?.taskType === 'quiz'
   const isInformation = task?.taskType === 'information'

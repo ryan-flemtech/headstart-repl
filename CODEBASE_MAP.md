@@ -1,6 +1,6 @@
 # CODEBASE_MAP.md
 
-One-line role for every source file. Update this file when files are added, moved, or removed.
+One-line role for every source file. When a pull request adds, moves, or removes a source component or test target, update this map and consider the corresponding inventory in `TESTING.md`.
 
 Referenced from AGENTS.md. Use this for navigation before opening files.
 
@@ -29,6 +29,15 @@ Referenced from AGENTS.md. Use this for navigation before opening files.
 
 ---
 
+## Classroom Modules (`src/app/`)
+
+| File | Role |
+|---|---|
+| `studentStorage.js` | Student task/file localStorage key construction and saved-work persistence helpers |
+| `teacherLivePayload.js` | Pure student-to-teacherLive broadcast payload construction |
+
+---
+
 ## Classroom Components (`src/app/components/`)
 
 | File | Role |
@@ -54,6 +63,8 @@ Referenced from AGENTS.md. Use this for navigation before opening files.
 | `StudentModal.jsx` | Full-width modal: student workspace view + teacher actions (Go Live, Remote Reset, Rename, Remove) |
 | `LiveActivityToast.jsx` | Transient live-view notice for editor copy, paste, and click activity |
 | `TeacherTimers.jsx` | Timer strip for elapsed lesson time, planned duration, and active-task countdown |
+| `InformationTask.jsx` | Read-only information/introduction task rendering for lesson flow |
+| `CollapsiblePanelControls.jsx` | Shared collapse/expand tab controls for classroom and builder panels |
 
 ---
 
@@ -72,6 +83,14 @@ Referenced from AGENTS.md. Use this for navigation before opening files.
 |---|---|
 | `BuilderView.jsx` | Main builder layout: 3-pane (meta / task list / editor), validation, CRUD, download/upload |
 | `PreviewView.jsx` | Preview mode: wraps StudentView read-only so teacher can test the student experience |
+
+---
+
+## Builder Modules (`src/builder/`)
+
+| File | Role |
+|---|---|
+| `lessonUtils.js` | Pure builder lesson validation and export normalisation rules |
 
 ---
 
@@ -95,7 +114,9 @@ Referenced from AGENTS.md. Use this for navigation before opening files.
 | `CodeEditor.jsx` | Shared CodeMirror React wrapper: language/readOnly via compartments, no remount on prop change |
 | `SplitPane.jsx` | Draggable two-pane splitter: [15%, 85%] clamped, collapsible right pane with fixed width option |
 | `AssetBrowser.jsx` | Read-only lesson asset browser: file tree, click-to-copy paths, image hover preview |
+| `AssetImagePreview.jsx` | Shared asset image thumbnail and preview presentation |
 | `AssetPicker.jsx` | Dropdown asset picker for builder inputs: grouped by lesson/shared/common sources, manual fallback |
+| `assetPaths.js` | Encoded absolute asset URL construction for iframe and Scratch consumers |
 | `useAssets.js` | Hook for fetching and caching `public/assets/manifest.json`; exposes `lessonAssets`, `sharedAssets`, `lessonFolderAssets` |
 | `checks.js` | Check evaluation engine: `evaluateCheckResults()`, `evaluateSingleCheck()`, `CHECK_TYPES` constants |
 | `codemirror.js` | CodeMirror config: `headstartTheme`, `headstartHighlight`, `createBaseExtensions(type, readOnly)`, `getTabSize(type)` |
@@ -106,6 +127,7 @@ Referenced from AGENTS.md. Use this for navigation before opening files.
 | `pyodide.worker.js` | Web Worker: Pyodide loader, AST-based async `input()` transform, stdout/stderr event streaming |
 | `scratch.js` | Custom Scratch interpreter: 62 block definitions, multi-sprite state, broadcast, sounds, check evaluation |
 | `taskUtils.js` | Task flattening/group helpers plus estimated-duration total and formatting |
+| `workspaceData.js` | Pure scratch state clone/parse and decoded session file-list helpers |
 | `useIsMobile.js` | `useIsMobile(breakpoint=640) → boolean` — media query hook for responsive layout |
 
 ---

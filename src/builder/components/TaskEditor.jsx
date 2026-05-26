@@ -15,18 +15,12 @@ import ScratchWorkspace, { SPRITE_TYPES } from '../../app/components/ScratchWork
 import QuizTask from '../../app/components/QuizTask'
 import InformationTask from '../../app/components/InformationTask'
 import { DEFAULT_SPRITES } from '../../shared/scratch'
+import { resolveAssetsPath } from '../../shared/assetPaths'
 
 const CODE_FONT_STYLE = {
   fontFamily: "'JetBrains Mono', monospace",
   fontVariantLigatures: 'none',
   fontFeatureSettings: '"liga" 0, "calt" 0',
-}
-
-function resolveAssetsPath(rawPath) {
-  if (!rawPath) return ''
-  const base = import.meta.env.BASE_URL.replace(/\/$/, '')
-  const encoded = rawPath.split('/').map(s => (s ? encodeURIComponent(s) : s)).join('/')
-  return window.location.origin + base + encoded
 }
 
 function getTaskInlineCodeLanguages(lessonType, task) {
