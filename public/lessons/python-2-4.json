@@ -5,36 +5,44 @@
   "description": "Learn about a new type of loop - the For loop! ",
   "tasks": [
     {
+      "id": 1,
+      "taskType": "information",
+      "title": "Introduction",
+      "explainer": "",
+      "informationType": "introduction"
+    },
+    {
       "id": "g-1779552718380",
       "type": "group",
       "title": "Recap",
       "subtasks": [
         {
-          "id": 1,
+          "id": 2,
           "taskType": "information",
           "title": "Recap - 1",
-          "explainer": "# Recap of last time \n1. What are **Loops**? \n2. What does the `python:While` **Loop** do?\n3. How do we use the `python:While` **Loop**?"
+          "explainer": "1. What are **Loops**? \n2. What does the `python:While` **Loop** do?\n3. How do we use the `python:While` **Loop**?",
+          "informationType": "recap"
         },
         {
-          "id": 2,
+          "id": 3,
           "taskType": "information",
           "title": "Recap - 2",
           "explainer": "# What is a loop? \nA **loop** in programming is used when you want to **repeat** a **set of instructions** *multiple times*. \n\nInstead of writing the same code **again and again**, we use loops to **automate repetition**.\n\nA loop **repeats** actions until we say stop.\n\nThis saves us from writing the same code again and again!"
         },
         {
-          "id": 3,
+          "id": 4,
           "taskType": "information",
           "title": "Recap - 3",
           "explainer": "# While Loop\nA `python:While` **Loop** will keep looping as long as the **condition** we give it is `python:True`\n\nWe write a `python:While` **Loop** like this:\n\n```python\nwhile condition:\n```\n\nThe condition can be anything that will return a **boolean** - for example `python:value == value` or `python:value <= value`"
         },
         {
-          "id": 4,
+          "id": 5,
           "taskType": "information",
           "title": "Recap - 4",
           "explainer": "# Indentation\nJust like with our `python:if` statments we have to **indent** the code we want to loop inside the `python:While` **Loop**.\n\n```python\nwhile condition: \n  repeating_code\n```"
         },
         {
-          "id": 5,
+          "id": 6,
           "title": "Recap - 5",
           "explainer": "# While Output\nWhat will be the output of this `python:While` Loop?\n\n```python\ncount = 1\nwhile count <= 3:\n  print(\"Python is fun\")\n  count = count + 1\n```",
           "starterCode": "",
@@ -69,19 +77,19 @@
           "carryBlocksFrom": null
         },
         {
-          "id": 6,
+          "id": 7,
           "taskType": "information",
           "title": "Recap - 6",
           "explainer": "# Infinite Loop!\n\nIf our condition never becomes `python:False` then our `python:while` loop will keep repeating forever!\n\n```python\ncount = 1\nwhile count < 5:\n  print(\"Hello\")\n```\n\nBecause `python:count` never is increased the **condition** of `python:count < 5` is always `python:True` - Meaning the loop just keeps going forever!"
         },
         {
-          "id": 7,
+          "id": 8,
           "taskType": "information",
           "title": "Recap - 7",
           "explainer": "# Challenge\nLet's print out our names 5 times using a `python:while` loop. \n\nWe will break it down and build it together piece by piece... "
         },
         {
-          "id": 8,
+          "id": 9,
           "title": "Recap - 8",
           "explainer": "# Counter \nFirst create a **variable** called `python:count` to keep track of how many times our loop has run. We will set it to be equal to `python:0`",
           "starterCode": "",
@@ -97,11 +105,11 @@
           ]
         },
         {
-          "id": 9,
+          "id": 10,
           "title": "Recap - 9",
           "explainer": "# Create While Loop\nAdd a `python:while` loop with a **condition** of is `python:count` less than `python:5`",
           "starterCode": "count = 0",
-          "carryCodeFrom": 8,
+          "carryCodeFrom": 9,
           "completeCode": "count = 0\n\nwhile count < 5:",
           "interactionMode": "submit",
           "check": [
@@ -113,11 +121,11 @@
           ]
         },
         {
-          "id": 10,
+          "id": 11,
           "title": "Recap - 10",
           "explainer": "# Print out your name\nInside the `python:while` loop use a `python:print()` function to print our your name",
           "starterCode": "count = 0\n\nwhile count < 5:",
-          "carryCodeFrom": 9,
+          "carryCodeFrom": 10,
           "check": [
             {
               "type": "code_matches_regex",
@@ -129,11 +137,11 @@
           "completeCode": "count = 0\n\nwhile count < 5:\n  print(\"Ryan\")"
         },
         {
-          "id": 11,
+          "id": 12,
           "title": "Recap - 11",
           "explainer": "# Increase the Counter \nMake sure inside your `python:while` loop you are increasing the `python:count` variable by `python:1` each time!",
           "starterCode": "count = 0\n\nwhile count < 5:\n  print(\"Ryan\")",
-          "carryCodeFrom": 10,
+          "carryCodeFrom": 11,
           "check": [
             {
               "type": "output_line_count",
@@ -143,7 +151,7 @@
           "completeCode": "count = 0\n\nwhile count < 5:\n  print(\"Ryan\")\n  count += 1"
         },
         {
-          "id": 12,
+          "id": 13,
           "title": "Recap - 12",
           "explainer": "# New Challenge\nCan you print the numbers 1 to 10 using a `python:while` loop using the `python:num` **variable**? \n",
           "starterCode": "num = 1\n\n",
@@ -168,7 +176,7 @@
           ]
         },
         {
-          "id": 13,
+          "id": 14,
           "title": "Recap - 13",
           "explainer": "# Mini Challenge\nWhat will this code below print? \n```python\ncount = 3\nwhile count > 0:\n  print(count)\n  count = count - 1\nprint(\"Blast Off\")\n```",
           "starterCode": "num = 1\n\nwhile num <= 10:\n  print(num)\n  num += 1",
@@ -205,19 +213,20 @@
       ]
     },
     {
-      "id": 14,
+      "id": 15,
       "taskType": "information",
       "title": "Learning Objectives",
-      "explainer": "- Learn about `python:for` **loops**\n- Understand the `python:range()` **function**"
+      "explainer": "- Learn about `python:for` **loops**\n- Understand the `python:range()` **function**",
+      "informationType": "recap"
     },
     {
-      "id": 15,
+      "id": 16,
       "taskType": "information",
       "title": "Introducing the For Loop",
       "explainer": "The `python:for` **loop** allows us to repeat things a **fixed** number of times. \n\nIt will **automatically** count how many times the loop has run, and stop it after a **pre-set** number of loops. \n\n>:success No more `python:count` variable needed!"
     },
     {
-      "id": 16,
+      "id": 17,
       "taskType": "information",
       "title": "When can we use for loops?",
       "explainer": "- Repeat something a **fixed** number of times\n- Loop through a **list** or **characters in a string**"
@@ -228,7 +237,7 @@
       "title": "Writing a For Loop",
       "subtasks": [
         {
-          "id": 17,
+          "id": 18,
           "title": "Writing a For Loop - 1",
           "explainer": "Start with the **keyword** `python:for`\nThis tells Python you are about to repeat for a **fixed number of times**.",
           "starterCode": "",
@@ -244,11 +253,11 @@
           "completeCode": "for"
         },
         {
-          "id": 18,
+          "id": 19,
           "title": "Writing a For Loop - 2",
           "explainer": "Add a **variable name**. \n\nThis variable will **automatically** be *created* and **automatically** *updated* to the amount of times the loop has run each time. \n\nWe use the variable name of `python:i` for our `python:for` loops! \n\nWrite it after your `python:for` - `python:for i`",
           "starterCode": "for",
-          "carryCodeFrom": 17,
+          "carryCodeFrom": 18,
           "interactionMode": "submit",
           "check": [
             {
@@ -260,11 +269,11 @@
           "completeCode": "for i"
         },
         {
-          "id": 19,
+          "id": 20,
           "title": "Writing a For Loop - 3",
           "explainer": "We next add the `python:in` **keyword**. \n\nThis means that the `python:i` variable will be set to the values from **in**side a group!\n\nWrite `python:in` after `python:i`",
           "starterCode": "for i",
-          "carryCodeFrom": 18,
+          "carryCodeFrom": 19,
           "interactionMode": "submit",
           "check": [
             {
@@ -276,11 +285,11 @@
           "completeCode": "for i in"
         },
         {
-          "id": 20,
+          "id": 21,
           "title": "Writing a For Loop - 4",
           "explainer": "We then use the `python:range()` **function** to generate a group of numbers in order. \n\nWrite `python:range()` after `python:in`",
           "starterCode": "for i in",
-          "carryCodeFrom": 19,
+          "carryCodeFrom": 20,
           "interactionMode": "submit",
           "check": [
             {
@@ -292,23 +301,23 @@
           "completeCode": "for i in range()"
         },
         {
-          "id": 21,
+          "id": 22,
           "taskType": "information",
           "title": "Writing a For Loop - 5",
           "explainer": "# What is `python:range()`\n\nThe `python:range()` **function** generates a **list** of numbers. \n\nWe give it a number as an **argument** (Inside the brackets) and it will generate that amount of numbers in order. \n\nFor example `python:range(5)` will generate **5** numbers in order!"
         },
         {
-          "id": 22,
+          "id": 23,
           "taskType": "information",
           "title": "Writing a For Loop - 6",
           "explainer": "# But *which* numbers? \n\n**But** `python:range()` starts counting **from 0**. \n\nSo if we gave it the argument of 5, it would generate the numbers **0 through 4**: \n```python\n0\n1\n2\n3\n4\n```\nThat is indeed **5** numbers - It just doesn't include the number 5!"
         },
         {
-          "id": 23,
+          "id": 24,
           "title": "Writing a For Loop - 7",
           "explainer": "Let's give our `python:range()` **function** the **argument** of `python:5`\n\nThen just like our `python:while` loop and our `python:if` statement we need to add a **colon :** at the end of the line!\n\nThis says anything after the **colon** is the **instructions** to loop!",
           "starterCode": "for i in range()",
-          "carryCodeFrom": 20,
+          "carryCodeFrom": 21,
           "interactionMode": "submit",
           "check": [
             {
@@ -320,17 +329,17 @@
           "completeCode": "for i in range(5):"
         },
         {
-          "id": 24,
+          "id": 25,
           "taskType": "information",
           "title": "Writing a For Loop - 8",
           "explainer": "# Indentation\n\nJust like our `python:while` loop and our `python:if` statement we need to make sure the instructions to loop are **indented**. \n\nFor example:\n```python\nfor i in range(5):\n  print(i)\n```"
         },
         {
-          "id": 25,
+          "id": 26,
           "title": "Writing a For Loop - 9",
           "explainer": "# Add an instruction!\n\nAdd a `python:print()` **function** *inside* your `python:for` loop, add some text and run it!\n\n>:success We don't need to do anything else! No variable to change here!",
           "starterCode": "for i in range(5):",
-          "carryCodeFrom": 23,
+          "carryCodeFrom": 24,
           "check": [
             {
               "type": "output_line_count",
@@ -343,7 +352,7 @@
       ]
     },
     {
-      "id": 26,
+      "id": 27,
       "title": "The i Variable",
       "explainer": "The `python:i` variable is just a normal variable. It can be used inside our loop!\n\nAdd a `python:print()` **function** on the next line of our `python:for` loop here that prints the variable `python:i` - See what happens!",
       "starterCode": "for i in range(3):\n  print(\"Looping!\")",
@@ -358,7 +367,7 @@
       ]
     },
     {
-      "id": 27,
+      "id": 28,
       "title": "Code Challenge!",
       "explainer": "Can you **print** your name **4 times** using a `python:for` loop? ",
       "starterCode": "",
@@ -378,7 +387,7 @@
       "completeCode": "for i in range(4):\n  print(\"Ryan\")"
     },
     {
-      "id": 28,
+      "id": 29,
       "title": "Input For Loop",
       "explainer": "Can you use an `python:input()` **function** to set how many times our message is printed out? \n\nThe `python:range()` **function** requires an **Integer** - What will that mean you need to do to the result from your `python:input`?",
       "starterCode": "# Use an input to set how many times the message \"Hello!\" is printed out\n\nfor i in range():\n  print(\"Hello!\")",
@@ -398,10 +407,53 @@
       ]
     },
     {
-      "id": 29,
+      "id": 30,
       "taskType": "information",
       "title": "While vs For",
       "explainer": "When should we use a `python:while` loop and when should we use a `python:for` loop? \n\n# For\n`python:for` loops are best for when you have a set amount of times to repeat - Either from a given number of times to repeat, or a list to loop through. \n\n# While \n`python:while` loops are best for when you know what condition will mean you need to stop, not how many times to repeat. "
+    },
+    {
+      "id": 31,
+      "title": "Which Loop?",
+      "explainer": "Write a **loop** that adds `python:6` to the `python:number` **variable** 14 times. \nEvery time it adds on 6 `python:print()`what `python:number` is at that point\n\n>:warning Think... Which loop will you use? ",
+      "starterCode": "number = 7",
+      "carryCodeFrom": null,
+      "completeCode": "number = 6\n\nfor i in range(14):\n  number += 7\n  print(number)",
+      "check": [
+        {
+          "type": "output_contains",
+          "value": "13*19*25*31*37*43*49*55*61*67*73*79*85*91*",
+          "hint": "The numbers printed out aren't quite correct"
+        }
+      ],
+      "incorrectChecks": [
+        {
+          "type": "code_contains",
+          "value": "for",
+          "hint": "You need to loop **for** a number of times..."
+        }
+      ]
+    },
+    {
+      "id": 32,
+      "title": "Which Loop 2?",
+      "explainer": "Write a **loop** that divides the `python:number` **variable** by `python:1.3` until it is less than 1. \nEvery time you loop change the count variable - Once the loop has finished print out how many times it took!\n\n> Do you know how many times this will loop? Might that help you pick a loop? ",
+      "starterCode": "number = 1492\ncount = 0",
+      "carryCodeFrom": null,
+      "check": [
+        {
+          "type": "output_contains",
+          "value": "28"
+        }
+      ],
+      "completeCode": "number = 1492\ncount = 0\n\nwhile number > 1:\n  number /= 1.3\n  count += 1\nprint(f\"It took {count} divides to reach less than 1\")",
+      "incorrectChecks": [
+        {
+          "type": "code_contains",
+          "value": "for",
+          "hint": "Do we know how many times we want to loop?"
+        }
+      ]
     },
     {
       "id": "g-1779555853696",
@@ -409,8 +461,15 @@
       "title": "Recap",
       "subtasks": [
         {
-          "id": 30,
+          "id": 33,
+          "taskType": "information",
           "title": "Recap - 1",
+          "explainer": "- `python:for` **loops** allow us to loop for a set number of times. \n- `python:range()` gives us a **group of numbers**\n- `python:for` **loops** are best for when we know how many times to loop\n- `python:while` **loops** are best for when we only know when to stop looping ",
+          "informationType": "recap"
+        },
+        {
+          "id": 34,
+          "title": "Recap - 2",
           "explainer": "Which is the correct format for a `python:for` loop? ",
           "starterCode": "",
           "carryCodeFrom": null,
@@ -444,8 +503,8 @@
           "carryBlocksFrom": null
         },
         {
-          "id": 31,
-          "title": "Recap - 2",
+          "id": 35,
+          "title": "Recap - 3",
           "explainer": "What does the `python:range()` **function** do? ",
           "starterCode": "",
           "carryCodeFrom": null,
@@ -479,8 +538,8 @@
           "carryBlocksFrom": null
         },
         {
-          "id": 32,
-          "title": "Recap - 3",
+          "id": 36,
+          "title": "Recap - 4",
           "explainer": "Which of these loops is best for which?",
           "starterCode": "",
           "carryCodeFrom": null,
@@ -514,5 +573,6 @@
       ]
     }
   ],
-  "level": "Python Level 2"
+  "level": "Level 2",
+  "assetsPath": "/assets/python-2-4/"
 }
