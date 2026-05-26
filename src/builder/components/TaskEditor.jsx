@@ -1181,6 +1181,7 @@ function FillBlankBuilder({ task, onUpdate, lessonType = null }) {
   const mode = task.mode ?? 'drag'
   const text = task.text ?? ''
   const blanks = task.blanks ?? []
+  const distractors = task.distractors ?? []
   const blankCount = (text.match(/___/g) ?? []).length
 
   function handleTextChange(newText) {
@@ -1194,6 +1195,20 @@ function FillBlankBuilder({ task, onUpdate, lessonType = null }) {
   function updateBlank(index, answer) {
     const next = blanks.map((b, i) => i === index ? { ...b, answer } : b)
     onUpdate({ ...task, blanks: next, _checkTested: false })
+  }
+
+  function addDistractor() {
+    const next = [...distractors, { id: `d${Date.now()}`, text: '' }]
+    onUpdate({ ...task, distractors: next })
+  }
+
+  function updateDistractor(index, text) {
+    const next = distractors.map((d, i) => i === index ? { ...d, text } : d)
+    onUpdate({ ...task, distractors: next })
+  }
+
+  function removeDistractor(index) {
+    onUpdate({ ...task, distractors: distractors.filter((_, i) => i !== index) })
   }
 
   return (
@@ -1245,6 +1260,38 @@ function FillBlankBuilder({ task, onUpdate, lessonType = null }) {
               </div>
             ))}
           </div>
+        </Field>
+      )}
+      {mode === 'drag' && (
+        <Field label="Extra options (distractors — drag mode only)">
+          <div style={s.quizAnswerStack}>
+            {distractors.map((d, index) => (
+              <div key={d.id} style={{ ...s.quizAnswerCard, alignItems: 'center' }}>
+                <span style={s.quizAnswerBadge}>✕</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <input
+                    type="text"
+                    style={s.input}
+                    value={d.text}
+                    onChange={e => updateDistractor(index, e.target.value)}
+                    placeholder={`Distractor option ${index + 1}`}
+                  />
+                </div>
+                <button
+                  type="button"
+                  style={s.removeBtn}
+                  onClick={() => removeDistractor(index)}
+                  title="Remove distractor"
+                >✕</button>
+              </div>
+            ))}
+            <button type="button" className="btn-ghost" style={s.addCheckBtn} onClick={addDistractor}>
+              + Add distractor
+            </button>
+          </div>
+          <span style={{ fontFamily: 'var(--font-body)', fontSize: '0.82rem', color: '#6b7280', marginTop: 2 }}>
+            These extra tiles appear in the answer bank but are not the answer to any blank.
+          </span>
         </Field>
       )}
     </>
