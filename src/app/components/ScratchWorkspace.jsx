@@ -779,8 +779,9 @@ export default function ScratchWorkspace({
         setCheckAttempted(false)
         const signal = createSignal()
         signalRef.current = signal
-        const sws = buildSpriteWorkspaces().filter(s => s.id === draggedId)
-        runAllSpritesEvent(sws, 'event_whenthisspriteclicked', signal)
+        const allSws = buildSpriteWorkspaces()
+        const sws = allSws.filter(s => s.id === draggedId)
+        runAllSpritesEvent(sws, 'event_whenthisspriteclicked', signal, null, allSws)
           .then(() => finishRun(signal))
           .catch(() => finishRun(signal))
       }

@@ -706,10 +706,11 @@ export async function runAllSprites(spriteWorkspaces, signal) {
   }))
 }
 
-export async function runAllSpritesEvent(spriteWorkspaces, eventType, signal, option = null) {
+export async function runAllSpritesEvent(spriteWorkspaces, eventType, signal, option = null, allSpritesContext = null) {
+  const broadcastSprites = allSpritesContext ?? spriteWorkspaces
   signal.variables ??= {}
   await Promise.all(spriteWorkspaces.map(sp => {
-    const context = createRunContext(sp.workspace, sp.state, sp.onUpdate, signal, spriteWorkspaces, sp.costumes ?? [])
+    const context = createRunContext(sp.workspace, sp.state, sp.onUpdate, signal, broadcastSprites, sp.costumes ?? [])
     let hats = sp.workspace.getBlocksByType(eventType, false)
     if (eventType === 'event_whenkeypressed') {
       hats = hats.filter(hat => keyMatches(hat.getFieldValue('KEY_OPTION'), option))
