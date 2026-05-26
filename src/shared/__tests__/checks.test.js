@@ -44,6 +44,65 @@ describe('evaluateSingleCheck — output_contains (fallthrough)', () => {
   })
 })
 
+// ─── multiple options (contains) ─────────────────────────────────────────────
+
+describe('evaluateSingleCheck — multiple contains options ("opt1","opt2" format)', () => {
+  it('output_contains passes when output contains the first option', () => {
+    const check = { type: 'output_contains', value: '"hello","goodbye"' }
+    expect(evaluateSingleCheck(check, 'hello world')).toBe(true)
+  })
+
+  it('output_contains passes when output contains the second option', () => {
+    const check = { type: 'output_contains', value: '"hello","goodbye"' }
+    expect(evaluateSingleCheck(check, 'goodbye everyone')).toBe(true)
+  })
+
+  it('output_contains fails when output contains none of the options', () => {
+    const check = { type: 'output_contains', value: '"hello","goodbye"' }
+    expect(evaluateSingleCheck(check, 'hi there')).toBe(false)
+  })
+
+  it('output_contains with a single quoted value matches like normal', () => {
+    const check = { type: 'output_contains', value: '"hello"' }
+    expect(evaluateSingleCheck(check, 'hello world')).toBe(true)
+  })
+
+  it('output_contains treats value without quotes as normal single-value check', () => {
+    const check = { type: 'output_contains', value: 'hello' }
+    expect(evaluateSingleCheck(check, 'hello world')).toBe(true)
+  })
+
+  it('code_contains passes when code contains any of the options', () => {
+    const check = { type: 'code_contains', value: '"for","while"' }
+    expect(evaluateSingleCheck(check, '', { code: 'while True:' })).toBe(true)
+  })
+
+  it('code_contains fails when code contains none of the options', () => {
+    const check = { type: 'code_contains', value: '"for","while"' }
+    expect(evaluateSingleCheck(check, '', { code: 'x = 1' })).toBe(false)
+  })
+
+  it('answer_contains passes when answer contains any of the options', () => {
+    const check = { type: 'answer_contains', value: '"paris","london"' }
+    expect(evaluateSingleCheck(check, '', { answer: 'london' })).toBe(true)
+  })
+
+  it('answer_contains fails when answer contains none of the options', () => {
+    const check = { type: 'answer_contains', value: '"paris","london"' }
+    expect(evaluateSingleCheck(check, '', { answer: 'berlin' })).toBe(false)
+  })
+
+  it('multiple options matching is case-insensitive', () => {
+    const check = { type: 'output_contains', value: '"Hello","Goodbye"' }
+    expect(evaluateSingleCheck(check, 'HELLO WORLD')).toBe(true)
+  })
+
+  it('does not parse as multi-option when format has extra chars outside quotes', () => {
+    const check = { type: 'output_contains', value: '"hello" extra' }
+    expect(evaluateSingleCheck(check, '"hello" extra')).toBe(true)
+  })
+})
+
 // ─── output_equals ────────────────────────────────────────────────────────────
 
 describe('evaluateSingleCheck — output_equals', () => {
