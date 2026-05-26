@@ -285,8 +285,8 @@ export default function TaskList({
                           draggable
                           onDragStart={e => handleDragStart(e, { kind: 'task', id: subtask.id, sourceGroupId: item.id })}
                           onDragEnd={handleDragEnd}
-                          onDragOver={e => handleDragOver(e, { groupId: item.id, index: j })}
-                          onDrop={e => handleDrop(e, { groupId: item.id, index: j })}
+                          onDragOver={e => { e.stopPropagation(); handleDragOver(e, { groupId: item.id, index: j }) }}
+                          onDrop={e => { e.stopPropagation(); handleDrop(e, { groupId: item.id, index: j }) }}
                           onClick={() => onSelect(subtask.id)}
                         >
                           <span style={s.subtaskNum}>{j + 1}</span>
