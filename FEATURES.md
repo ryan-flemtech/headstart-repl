@@ -111,6 +111,7 @@ All features listed here are implemented in the current codebase. Replaces `Quiz
 ### StudentModal
 - Full workspace view: code/output/iframe/quiz/Scratch stage
 - Go Live / Stop Live (one-to-one keystroke streaming)
+- Live code selection/cursor highlight plus copy, paste, and click activity notices
 - Remote Reset to Starter (loads `starterCode`/`starterFiles`/`starterBlocks`)
 - Remote Reset to Complete (loads `completeCode`/`completeFiles`/`completeBlocks`)
 - Rename student
@@ -119,6 +120,7 @@ All features listed here are implemented in the current codebase. Replaces `Quiz
 ### Teacher Live Broadcast (teacherLive)
 - Broadcasts teacher's (or a pinned student's) screen to **all** students simultaneously
 - Activated via `?teacher=true&present=true` presentation window
+- Broadcast code view includes live selection/cursor highlighting and activity notices
 - Cleared on teacher disconnect via `onDisconnect`
 
 ### Sandbox Mode
@@ -163,6 +165,7 @@ All features listed here are implemented in the current codebase. Replaces `Quiz
 ### Sync (when watched by teacher)
 - Python: code synced per keystroke, output streamed line by line during run
 - HTML: active-tab files synced per keystroke
+- Python/HTML: selection, cursor position, copy/paste, and click activity synced during live viewing
 - Quiz: answer synced on submit
 - Completely silent — no student-facing indicator
 
