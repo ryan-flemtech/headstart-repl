@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import StudentCard from './StudentCard'
 import StudentModal from './StudentModal'
+import { findTaskById } from '../../shared/taskUtils'
 
 function formatCheck(check) {
   if (!check) return null
@@ -46,7 +47,7 @@ export default function StudentGrid({ students = [], lesson, lessonId, session, 
     }
   }
 
-  const currentTask = lesson?.tasks?.find(t => t.id === session?.currentTaskId)
+  const currentTask = findTaskById(lesson?.tasks, session?.currentTaskId)
   const tasksWithChecks = currentTask?.check != null ? [currentTask] : []
   const hasCheck = currentTask?.check != null
   const passedCount = hasCheck ? students.filter(student => student.checkPassed).length : 0

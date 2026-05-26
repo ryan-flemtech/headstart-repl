@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { getQuizOptionText } from './QuizTask'
 import { InlineMarkdown } from '../../shared/markdown'
+import { findTaskById } from '../../shared/taskUtils'
 
 export default function StudentCard({ student, lesson, lessonId, session, onRename, onRemove, onExpand }) {
   const [editing, setEditing] = useState(false)
@@ -12,7 +13,7 @@ export default function StudentCard({ student, lesson, lessonId, session, onRena
     setEditing(false)
   }
 
-  const currentTask = lesson?.tasks?.find(t => t.id === session?.currentTaskId)
+  const currentTask = findTaskById(lesson?.tasks, session?.currentTaskId)
   const isSubmitMode = currentTask?.interactionMode === 'submit'
   const isQuiz = currentTask?.taskType === 'quiz'
   const isInformation = currentTask?.taskType === 'information'

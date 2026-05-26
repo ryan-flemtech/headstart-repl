@@ -185,6 +185,9 @@ function MatchQuiz({ task, selectedAnswer, onSelectAnswer, submitted, checkPasse
 
   const state = useMemo(() => {
     if (selectedAnswer && typeof selectedAnswer === 'object' && !Array.isArray(selectedAnswer)) return selectedAnswer
+    if (typeof selectedAnswer === 'string' && selectedAnswer) {
+      try { const parsed = JSON.parse(selectedAnswer); if (parsed && typeof parsed === 'object') return parsed } catch {}
+    }
     return {}
   }, [selectedAnswer])
 
@@ -361,6 +364,9 @@ function FillBlankQuiz({ task, selectedAnswer, onSelectAnswer, submitted, checkP
 
   const state = useMemo(() => {
     if (selectedAnswer && typeof selectedAnswer === 'object' && !Array.isArray(selectedAnswer)) return selectedAnswer
+    if (typeof selectedAnswer === 'string' && selectedAnswer) {
+      try { const parsed = JSON.parse(selectedAnswer); if (parsed && typeof parsed === 'object') return parsed } catch {}
+    }
     return {}
   }, [selectedAnswer])
 

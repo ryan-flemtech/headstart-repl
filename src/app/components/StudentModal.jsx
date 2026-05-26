@@ -10,6 +10,7 @@ import ExplainerPanel from './ExplainerPanel'
 import LiveActivityToast from './LiveActivityToast'
 import { resolveAssetsPath } from '../../shared/assetPaths'
 import { decodeSessionFiles, parseScratchState } from '../../shared/workspaceData'
+import { findTaskById } from '../../shared/taskUtils'
 
 function parseSpriteState(raw) {
   if (!raw) return null
@@ -28,7 +29,7 @@ export default function StudentModal({ student, lesson, session, isLive, isLiveF
   const isPython  = lesson?.type === 'python'
   const isScratch = lesson?.type === 'scratch'
   const files = decodeSessionFiles(student.currentFiles, decodeFileKey, 'html')
-  const task      = lesson?.tasks?.find(t => t.id === session?.currentTaskId)
+  const task      = findTaskById(lesson?.tasks, session?.currentTaskId)
   const isQuiz    = task?.taskType === 'quiz'
   const isInformation = task?.taskType === 'information'
   const scratchState = isScratch ? parseScratchState(student.currentCode) : null
