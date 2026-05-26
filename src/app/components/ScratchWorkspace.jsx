@@ -33,6 +33,12 @@ export const SPRITE_TYPES = ['cat', 'ball', 'star', 'arrow', 'bat', 'parrot']
 
 const SPRITE_TYPE_COLOR = { cat: '#FFA500', ball: '#4C97FF', star: '#FFD700', arrow: '#9966FF', bat: '#374151', parrot: '#22c55e' }
 
+const ROT_STYLES = [
+  { val: 'all around',  icon: '↺', title: 'Rotate all around' },
+  { val: 'left-right',  icon: '↔', title: 'Flip left-right only' },
+  { val: "don't rotate", icon: '↑', title: "Don't rotate" },
+]
+
 function normaliseInitialStates(raw, sprites) {
   if (!raw) return {}
   if (sprites[0] && Object.prototype.hasOwnProperty.call(raw, sprites[0].id)) return raw
@@ -171,6 +177,112 @@ function spriteRadius(s) { return Math.max(4, (s.size / 100) * 24) }
 function hitTest(s, canvasX, canvasY) {
   const cx = toCanvasX(s.x); const cy = toCanvasY(s.y)
   return Math.hypot(canvasX - cx, canvasY - cy) <= spriteRadius(s) + 8
+}
+
+// ── Sprite thumbnail ──────────────────────────────────────────────────────────
+
+function drawSpriteThumb(ctx, sprite, state, imageCache, assetsPath, size) {
+  const cx = size / 2
+  const cy = size / 2
+  const r  = Math.max(4, size * 0.35)
+  const dir = Number.isFinite(Number(state?.direction)) ? Number(state.direction) : 90
+  const rs  = state?.rotationStyle ?? 'all around'
+  const rot = rs === "don't rotate" ? 0 : rs === 'left-right' ? (dir > 90 && dir < 270 ? Math.PI : 0) : (dir - 90) * (Math.PI / 180)
+
+  const costumeEntry = sprite.costumes?.length > 0
+    ? (sprite.costumes.find(c => c.name === state?.costume) ?? sprite.costumes[0])
+    : null
+  if (costumeEntry?.image && assetsPath && imageCache) {
+    const url = assetsPath.replace(/\/$/, '') + '/' + costumeEntry.image.replace(/^\//, '')
+    const img = imageCache[url]
+    if (img) {
+      ctx.save(); ctx.translate(cx, cy); ctx.rotate(rot)
+      ctx.drawImage(img, -r, -r, r * 2, r * 2)
+      ctx.restore(); return
+    }
+  }
+
+  ctx.save(); ctx.translate(cx, cy); ctx.rotate(rot)
+  switch (sprite.type ?? 'cat') {
+    case 'ball':
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2)
+      ctx.fillStyle = '#4C97FF'; ctx.fill()
+      ctx.strokeStyle = '#2244aa'; ctx.lineWidth = 1.5; ctx.stroke()
+      break
+    case 'star': {
+      ctx.beginPath()
+      for (let i = 0; i < 10; i++) {
+        const a = (i * Math.PI) / 5 - Math.PI / 2
+        const rad = i % 2 === 0 ? r : r * 0.42
+        i === 0 ? ctx.moveTo(Math.cos(a) * rad, Math.sin(a) * rad) : ctx.lineTo(Math.cos(a) * rad, Math.sin(a) * rad)
+      }
+      ctx.closePath(); ctx.fillStyle = '#FFD700'; ctx.fill()
+      ctx.strokeStyle = '#CC9900'; ctx.lineWidth = 1.5; ctx.stroke()
+      break
+    }
+    case 'arrow':
+      ctx.beginPath()
+      ctx.moveTo(0, -r); ctx.lineTo(r * 0.65, r * 0.5); ctx.lineTo(0, r * 0.1); ctx.lineTo(-r * 0.65, r * 0.5)
+      ctx.closePath(); ctx.fillStyle = '#9966FF'; ctx.fill()
+      ctx.strokeStyle = '#6633cc'; ctx.lineWidth = 1.5; ctx.stroke()
+      break
+    case 'bat':
+      ctx.beginPath(); ctx.arc(0, 0, r * 0.55, 0, Math.PI * 2)
+      ctx.fillStyle = '#374151'; ctx.fill()
+      ctx.beginPath(); ctx.ellipse(-r * 0.9, -r * 0.1, r * 0.55, r * 0.3, -0.3, 0, Math.PI * 2)
+      ctx.fillStyle = '#374151'; ctx.fill()
+      ctx.beginPath(); ctx.ellipse(r * 0.9, -r * 0.1, r * 0.55, r * 0.3, 0.3, 0, Math.PI * 2)
+      ctx.fillStyle = '#374151'; ctx.fill()
+      break
+    case 'parrot':
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2)
+      ctx.fillStyle = '#22c55e'; ctx.fill()
+      ctx.strokeStyle = '#166534'; ctx.lineWidth = 1.5; ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(r * 0.3, -r * 0.1); ctx.lineTo(r * 0.8, r * 0.1); ctx.lineTo(r * 0.3, r * 0.25)
+      ctx.closePath(); ctx.fillStyle = '#FBA504'; ctx.fill()
+      break
+    default: {
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2)
+      ctx.fillStyle = '#FFA500'; ctx.fill(); ctx.strokeStyle = '#cc6600'; ctx.lineWidth = 1.5; ctx.stroke()
+      const er = Math.max(2, r * 0.18)
+      ctx.beginPath(); ctx.arc(-r * 0.3, -r * 0.2, er, 0, Math.PI * 2); ctx.arc(r * 0.3, -r * 0.2, er, 0, Math.PI * 2)
+      ctx.fillStyle = '#222'; ctx.fill()
+      ctx.beginPath(); ctx.arc(0, r * 0.15, r * 0.35, 0, Math.PI)
+      ctx.strokeStyle = '#222'; ctx.lineWidth = 1.5; ctx.stroke()
+      break
+    }
+  }
+  ctx.restore()
+}
+
+function SpriteThumb({ sprite, state, imageCache, assetsPath, size = 52, imageVersion }) {
+  const canvasRef = useRef(null)
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    ctx.clearRect(0, 0, size, size)
+    if (state) drawSpriteThumb(ctx, sprite, state, imageCache, assetsPath, size)
+  }, [sprite, state, imageCache, assetsPath, size, imageVersion])
+  return <canvas ref={canvasRef} width={size} height={size} style={{ display: 'block' }} />
+}
+
+function PropField({ label, value, onChange, readOnly, min, max }) {
+  return (
+    <div style={s.spritePropField}>
+      <span style={s.spritePropLabel}>{label}</span>
+      <input
+        type="number"
+        step="1"
+        min={min}
+        max={max}
+        style={s.spritePropInput}
+        value={value}
+        readOnly={readOnly}
+        onChange={readOnly ? undefined : e => { const v = e.target.valueAsNumber; if (!isNaN(v)) onChange(v) }}
+      />
+    </div>
+  )
 }
 
 // ── Check helpers ─────────────────────────────────────────────────────────────
@@ -389,6 +501,13 @@ export default function ScratchWorkspace({
       },
     })).filter(sp => sp.workspace)
   }, [sprites])
+
+  function updateSpriteStateOverride(id, updates) {
+    const newState = { ...spriteStatesRef.current[id], ...updates }
+    spriteStatesRef.current = { ...spriteStatesRef.current, [id]: newState }
+    setSpriteStates(prev => ({ ...prev, [id]: newState }))
+    if ('x' in updates || 'y' in updates) refreshSpriteToolbox(id)
+  }
 
   function buildToolboxForSprite(spriteId) {
     const state = spriteStatesRef.current[spriteId] ?? { x: 0, y: 0 }
@@ -834,21 +953,103 @@ export default function ScratchWorkspace({
 
   const showManualCheck = scratchChecks.some(c => c.evaluation === 'manual')
 
-  // ── Sprite strip (shared between stage mode and hideStage mode) ───────────────
-  const spriteStrip = (
-    <div style={hideStage ? s.spriteStripTop : s.spriteStrip}>
-      {sprites.map(sp => (
-        <button
-          key={sp.id}
-          type="button"
-          style={{ ...s.spriteChip, ...(sp.id === selectedSpriteId ? s.spriteChipActive : {}) }}
-          onClick={() => setSelectedSpriteId(sp.id)}
-          title={sp.name}
-        >
-          <span style={{ ...s.spriteChipDot, background: SPRITE_TYPE_COLOR[sp.type ?? 'cat'] ?? '#aaa' }} />
-          <span style={s.spriteChipName}>{sp.name}</span>
-        </button>
-      ))}
+  // ── Sprite panel (tiles + properties) ────────────────────────────────────────
+  function renderSpriteProps(compact) {
+    const sp = sprites.find(x => x.id === selectedSpriteId)
+    const st = spriteStates[selectedSpriteId]
+    if (!sp || !st) return null
+    return (
+      <div style={compact ? s.spritePropBarCompact : s.spritePropBar}>
+        <PropField label="x" value={Math.round(st.x ?? 0)} onChange={v => updateSpriteStateOverride(selectedSpriteId, { x: Math.max(-240, Math.min(240, v)) })} readOnly={readOnly} min={-240} max={240} />
+        <PropField label="y" value={Math.round(st.y ?? 0)} onChange={v => updateSpriteStateOverride(selectedSpriteId, { y: Math.max(-180, Math.min(180, v)) })} readOnly={readOnly} min={-180} max={180} />
+        <PropField label="Direction" value={Math.round(st.direction ?? 90)} onChange={v => updateSpriteStateOverride(selectedSpriteId, { direction: v })} readOnly={readOnly} min={-179} max={180} />
+        <PropField label="Size" value={Math.round(st.size ?? 100)} onChange={v => updateSpriteStateOverride(selectedSpriteId, { size: Math.max(1, v) })} readOnly={readOnly} min={1} max={1000} />
+        <div style={s.spritePropField}>
+          <span style={s.spritePropLabel}>Show</span>
+          <button
+            type="button"
+            style={{ ...s.showHideBtn, ...(st.visible ? s.showHideBtnOn : s.showHideBtnOff) }}
+            onClick={readOnly ? undefined : () => updateSpriteStateOverride(selectedSpriteId, { visible: !st.visible })}
+            disabled={readOnly}
+            title={st.visible ? 'Click to hide' : 'Click to show'}
+          >
+            {st.visible ? '👁' : '🚫'}
+          </button>
+        </div>
+        <div style={s.spritePropField}>
+          <span style={s.spritePropLabel}>Rotation</span>
+          <div style={s.rotStyleGroup}>
+            {ROT_STYLES.map(({ val, icon, title }) => (
+              <button
+                key={val}
+                type="button"
+                style={{ ...s.rotStyleBtn, ...((st.rotationStyle ?? 'all around') === val ? s.rotStyleBtnActive : {}) }}
+                onClick={readOnly ? undefined : () => updateSpriteStateOverride(selectedSpriteId, { rotationStyle: val })}
+                disabled={readOnly}
+                title={title}
+              >
+                {icon}
+              </button>
+            ))}
+          </div>
+        </div>
+        {sp.costumes?.length > 1 && (
+          <div style={s.spritePropField}>
+            <span style={s.spritePropLabel}>Costume</span>
+            <select
+              style={s.costumeSelect}
+              value={st.costume ?? sp.costumes[0]?.name ?? ''}
+              disabled={readOnly}
+              onChange={readOnly ? undefined : e => updateSpriteStateOverride(selectedSpriteId, { costume: e.target.value })}
+            >
+              {sp.costumes.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
+            </select>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  const spritePanelFull = (
+    <div style={s.spritePanel}>
+      <div style={s.spriteTileRow}>
+        {sprites.map(sp => (
+          <button
+            key={sp.id}
+            type="button"
+            style={{ ...s.spriteTile, ...(sp.id === selectedSpriteId ? s.spriteTileActive : {}) }}
+            onClick={() => setSelectedSpriteId(sp.id)}
+          >
+            <div style={s.spriteTileThumb}>
+              <SpriteThumb sprite={sp} state={spriteStates[sp.id]} imageCache={imageCacheRef.current} assetsPath={assetsPath} size={52} imageVersion={imageVersion} />
+              {!spriteStates[sp.id]?.visible && <span style={s.spriteTileHiddenBadge} title="Hidden">👁</span>}
+            </div>
+            <span style={s.spriteTileName}>{sp.name}</span>
+          </button>
+        ))}
+      </div>
+      {renderSpriteProps(false)}
+    </div>
+  )
+
+  const spritePanelCompact = (
+    <div style={s.spritePanelCompact}>
+      <div style={s.spriteTileRowCompact}>
+        {sprites.map(sp => (
+          <button
+            key={sp.id}
+            type="button"
+            style={{ ...s.spriteTileCompact, ...(sp.id === selectedSpriteId ? s.spriteTileCompactActive : {}) }}
+            onClick={() => setSelectedSpriteId(sp.id)}
+          >
+            <div style={s.spriteTileCompactThumb}>
+              <SpriteThumb sprite={sp} state={spriteStates[sp.id]} imageCache={imageCacheRef.current} assetsPath={assetsPath} size={24} imageVersion={imageVersion} />
+            </div>
+            <span style={s.spriteTileCompactName}>{sp.name}</span>
+          </button>
+        ))}
+      </div>
+      {renderSpriteProps(true)}
     </div>
   )
 
@@ -866,8 +1067,8 @@ export default function ScratchWorkspace({
         </div>
       )}
 
-      {/* Sprite strip above editor when stage is hidden */}
-      {hideStage && sprites.length > 1 && spriteStrip}
+      {/* Sprite panel above editor when stage is hidden */}
+      {hideStage && spritePanelCompact}
 
       {/* Block editor — all workspace divs stacked, only selected one visible */}
       <div style={s.editorPane}>
@@ -957,7 +1158,7 @@ export default function ScratchWorkspace({
             )}
           </div>
 
-          {spriteStrip}
+          {spritePanelFull}
 
           <div style={s.controls}>
             {!readOnly && showManualCheck && (
@@ -979,7 +1180,6 @@ export default function ScratchWorkspace({
 const s = {
   root: { display: 'flex', flex: 1, minHeight: 0, minWidth: 0, gap: 8, height: '100%', position: 'relative' },
   rootColumn: { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, gap: 0, height: '100%', position: 'relative' },
-  spriteStripTop: { display: 'flex', gap: 6, flexWrap: 'wrap', padding: '6px 8px', borderBottom: '1px solid #e5e7eb', background: '#fafafa', flexShrink: 0 },
   overlay: { position: 'absolute', inset: 0, zIndex: 10, background: '#f5f5f5', borderRadius: 8 },
   editorPane: { flex: '1 1 420px', minWidth: 0, border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden', background: '#F9F9F9', display: 'flex', flexDirection: 'column' },
   editorPaneHeader: { display: 'flex', alignItems: 'center', height: 30, padding: '0 6px', borderBottom: '1px solid #e5e7eb', background: '#fafafa', flexShrink: 0 },
@@ -989,17 +1189,43 @@ const s = {
   stageToolbar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, flexWrap: 'wrap' },
   canvas: { display: 'block', width: STAGE_W, height: STAGE_H, border: '1px solid #e5e7eb', borderRadius: 8 },
   stageFrame: { position: 'relative', width: STAGE_W, height: STAGE_H },
-  spriteStrip: { display: 'flex', gap: 6, flexWrap: 'wrap', padding: '4px 0' },
-  spriteChip: {
-    display: 'flex', alignItems: 'center', gap: 6,
-    padding: '6px 10px', border: '1px solid #e5e7eb', borderRadius: 20,
+  // ── Sprite panel (full, below stage) ─────────────────────────────────────────
+  spritePanel: { display: 'flex', flexDirection: 'column', gap: 6, padding: '6px 0 2px' },
+  spriteTileRow: { display: 'flex', gap: 6, flexWrap: 'wrap' },
+  spriteTile: {
+    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+    padding: '6px 8px', border: '2px solid #e5e7eb', borderRadius: 8,
     background: '#fff', cursor: 'pointer', fontFamily: 'var(--font-body)',
-    fontSize: '0.8rem', fontWeight: 600, color: 'var(--colour-text)',
-    transition: 'border-color 0.1s, background 0.1s',
+    transition: 'border-color 0.12s, background 0.12s', position: 'relative',
   },
-  spriteChipActive: { borderColor: 'var(--colour-primary)', background: '#f3eeff', color: 'var(--colour-primary)' },
-  spriteChipDot: { width: 10, height: 10, borderRadius: '50%', flexShrink: 0 },
-  spriteChipName: { maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  spriteTileActive: { borderColor: 'var(--colour-primary)', background: '#f3eeff' },
+  spriteTileThumb: { width: 52, height: 52, borderRadius: 6, overflow: 'hidden', background: '#f8f8f8', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  spriteTileHiddenBadge: { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, background: 'rgba(0,0,0,0.35)', borderRadius: 6 },
+  spriteTileName: { fontSize: '0.72rem', fontWeight: 600, color: 'var(--colour-text)', maxWidth: 64, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  spritePropBar: { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', padding: '4px 2px', borderTop: '1px solid #e5e7eb' },
+  spritePropField: { display: 'flex', flexDirection: 'column', gap: 2 },
+  spritePropLabel: { fontSize: '0.65rem', fontWeight: 700, color: '#6b7280', fontFamily: 'var(--font-body)', textTransform: 'uppercase', letterSpacing: '0.03em' },
+  spritePropInput: { width: 58, padding: '3px 5px', border: '1px solid #d1d5db', borderRadius: 5, fontFamily: 'var(--font-body)', fontSize: '0.8rem', color: 'var(--colour-text)', textAlign: 'center', background: '#fff' },
+  showHideBtn: { width: 30, height: 26, border: '1px solid #d1d5db', borderRadius: 5, cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff', transition: 'background 0.1s' },
+  showHideBtnOn:  { background: '#f0fdf4', borderColor: '#86efac' },
+  showHideBtnOff: { background: '#fef2f2', borderColor: '#fca5a5', opacity: 0.7 },
+  rotStyleGroup: { display: 'flex', gap: 2 },
+  rotStyleBtn: { width: 26, height: 26, border: '1px solid #d1d5db', borderRadius: 4, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff', fontFamily: 'var(--font-body)', transition: 'background 0.1s, border-color 0.1s' },
+  rotStyleBtnActive: { background: '#ede9fe', borderColor: 'var(--colour-primary)', color: 'var(--colour-primary)' },
+  costumeSelect: { padding: '3px 5px', border: '1px solid #d1d5db', borderRadius: 5, fontFamily: 'var(--font-body)', fontSize: '0.78rem', color: 'var(--colour-text)', background: '#fff', cursor: 'pointer' },
+  // ── Sprite panel compact (hideStage mode) ─────────────────────────────────────
+  spritePanelCompact: { display: 'flex', flexDirection: 'column', borderBottom: '1px solid #e5e7eb', background: '#fafafa', flexShrink: 0 },
+  spriteTileRowCompact: { display: 'flex', gap: 5, flexWrap: 'wrap', padding: '5px 8px' },
+  spriteTileCompact: {
+    display: 'flex', alignItems: 'center', gap: 5,
+    padding: '3px 8px 3px 4px', border: '2px solid #e5e7eb', borderRadius: 16,
+    background: '#fff', cursor: 'pointer', fontFamily: 'var(--font-body)',
+    transition: 'border-color 0.12s, background 0.12s',
+  },
+  spriteTileCompactActive: { borderColor: 'var(--colour-primary)', background: '#f3eeff' },
+  spriteTileCompactThumb: { width: 24, height: 24, borderRadius: 4, overflow: 'hidden', background: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  spriteTileCompactName: { fontSize: '0.78rem', fontWeight: 600, color: 'var(--colour-text)', maxWidth: 72, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  spritePropBarCompact: { display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', padding: '4px 8px 6px', borderTop: '1px solid #e5e7eb' },
   broadcastToastStack: { position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center', zIndex: 6, pointerEvents: 'none' },
   broadcastToast: { background: 'rgba(255, 171, 25, 0.96)', color: '#fff', padding: '4px 14px', borderRadius: 20, fontFamily: 'var(--font-body)', fontSize: '0.78rem', fontWeight: 700, boxShadow: '0 2px 8px rgba(0,0,0,0.22)', whiteSpace: 'nowrap', animation: 'scratch-toast-in 0.18s ease' },
   broadcastToastIcon: { fontSize: '0.75rem' },
