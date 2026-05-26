@@ -320,12 +320,22 @@ select {
 /* Teacher live broadcast dot shown in student banner */
 .live-dot {
   display: inline-block;
-  width: 10px;
-  height: 10px;
+  width: 13px;
+  height: 13px;
   border-radius: 50%;
   background: #ef4444;
   flex-shrink: 0;
   animation: online-pulse 1.2s ease-in-out infinite;
+}
+
+/* Grey-out editors and inputs when student is in forced live view */
+.live-view-active .cm-editor {
+  filter: grayscale(0.55) brightness(0.97);
+}
+.live-view-active textarea,
+.live-view-active input:not([type='button']):not([type='submit']):not([type='reset']):not([type='checkbox']):not([type='radio']) {
+  background: #e0e0e0 !important;
+  color: #888 !important;
 }
 
 /* Student presence badges */

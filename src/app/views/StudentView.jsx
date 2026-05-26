@@ -1201,7 +1201,7 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
             <ExplainerPanel title={task.title} content={task.explainer} />
           )}
 
-        <div style={editorAreaStyle}>
+        <div style={editorAreaStyle} className={isForcedTeacherLive ? 'live-view-active' : undefined}>
           {(task?.check || isAutoEvaluatedQuiz) && displayCheckAttempted && (
             <CheckFeedbackBanner
               passed={displayCheckPassed}
@@ -1555,14 +1555,15 @@ const styles = {
     background: 'var(--colour-primary)',
     color: '#fff',
     fontFamily: 'var(--font-body)',
-    fontWeight: 600,
-    fontSize: '0.9rem',
-    padding: '10px 16px',
+    fontWeight: 700,
+    fontSize: '1.15rem',
+    padding: '16px 20px',
     flexShrink: 0,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
+    gap: 12,
+    letterSpacing: '0.01em',
   },
   presentationControls: {
     display: 'flex',
