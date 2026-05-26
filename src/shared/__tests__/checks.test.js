@@ -82,6 +82,11 @@ describe('evaluateSingleCheck — multiple contains options ("opt1","opt2" forma
     expect(evaluateSingleCheck(check, '', { code: 'x = 1' })).toBe(false)
   })
 
+  it('code_contains normalizes whitespace in each option', () => {
+    const check = { type: 'code_contains', value: '"if score > 10:","while running:"' }
+    expect(evaluateSingleCheck(check, '', { code: 'if score>10:\n  print("win")' })).toBe(true)
+  })
+
   it('answer_contains passes when answer contains any of the options', () => {
     const check = { type: 'answer_contains', value: '"paris","london"' }
     expect(evaluateSingleCheck(check, '', { answer: 'london' })).toBe(true)
@@ -163,6 +168,16 @@ describe('evaluateSingleCheck — code_contains', () => {
     expect(evaluateSingleCheck(check, '', { code: 'print("hello")' })).toBe(true)
   })
 
+  it('ignores whitespace outside quoted text', () => {
+    const check = { type: 'code_contains', value: 'for item in range(3):' }
+    expect(evaluateSingleCheck(check, '', { code: 'for\titem  in\nrange(3):' })).toBe(true)
+  })
+
+  it('preserves whitespace inside quoted text', () => {
+    const check = { type: 'code_contains', value: 'print("hello world")' }
+    expect(evaluateSingleCheck(check, '', { code: 'print( "helloworld" )' })).toBe(false)
+  })
+
   it('returns false when code does not contain the value', () => {
     const check = { type: 'code_contains', value: 'for' }
     expect(evaluateSingleCheck(check, '', { code: 'x = 1' })).toBe(false)
@@ -178,8 +193,27 @@ describe('evaluateSingleCheck — code_does_not_contain', () => {
   })
 
   it('returns false when code contains the value', () => {
-    const check = { type: 'code_does_not_contain', value: 'print' }
-    expect(evaluateSingleCheck(check, '', { code: 'print("hi")' })).toBe(false)
+    const check = { type: 'code_does_not_contain', value: 'print("hi")' }
+    expect(evaluateSingleCheck(check, '', { code: 'print( "hi" )' })).toBe(false)
+  })
+})
+
+describe('evaluateSingleCheck — code equality checks', () => {
+  it('ignores whitespace outside quoted text for equality', () => {
+    const check = { type: 'code_equals', value: 'name = "Ada Lovelace"' }
+    expect(evaluateSingleCheck(check, '', { code: 'name="Ada Lovelace"\n' })).toBe(true)
+  })
+
+  it('does not ignore whitespace inside quoted text for equality', () => {
+    const check = { type: 'code_not_equals', value: 'name = "Ada Lovelace"' }
+    expect(evaluateSingleCheck(check, '', { code: 'name = "AdaLovelace"' })).toBe(true)
+  })
+})
+
+describe('evaluateSingleCheck — code_matches_regex', () => {
+  it('runs its pattern against whitespace-normalized code', () => {
+    const check = { type: 'code_matches_regex', value: '^total=count\\+1$' }
+    expect(evaluateSingleCheck(check, '', { code: ' total=count + 1\n' })).toBe(true)
   })
 })
 

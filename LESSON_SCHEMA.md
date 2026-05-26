@@ -516,9 +516,9 @@ When `check` is an array, every check must pass.
 | `output_line_count` | `type`, `value` | Yes | No | Yes | Yes | Output/body text must contain exactly this many lines. |
 | `output_not_empty` | `type` | Yes | No | Yes | Yes | Output/body text must not be empty. |
 | `output_empty` | `type` | Yes | No | Yes | Yes | Output/body text must be empty or whitespace-only. |
-| `code_contains` | `type`, `value` | Yes | Yes | Yes | Yes | Source code contains value, case-insensitive. |
-| `code_does_not_contain` | `type`, `value` | Yes | Yes | Yes | Yes | Source code does not contain value, case-insensitive. |
-| `code_equals` | `type`, `value` | Yes | Yes | Yes | Yes | Source code exactly equals value, case-insensitive, ignoring final newlines. |
+| `code_contains` | `type`, `value` | Yes | Yes | Yes | Yes | Source code contains value, case-insensitive; ignores whitespace outside quoted text. |
+| `code_does_not_contain` | `type`, `value` | Yes | Yes | Yes | Yes | Source code does not contain value, case-insensitive; ignores whitespace outside quoted text. |
+| `code_equals` | `type`, `value` | Yes | Yes | Yes | Yes | Source code equals value, case-insensitive; ignores whitespace outside quoted text. |
 | `element_exists` | `type`, `selector` | Yes | No | No | Yes | At least one iframe element matches CSS selector. |
 | `element_count` | `type`, `selector`, `value` | Yes | No | No | Yes | Number of matching iframe elements equals `value`. |
 | `element_value` | `type`, `selector`, `value` | Yes | No | No | Yes | Matching element text/value contains `value`, case-insensitive. |

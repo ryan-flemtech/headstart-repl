@@ -295,9 +295,9 @@ Groups are collapsible in TaskNavigator and rendered as sections in progress dot
 | `output_line_count` | ✅ | ✅ | ✅ | — | Output has exactly N lines |
 | `output_not_empty` | ✅ | ✅ | ✅ | — | Output is not empty |
 | `output_empty` | ✅ | ✅ | ✅ | — | Output is empty or whitespace-only |
-| `code_contains` | ✅ | ✅ | ✅ | ✅ | Source includes value (case-insensitive) |
-| `code_does_not_contain` | ✅ | ✅ | ✅ | ✅ | Source does not include value |
-| `code_equals` | ✅ | ✅ | ✅ | ✅ | Source equals value (case-insensitive, trimmed) |
+| `code_contains` | ✅ | ✅ | ✅ | ✅ | Source includes value (case-insensitive, ignoring whitespace outside quotes) |
+| `code_does_not_contain` | ✅ | ✅ | ✅ | ✅ | Source does not include value (ignoring whitespace outside quotes) |
+| `code_equals` | ✅ | ✅ | ✅ | ✅ | Source equals value (case-insensitive, ignoring whitespace outside quotes) |
 | `element_exists` | — | ✅ | ✅ | — | CSS selector matches at least one element |
 | `element_count` | — | ✅ | ✅ | — | Selector match count equals value |
 | `element_value` | — | ✅ | ✅ | — | Element text/value contains value (case-insensitive) |

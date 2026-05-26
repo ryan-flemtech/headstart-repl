@@ -149,26 +149,26 @@ export function evaluateSingleCheck(check, output, context = {}) {
   if (check.type === 'code_contains') {
     const codeOptions = parseMultipleContainOptions(check.value)
     if (codeOptions) {
-      const actual = normalizeOutput(context.code ?? '')
-      return codeOptions.some(opt => wildcardContains(actual, normalizeOutput(opt)))
+      const actual = normalizeCode(context.code ?? '')
+      return codeOptions.some(opt => wildcardContains(actual, normalizeCode(opt)))
     }
-    return wildcardContains(normalizeOutput(context.code ?? ''), normalizeOutput(check.value))
+    return wildcardContains(normalizeCode(context.code ?? ''), normalizeCode(check.value))
   }
 
   if (check.type === 'code_does_not_contain') {
-    return !wildcardContains(normalizeOutput(context.code ?? ''), normalizeOutput(check.value))
+    return !wildcardContains(normalizeCode(context.code ?? ''), normalizeCode(check.value))
   }
 
   if (check.type === 'code_equals') {
-    return wildcardEquals(normalizeExactOutput(context.code ?? ''), normalizeExactOutput(check.value))
+    return wildcardEquals(normalizeCode(context.code ?? ''), normalizeCode(check.value))
   }
 
   if (check.type === 'code_not_equals') {
-    return !wildcardEquals(normalizeExactOutput(context.code ?? ''), normalizeExactOutput(check.value))
+    return !wildcardEquals(normalizeCode(context.code ?? ''), normalizeCode(check.value))
   }
 
   if (check.type === 'code_matches_regex') {
-    try { return new RegExp(check.value).test(normalizeOutput(context.code ?? '')) } catch { return false }
+    try { return new RegExp(check.value).test(normalizeCode(context.code ?? '')) } catch { return false }
   }
 
   if (check.type === 'element_count') {
@@ -428,6 +428,33 @@ function normalizeOutput(value) {
 
 function normalizeExactOutput(value) {
   return String(value ?? '').replace(/\r\n?/g, '\n').replace(/\n+$/, '').toLowerCase()
+}
+
+function normalizeCode(value) {
+  const code = String(value ?? '').replace(/\r\n?/g, '\n').toLowerCase()
+  let normalized = ''
+  let quote = null
+  let escaped = false
+
+  for (const character of code) {
+    if (quote) {
+      normalized += character
+      if (escaped) {
+        escaped = false
+      } else if (character === '\\') {
+        escaped = true
+      } else if (character === quote) {
+        quote = null
+      }
+    } else if (character === '"' || character === "'" || character === '`') {
+      quote = character
+      normalized += character
+    } else if (!/\s/.test(character)) {
+      normalized += character
+    }
+  }
+
+  return normalized
 }
 
 function countOutputLines(value) {
