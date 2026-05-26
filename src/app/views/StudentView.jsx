@@ -179,7 +179,7 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
 
   function canPublishTeacherLive() {
     if (!session?.teacherLive?.active) return false
-    if (teacherPresentation) return true
+    if (teacherPresentation) return session?.teacherLive?.source !== 'student'
     return session.teacherLive.sourceStudentId === identityRef.current?.anonymousId
   }
 
@@ -1027,13 +1027,21 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
   const isTeacherLiveViewer = !teacherPresentation
     && (phase === 'lesson' || phase === 'sandbox')
     && session?.teacherLive?.active
+    && session.teacherLive.source === 'teacher'
+  const isPresentationStudentViewer = teacherPresentation
+    && session?.teacherLive?.active
+    && session.teacherLive.source === 'student'
+  const isStudentGoLiveViewer = !teacherPresentation
+    && (phase === 'lesson' || phase === 'sandbox')
+    && session?.teacherLive?.active
+    && session.teacherLive.source === 'student'
     && session.teacherLive.sourceStudentId !== identity?.anonymousId
-  const task = flatTasks.find(t => t.id === (isTeacherLiveViewer ? forcedTeacherTaskId : (viewingTaskId ?? currentTaskId)))
+  const task = flatTasks.find(t => t.id === ((isTeacherLiveViewer || isPresentationStudentViewer || isStudentGoLiveViewer) ? forcedTeacherTaskId : (viewingTaskId ?? currentTaskId)))
   const isViewingPrev = viewingTaskId !== null && viewingTaskId !== currentTaskId
   const isSandbox = phase === 'sandbox'
   const isSolo = phase === 'solo'
-  const isTeacherLiveActive = teacherPresentation && session?.teacherLive?.active
-  const isForcedTeacherLive = isTeacherLiveViewer
+  const isTeacherLiveActive = teacherPresentation && session?.teacherLive?.active && session.teacherLive.source === 'teacher'
+  const isForcedTeacherLive = isTeacherLiveViewer || isPresentationStudentViewer || isStudentGoLiveViewer
   const teacherLiveFiles = session?.teacherLive?.files
     ? Object.entries(session.teacherLive.files).map(([name, content]) => ({
       name,
@@ -1153,7 +1161,7 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
       <TopBar
         lessonTitle={lesson.title}
         lessonLevel={lesson.level}
-        displayName={teacherPresentation ? 'Presentation' : identity?.displayName}
+        displayName={isPresentationStudentViewer ? `Other Student — ${session.teacherLive.sourceStudentName ?? 'Student'}` : teacherPresentation ? 'Presentation' : identity?.displayName}
         isSandbox={isSandbox}
         isSolo={teacherPresentation ? undefined : isSolo}
         right={topBarRight}
@@ -1162,7 +1170,9 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
 
       {isForcedTeacherLive && (
         <div style={styles.teacherLiveBanner}>
-          Teacher live view is active. Your own work is still saved and will return when live view stops.
+          {isPresentationStudentViewer || isStudentGoLiveViewer
+            ? `Other Student view — ${session.teacherLive.sourceStudentName ?? 'A student'}'s screen is being shared.`
+            : 'Teacher live view is active. Your own work is still saved and will return when live view stops.'}
         </div>
       )}
 
