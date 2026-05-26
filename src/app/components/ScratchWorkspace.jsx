@@ -254,6 +254,7 @@ export default function ScratchWorkspace({
   const [spriteStates, setSpriteStates] = useState(() => initSpriteStates(sprites))
   const [askPrompt, setAskPrompt]   = useState(null)
   const [askValue, setAskValue]     = useState('')
+  const [broadcastToasts, setBroadcastToasts] = useState([])
   const [stageCursor, setStageCursor] = useState('default')
   const [stageScale, setStageScale] = useState(1)
   const [flyoutCollapsed, setFlyoutCollapsed] = useState(false)
@@ -590,6 +591,11 @@ export default function ScratchWorkspace({
       setAskValue('')
       setAskPrompt(q)
     })
+    signal.onBroadcast = msg => {
+      const id = Date.now() + Math.random()
+      setBroadcastToasts(prev => [...prev, { id, message: msg }])
+      setTimeout(() => setBroadcastToasts(prev => prev.filter(t => t.id !== id)), 2000)
+    }
     return signal
   }, [backdrops])
 
@@ -919,6 +925,15 @@ export default function ScratchWorkspace({
           </div>
 
           <div style={{ ...s.stageFrame, width: STAGE_W * stageScale, height: STAGE_H * stageScale }}>
+            {broadcastToasts.length > 0 && (
+              <div style={s.broadcastToastStack}>
+                {broadcastToasts.map(t => (
+                  <div key={t.id} style={s.broadcastToast}>
+                    <span style={s.broadcastToastIcon}>📢</span> {t.message}
+                  </div>
+                ))}
+              </div>
+            )}
             <canvas
               ref={canvasRef}
               width={STAGE_W}
@@ -984,6 +999,9 @@ const s = {
   spriteChipActive: { borderColor: 'var(--colour-primary)', background: '#f3eeff', color: 'var(--colour-primary)' },
   spriteChipDot: { width: 10, height: 10, borderRadius: '50%', flexShrink: 0 },
   spriteChipName: { maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  broadcastToastStack: { position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center', zIndex: 6, pointerEvents: 'none' },
+  broadcastToast: { background: 'rgba(255, 171, 25, 0.96)', color: '#fff', padding: '4px 14px', borderRadius: 20, fontFamily: 'var(--font-body)', fontSize: '0.78rem', fontWeight: 700, boxShadow: '0 2px 8px rgba(0,0,0,0.22)', whiteSpace: 'nowrap', animation: 'scratch-toast-in 0.18s ease' },
+  broadcastToastIcon: { fontSize: '0.75rem' },
   askBox: { position: 'absolute', left: 12, right: 12, bottom: 12, display: 'grid', gap: 8, padding: 10, background: '#fff', border: '1px solid #d1d5db', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.14)' },
   askLabel: { fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 700, color: 'var(--colour-text)' },
   askRow: { display: 'grid', gridTemplateColumns: '1fr auto', gap: 8 },
