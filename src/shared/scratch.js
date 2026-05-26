@@ -939,6 +939,7 @@ async function runBlock(block, context) {
     case 'event_broadcast':
     case 'event_broadcastandwait': {
       const msg = stringValue(block, 'BROADCAST_INPUT', context)
+      context.signal.onBroadcast?.(msg)
       const targets = context.allSprites ?? [{ workspace: context.workspace, state: context.state, onUpdate: context.onUpdate }]
       await Promise.all(targets.map(sp => {
         const ctx = createRunContext(sp.workspace, sp.state, sp.onUpdate, context.signal, context.allSprites, sp.costumes ?? [])
