@@ -187,6 +187,7 @@ export default function StudentModal({ student, lesson, session, isLive, isLiveF
               submitted={student.lastRunStatus === 'submitted'}
               checkPassed={student.checkPassed}
               disabled
+              showCorrectAnswer
             />
           ) : isPython ? (
             <>
