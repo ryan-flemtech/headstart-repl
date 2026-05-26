@@ -1,8 +1,8 @@
 import '@testing-library/jest-dom'
 
-// Node can expose an unusable experimental localStorage when its backing-file
-// option is empty; keep tests on a normal Storage-compatible implementation.
-if (typeof globalThis.localStorage?.clear !== 'function') {
+// Query jsdom's storage instead of Node's native getter, which warns when no
+// persistence file is configured in recent Node versions.
+if (typeof window.localStorage?.clear !== 'function') {
   const values = new Map()
   const storage = {
     get length() { return values.size },

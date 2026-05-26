@@ -13,43 +13,9 @@ import StudentGrid from '../components/StudentGrid'
 import QuizTask from '../components/QuizTask'
 import LiveActivityToast from '../components/LiveActivityToast'
 import TeacherTimers from '../components/TeacherTimers'
-
-function resolveAssetsPath(rawPath) {
-  if (!rawPath) return ''
-  const base = import.meta.env.BASE_URL.replace(/\/$/, '')
-  const encoded = rawPath.split('/').map(s => (s ? encodeURIComponent(s) : s)).join('/')
-  return window.location.origin + base + encoded
-}
-
-function getFileType(name) {
-  if (name.endsWith('.html')) return 'html'
-  if (name.endsWith('.css')) return 'css'
-  if (name.endsWith('.js')) return 'javascript'
-  return 'text'
-}
-
-function decodeSessionFiles(sessionFiles) {
-  if (!sessionFiles) return []
-  return Object.entries(sessionFiles).map(([key, content]) => {
-    const name = decodeFileKey(key)
-    return { name, content, type: getFileType(name) }
-  })
-}
-
-function parseScratchState(raw) {
-  if (!raw) return null
-  if (typeof raw === 'object') return raw
-  try { return JSON.parse(raw) } catch { return null }
-}
-
-function cloneFiles(files = []) {
-  return files.map(file => ({ ...file }))
-}
-
-function cloneScratchState(state) {
-  if (!state) return null
-  return JSON.parse(JSON.stringify(state))
-}
+import { resolveAssetsPath } from '../../shared/assetPaths'
+import { cloneFiles, cloneScratchState, decodeSessionFiles, parseScratchState } from '../../shared/workspaceData'
+import { buildStudentLivePayload } from '../teacherLivePayload'
 
 export default function TeacherView({ lessonId }) {
   const navigate = useNavigate()
@@ -136,7 +102,7 @@ export default function TeacherView({ lessonId }) {
   function getSandboxStarterFiles({ preferDraft = true } = {}) {
     const task = flattenTasks(lesson?.tasks ?? []).find(t => t.id === currentTaskId)
     if (preferDraft && sandboxDraftRef.current.files?.length > 0) return cloneFiles(sandboxDraftRef.current.files)
-    const liveFiles = session?.state === 'sandbox' ? decodeSessionFiles(session.sandboxFiles) : []
+    const liveFiles = session?.state === 'sandbox' ? decodeSessionFiles(session.sandboxFiles, decodeFileKey) : []
     if (liveFiles.length > 0) return cloneFiles(liveFiles)
     if (lesson?.sandboxStarterFiles?.length > 0) return cloneFiles(lesson.sandboxStarterFiles)
     if (files.length > 0) return cloneFiles(files)
@@ -286,32 +252,6 @@ export default function TeacherView({ lessonId }) {
     if (goHome) navigate('/')
   }
 
-  function buildStudentLivePayload(student) {
-    const task = flattenTasks(lesson?.tasks ?? []).find(t => t.id === session?.currentTaskId)
-    const liveFiles = student.currentFiles
-      ? Object.fromEntries(
-          Object.entries(student.currentFiles).map(([key, content]) => [decodeFileKey(key), content])
-        )
-      : {}
-
-    return {
-      source: 'student',
-      sourceStudentId: student.anonymousId,
-      sourceStudentName: student.displayName,
-      taskId: session?.currentTaskId ?? currentTaskId,
-      lessonType: lesson?.type,
-      code: student.currentCode ?? '',
-      files: liveFiles,
-      activeFile: task?.entryFile ?? Object.keys(liveFiles)[0] ?? '',
-      output: student.currentOutput ?? '',
-      runStatus: student.lastRunStatus ?? null,
-      checkPassed: !!student.checkPassed,
-      checkAttempted: student.checkPassed != null || student.lastRunStatus != null,
-      selection: student.currentSelection ?? null,
-      activity: student.currentActivity ?? null,
-    }
-  }
-
   async function handleGoLiveForMe(studentId) {
     await setTeacherLive(null)
     await setActiveStudentView(studentId)
@@ -319,7 +259,13 @@ export default function TeacherView({ lessonId }) {
 
   async function handleGoLiveForAll(student) {
     await setActiveStudentView(student.anonymousId)
-    await setTeacherLive(buildStudentLivePayload(student))
+    await setTeacherLive(buildStudentLivePayload({
+      student,
+      lesson,
+      taskId: session?.currentTaskId ?? currentTaskId,
+      entryFileTaskId: session?.currentTaskId,
+      decodeFileKey,
+    }))
   }
 
   async function handleStopStudentLive() {

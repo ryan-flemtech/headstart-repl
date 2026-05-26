@@ -30,6 +30,11 @@ Testing strategy, tool choices, and conventions. Read this before writing or mod
 | `src/shared/taskUtils.js` | `flattenTasks`, `findTaskById`, `findGroupForTask`, `getProgressItems`, `updateTaskInTasks`, `updateSubtaskTitles` |
 | `src/shared/codemirror.js` | `getTabSize`, `getLanguageExtension`, `createBaseExtensions` |
 | `src/shared/iframe.js` | `getMime` (pure lookup), `buildIframeSrc` string-rewriting logic (mock Blob + URL.createObjectURL) |
+| `src/shared/assetPaths.js` | Absolute asset URL encoding and base-path handling |
+| `src/shared/workspaceData.js` | Scratch state parsing/cloning and decoded HTML file conversion |
+| `src/builder/lessonUtils.js` | Lesson validation messages and exported task JSON normalisation |
+| `src/app/studentStorage.js` | Exact localStorage key formats plus saved task/file snapshot reads and writes |
+| `src/app/teacherLivePayload.js` | Decoded teacher-live payload construction from a student snapshot |
 
 **Placement:** `src/shared/__tests__/checks.test.js`, `src/shared/__tests__/taskUtils.test.js`, etc.
 
@@ -53,6 +58,9 @@ Testing strategy, tool choices, and conventions. Read this before writing or mod
 | `src/app/components/TaskProgressDots.jsx` | Renders past/current/locked dots; click on past dot fires callback; locked dot is not clickable |
 | `src/app/components/CheckFeedbackBanner.jsx` | Renders pass state; renders fail + hint; renders "see complete code" when unlocked |
 | `src/app/components/QuizTask.jsx` | Multiple-choice renders all options; selecting an answer fires callback; match/fill-blank drag interactions |
+| `src/app/components/InformationTask.jsx` | Information/introduction content and duration rendering |
+| `src/app/components/LiveActivityToast.jsx` | Activity notification rendering and expiry behaviour |
+| `src/app/components/TeacherTimers.jsx` | Elapsed/countdown rendering and expired task state |
 | `src/shared/markdown.jsx` | `MarkdownRenderer` renders headings, tables, code fences, callouts; `InlineMarkdown` renders inline-only |
 | `src/builder/App.jsx` | Shows restore prompt when localStorage has saved lesson; auto-saves on lesson change; `beforeunload` fires when dirty |
 
@@ -103,7 +111,7 @@ global.URL.revokeObjectURL = vi.fn()
 
 **Placement:** `e2e/` directory at project root
 
-**Config:** `playwright.config.js` — `baseURL: 'http://localhost:5173'`, screenshots on failure, 1 retry, Chromium only for CI, all browsers locally.
+**Config:** `playwright.config.js` — `baseURL: 'http://localhost:5173/editor/'`, screenshots on failure, 1 retry, Chromium only for CI, all browsers locally.
 
 ---
 
@@ -114,6 +122,7 @@ global.URL.revokeObjectURL = vi.fn()
 - Test setup file: `src/test/setup.js`
 - All `__tests__` directories mirror the source directory they test
 - No co-located test files (keep test files in `__tests__/` subdirectories)
+- When adding a source component or test target, consider updating `CODEBASE_MAP.md` and this inventory in the same pull request.
 
 ---
 
@@ -129,7 +138,7 @@ global.URL.revokeObjectURL = vi.fn()
 
 ## Coverage Thresholds
 
-Set in `vitest.config.js`. Current thresholds reflect the initial test scope (pure functions + simple components). The large, Firebase-dependent components — `StudentView`, `TeacherView`, `useSession`, `QuizTask`, and all builder views — are untested and drag global coverage to ~8-9%. Thresholds should be raised incrementally as these components gain tests.
+Set in `vitest.config.js`. Current thresholds reflect the initial test scope (pure functions + selected simple components). `QuizTask`, `InformationTask`, `TeacherTimers`, and pure builder validation/export logic now have focused coverage; large orchestration surfaces including `StudentView`, `TeacherView`, `useSession`, and builder UI views still require incremental coverage before raising thresholds.
 
 | Phase | When to raise to | Prerequisite |
 |---|---|---|
@@ -142,4 +151,4 @@ Set in `vitest.config.js`. Current thresholds reflect the initial test scope (pu
 
 ---
 
-*Last updated: May 2026 — initial strategy document, written by testing setup workflow.*
+*Last updated: May 2026 — refreshed after builder/shared utility characterization coverage was added.*

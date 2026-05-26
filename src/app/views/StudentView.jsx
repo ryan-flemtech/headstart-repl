@@ -21,35 +21,8 @@ import QuizTask from '../components/QuizTask'
 import CheckFeedbackBanner from '../components/CheckFeedbackBanner'
 import LiveActivityToast from '../components/LiveActivityToast'
 import SplitPane from '../../shared/SplitPane'
-
-// Returns a full absolute URL for the assets base so blob-URL iframes can load
-// resources without ambiguity (root-relative paths don't resolve in blob docs).
-function resolveAssetsPath(rawPath) {
-  if (!rawPath) return ''
-  const base = import.meta.env.BASE_URL.replace(/\/$/, '')
-  const encoded = rawPath.split('/').map(s => (s ? encodeURIComponent(s) : s)).join('/')
-  return window.location.origin + base + encoded
-}
-
-const LS_KEY = (lessonId, taskId, anonymousId) =>
-  `headstart_${lessonId}_${taskId}_${anonymousId}`
-const LS_FILE_KEY = (lessonId, taskId, filename, anonymousId) =>
-  `headstart_${lessonId}_${taskId}_${filename}_${anonymousId}`
-
-function loadSavedCode(lessonId, taskId, anonymousId) {
-  const raw = localStorage.getItem(LS_KEY(lessonId, taskId, anonymousId))
-  return raw ? JSON.parse(raw) : null
-}
-function saveCode(lessonId, taskId, anonymousId, data) {
-  localStorage.setItem(LS_KEY(lessonId, taskId, anonymousId), JSON.stringify(data))
-}
-function loadSavedFile(lessonId, taskId, filename, anonymousId) {
-  const raw = localStorage.getItem(LS_FILE_KEY(lessonId, taskId, filename, anonymousId))
-  return raw ? JSON.parse(raw).content : null
-}
-function saveFile(lessonId, taskId, filename, anonymousId, content) {
-  localStorage.setItem(LS_FILE_KEY(lessonId, taskId, filename, anonymousId), JSON.stringify({ content }))
-}
+import { resolveAssetsPath } from '../../shared/assetPaths'
+import { loadSavedCode, loadSavedFile, saveCode, saveFile } from '../studentStorage'
 
 const TASK_TRANSITION_MS = 380
 

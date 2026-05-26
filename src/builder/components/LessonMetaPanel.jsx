@@ -7,13 +7,7 @@ import { ScratchToolboxPicker, SpriteManager, BackdropManager } from './TaskEdit
 import { DEFAULT_SPRITES } from '../../shared/scratch'
 import { useAssets } from '../../shared/useAssets'
 import AssetBrowser from '../../shared/AssetBrowser'
-
-function resolveAssetsPath(rawPath) {
-  if (!rawPath) return ''
-  const base = import.meta.env.BASE_URL.replace(/\/$/, '')
-  const encoded = rawPath.split('/').map(seg => (seg ? encodeURIComponent(seg) : seg)).join('/')
-  return window.location.origin + base + encoded
-}
+import { resolveAssetsPath } from '../../shared/assetPaths'
 
 export default function LessonMetaPanel({ lesson, onUpdate, onCollapse }) {
   const [sandboxOpen, setSandboxOpen] = useState(false)
@@ -196,13 +190,6 @@ function ScratchSandboxStarter({ value, toolbox, sprites, backdrops, assetsPath,
   const [testBlocks, setTestBlocks] = useState(() => cloneScratchStarter(parseScratchStarter(value)))
   const [syncNowKey, setSyncNowKey] = useState(0)
   const starterBlocksRef = React.useRef(parseScratchStarter(value))
-
-  function resolveAssetsPath(rawPath) {
-    if (!rawPath) return ''
-    const base = import.meta.env.BASE_URL.replace(/\/$/, '')
-    const encoded = rawPath.split('/').map(seg => (seg ? encodeURIComponent(seg) : seg)).join('/')
-    return window.location.origin + base + encoded
-  }
 
   function handleTabChange(tab) {
     if (tab === activeTab) return

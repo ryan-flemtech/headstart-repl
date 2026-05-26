@@ -1,0 +1,216 @@
+import { checkAllowedForSubmit, normalizeChecks } from '../shared/checks'
+import { flattenTasks } from '../shared/taskUtils'
+
+export function validateLesson(lesson) {
+  const errors = []
+  const warnings = []
+  const { id, title, type, tasks } = lesson
+
+  if (!id) errors.push('Lesson ID is required')
+  else if (!/^[a-z0-9-]+$/.test(id)) errors.push('Lesson ID must be lowercase with hyphens only')
+  if (!title) errors.push('Lesson title is required')
+  if (!tasks || tasks.length === 0) errors.push('Lesson must have at least one task')
+
+  tasks.forEach((item, i) => {
+    if (item.type === 'group') {
+      if (!item.title) errors.push(`Group ${i + 1} is missing a title`)
+      if (!item.subtasks || item.subtasks.length === 0) {
+        errors.push(`Group "${item.title || (i + 1)}" has no subtasks — add at least one subtask`)
+      }
+    }
+  })
+
+  const flat = flattenTasks(tasks)
+  flat.forEach((task, i) => {
+    const n = i + 1
+    if (!task.title) errors.push(`Task ${n} is missing a title`)
+    if (task.estimatedMinutes != null && (!Number.isInteger(Number(task.estimatedMinutes)) || Number(task.estimatedMinutes) <= 0)) {
+      errors.push(`Task ${n} estimated time must be a positive whole number of minutes`)
+    }
+    if (task.taskType === 'information' && task.informationType !== 'introduction' && !task.explainer?.trim()) {
+      errors.push(`Task ${n} is an information task but has no explainer`)
+    }
+
+    if (task.taskType === 'quiz') {
+      const quizType = task.quizType ?? 'multiple_choice'
+      if (quizType === 'multiple_choice') {
+        if (!task.options || task.options.length < 2) errors.push(`Task ${n} is a quiz but has fewer than 2 options.`)
+        if (task.options?.some(option => !option.text?.trim())) errors.push(`Task ${n} is a quiz but has an empty option text field.`)
+        if (task.check?.type !== 'answer_equals' || !task.check.value) errors.push(`Task ${n} is a quiz but no correct answer has been selected.`)
+      } else if (quizType === 'match') {
+        if (!task.pairs || task.pairs.length < 2) errors.push(`Task ${n} is a match quiz but has fewer than 2 pairs.`)
+        if (task.pairs?.some(pair => !pair.prompt?.trim() || !pair.answer?.trim())) errors.push(`Task ${n} is a match quiz but has an empty prompt or answer.`)
+      } else if (quizType === 'fill_blank') {
+        if (!task.text?.includes('___')) errors.push(`Task ${n} is a fill-in-the-blank quiz but has no blanks in the text.`)
+        if (!task.blanks || task.blanks.length === 0) errors.push(`Task ${n} is a fill-in-the-blank quiz but has no blank answers.`)
+        if (task.blanks?.some(blank => !blank.answer?.trim())) errors.push(`Task ${n} is a fill-in-the-blank quiz but has an empty answer.`)
+      } else if (quizType === 'short_answer') {
+        if (task.check != null && (!task.check.type?.startsWith('answer_') || !task.check.value?.trim())) {
+          errors.push(`Task ${n} is a short-answer quiz with a check enabled but no check value.`)
+        }
+      }
+    } else if (task.taskType !== 'information' && type === 'html') {
+      if (!task.starterFiles || task.starterFiles.length === 0) errors.push(`Task ${n} has no files`)
+      else {
+        const names = task.starterFiles.map(file => file.name)
+        if (new Set(names).size !== names.length) errors.push(`Task ${n} has duplicate filenames`)
+        if (!task.starterFiles.some(file => file.type === 'html' || file.name.endsWith('.html'))) {
+          errors.push(`Task ${n} has no HTML file to use as entry point`)
+        }
+      }
+    }
+
+    if (task.taskType !== 'information' && task.taskType !== 'quiz') {
+      if (type === 'scratch') {
+        if (task.toolbox) {
+          try {
+            const parsed = new DOMParser().parseFromString(task.toolbox, 'text/xml')
+            if (parsed.querySelector('parsererror')) errors.push(`Task ${n} has invalid toolbox XML`)
+          } catch {
+            errors.push(`Task ${n} has invalid toolbox XML`)
+          }
+        }
+        if (task.check?.type === 'sprite_property') {
+          if (!task.check.property) errors.push(`Task ${n} sprite check is missing a property`)
+          if (!task.check.operator) errors.push(`Task ${n} sprite check is missing an operator`)
+          if (task.check.value == null || task.check.value === '') errors.push(`Task ${n} sprite check is missing a value`)
+        }
+        if (task.check?.type === 'block_used' && !task.check.opcode) {
+          errors.push(`Task ${n} block-used check is missing a block opcode`)
+        }
+      } else if (task.check) {
+        const checks = normalizeChecks(task.check)
+        if (task.interactionMode === 'submit' && checks.some(check => !checkAllowedForSubmit(check))) {
+          errors.push(`Task ${n} uses submit mode but has a check that requires running the code`)
+        }
+        if (checks.some(check => check.type?.startsWith('element_') && !check.selector?.trim())) {
+          errors.push(`Task ${n} has an element check but no CSS selector`)
+        }
+        if (checks.some(check => check.type === 'element_attribute' && !check.attribute?.trim())) {
+          errors.push(`Task ${n} has an element attribute check but no attribute name`)
+        }
+        if (checks.some(check => check.type === 'element_style_property' && !check.property?.trim())) {
+          errors.push(`Task ${n} has an element style check but no CSS property`)
+        }
+        if (checks.some(check => check.type?.startsWith('variable_') && !check.name?.trim())) {
+          errors.push(`Task ${n} has a variable check but no variable name`)
+        }
+        if (checks.some(check => check.type === 'variable_dict_key_value' && !check.key?.trim())) {
+          errors.push(`Task ${n} has a dictionary key-value check but no key`)
+        }
+        if (checks.some(check => check.type === 'variable_array_nth_item' && (check.index == null || check.index === '' || Number(check.index) < 0))) {
+          errors.push(`Task ${n} has an array N-th item check but no valid index`)
+        }
+        if (checks.some(check => !['code_no_error', 'output_not_empty', 'output_empty', 'element_exists', 'element_attribute', 'element_style_property', 'variable_exists'].includes(check.type) && !check.value && check.value !== 0)) {
+          errors.push(`Task ${n} has a check enabled but no check value`)
+        }
+      }
+    }
+
+    const carryFrom = task.taskType === 'quiz' || task.taskType === 'information'
+      ? null
+      : type === 'scratch' ? task.carryBlocksFrom : task.carryCodeFrom
+    if (carryFrom != null && !flat.some(candidate => candidate.id === carryFrom)) {
+      errors.push(`Task ${n} references task ${carryFrom} for carry-through but that task does not exist`)
+    }
+
+    const hasStarter = task.taskType === 'information'
+      ? true
+      : task.taskType === 'quiz'
+        ? quizHasStarter(task)
+        : type === 'python'
+          ? !!task.starterCode
+          : type === 'scratch'
+            ? !!task.starterBlocks
+            : task.starterFiles?.some(file => file.content.trim())
+    if (!hasStarter) warnings.push(`Task ${n} has no starter code — students will start with an empty editor`)
+
+    const checkHasValue = task.taskType === 'information'
+      ? false
+      : task.taskType === 'quiz'
+        ? quizHasCheckValue(task)
+        : type === 'scratch'
+          ? !!task.check
+          : normalizeChecks(task.check).some(check => ['code_no_error', 'output_not_empty', 'output_empty', 'element_exists', 'element_attribute', 'element_style_property', 'variable_exists'].includes(check.type) || check.value)
+    if (checkHasValue && !task._checkTested) {
+      warnings.push(`Task ${n} has a completion check that hasn't been tested — run the task to verify it`)
+    }
+  })
+
+  return { errors, warnings }
+}
+
+export function quizHasStarter(task) {
+  const quizType = task.quizType ?? 'multiple_choice'
+  if (quizType === 'multiple_choice') return task.options?.some(option => option.text?.trim())
+  if (quizType === 'match') return task.pairs?.some(pair => pair.prompt?.trim() || pair.answer?.trim())
+  if (quizType === 'fill_blank') return !!task.text?.trim() || task.blanks?.some(blank => blank.answer?.trim())
+  if (quizType === 'short_answer') return !!task.explainer?.trim()
+  return false
+}
+
+export function quizHasCheckValue(task) {
+  const quizType = task.quizType ?? 'multiple_choice'
+  if (quizType === 'match') return task.pairs?.length > 0 && task.pairs.every(pair => pair.prompt?.trim() && pair.answer?.trim())
+  if (quizType === 'fill_blank') return task.blanks?.length > 0 && task.blanks.every(blank => blank.answer?.trim())
+  return !!task.check?.value
+}
+
+export function normalizeTasksForExport(tasks) {
+  let counter = 0
+  const idMap = {}
+  function assignIds(items) {
+    for (const item of items) {
+      if (item.type === 'group') assignIds(item.subtasks ?? [])
+      else idMap[item.id] = ++counter
+    }
+  }
+  assignIds(tasks)
+
+  function normalizeCheckForExport(check) {
+    const next = { ...check }
+    if (next.hint != null) {
+      const hint = String(next.hint).trim()
+      if (hint) next.hint = hint
+      else delete next.hint
+    }
+    return next
+  }
+
+  function normalizeTask(task) {
+    if (task.taskType === 'information') {
+      const exported = {
+        id: idMap[task.id],
+        taskType: 'information',
+        title: task.title,
+        explainer: task.explainer ?? '',
+      }
+      if (task.estimatedMinutes != null) exported.estimatedMinutes = task.estimatedMinutes
+      if ((task.informationType ?? 'standard') !== 'standard') exported.informationType = task.informationType
+      return exported
+    }
+
+    const { _checkTested, _customTitle, hints: _hints, ...rest } = task
+    const exported = { ...rest, id: idMap[task.id] }
+    if (exported.carryCodeFrom != null) exported.carryCodeFrom = idMap[exported.carryCodeFrom] ?? exported.carryCodeFrom
+    if (exported.carryBlocksFrom != null) exported.carryBlocksFrom = idMap[exported.carryBlocksFrom] ?? exported.carryBlocksFrom
+    if (Array.isArray(exported.check)) exported.check = exported.check.map(normalizeCheckForExport)
+    else if (exported.check) exported.check = normalizeCheckForExport(exported.check)
+    if (Array.isArray(exported.options)) {
+      exported.options = exported.options.map(option => {
+        const next = { ...option }
+        if (next.feedback != null) {
+          const feedback = String(next.feedback).trim()
+          if (feedback) next.feedback = feedback
+          else delete next.feedback
+        }
+        return next
+      })
+    }
+    return exported
+  }
+
+  return tasks.map(item => item.type === 'group'
+    ? { id: item.id, type: 'group', title: item.title, subtasks: (item.subtasks ?? []).map(normalizeTask) }
+    : normalizeTask(item))
+}
