@@ -4,6 +4,7 @@ import { flattenTasks } from '../../shared/taskUtils'
 export default function TaskNavigator({
   tasks = [],
   currentTaskId,
+  previewTaskId,
   session,
   students = [],
   onTaskSelect,
@@ -15,7 +16,9 @@ export default function TaskNavigator({
 }) {
   const total = students.length
   const flatTasks = flattenTasks(tasks)
-  const currentIndex = flatTasks.findIndex(t => t.id === currentTaskId)
+  // Navigate Prev/Next relative to what's currently displayed (preview or session task)
+  const displayId = previewTaskId ?? currentTaskId
+  const displayIndex = flatTasks.findIndex(t => t.id === displayId)
 
   const [expandedGroups, setExpandedGroups] = useState(() => {
     const map = {}
@@ -53,6 +56,7 @@ export default function TaskNavigator({
           if (item.type === 'group') {
             const subtasks = item.subtasks ?? []
             const isCurrentGroup = subtasks.some(t => t.id === currentTaskId)
+            const isPreviewGroup = previewTaskId && subtasks.some(t => t.id === previewTaskId)
             const expanded = expandedGroups[item.id] !== false
 
             return (
@@ -61,6 +65,7 @@ export default function TaskNavigator({
                   style={{
                     ...s.groupHeader,
                     ...(isCurrentGroup ? s.groupHeaderActive : {}),
+                    ...(isPreviewGroup && !isCurrentGroup ? s.groupHeaderPreview : {}),
                     ...((isSandbox || sandboxStaging) ? { opacity: 0.45, cursor: 'default' } : {}),
                   }}
                   onClick={() => (!isSandbox && !sandboxStaging) && toggleGroup(item.id)}
@@ -72,6 +77,7 @@ export default function TaskNavigator({
 
                 {expanded && subtasks.map(task => {
                   const isCurrent = task.id === currentTaskId
+                  const isPreview = previewTaskId && task.id === previewTaskId
                   const runCount = students.filter(st => st.lastRunStatus != null && st.lastRunAt).length
                   const checkCount = students.filter(st => st.checkPassed).length
                   const hasCheck = task.check != null
@@ -82,6 +88,7 @@ export default function TaskNavigator({
                       style={{
                         ...s.subtaskItem,
                         ...(isCurrent ? s.subtaskItemActive : {}),
+                        ...(isPreview && !isCurrent ? s.subtaskItemPreview : {}),
                         ...((isSandbox || sandboxStaging) ? { opacity: 0.45, cursor: 'default' } : {}),
                       }}
                       onClick={() => (!isSandbox && !sandboxStaging) && onTaskSelect?.(task.id)}
@@ -97,6 +104,7 @@ export default function TaskNavigator({
                         )}
                       </div>
                       {isCurrent && <span style={s.arrow}>◀</span>}
+                      {isPreview && !isCurrent && <span style={s.previewEye}>👁</span>}
                     </button>
                   )
                 })}
@@ -106,6 +114,7 @@ export default function TaskNavigator({
 
           // Standalone task
           const isCurrent = item.id === currentTaskId
+          const isPreview = previewTaskId && item.id === previewTaskId
           const runCount = students.filter(st => st.lastRunStatus != null && st.lastRunAt).length
           const checkCount = students.filter(st => st.checkPassed).length
           const hasCheck = item.check != null
@@ -116,6 +125,7 @@ export default function TaskNavigator({
               style={{
                 ...s.item,
                 ...(isCurrent ? s.itemActive : {}),
+                ...(isPreview && !isCurrent ? s.itemPreview : {}),
                 ...((isSandbox || sandboxStaging) ? { opacity: 0.45, cursor: 'default' } : {}),
               }}
               onClick={() => (!isSandbox && !sandboxStaging) && onTaskSelect?.(item.id)}
@@ -131,19 +141,20 @@ export default function TaskNavigator({
                 )}
               </div>
               {isCurrent && <span style={s.arrow}>◀</span>}
+              {isPreview && !isCurrent && <span style={s.previewEye}>👁</span>}
             </button>
           )
         })}
       </div>
 
-      {/* Previous / Next — uses flat task list */}
+      {/* Previous / Next — navigates relative to displayed task (preview or session) */}
       <div style={s.navButtons}>
         <button
           className="btn-secondary"
           style={s.navBtn}
-          disabled={currentIndex <= 0}
+          disabled={displayIndex <= 0}
           onClick={() => {
-            const prev = flatTasks[currentIndex - 1]
+            const prev = flatTasks[displayIndex - 1]
             if (prev) onTaskSelect?.(prev.id)
           }}
         >
@@ -152,9 +163,9 @@ export default function TaskNavigator({
         <button
           className="btn-secondary"
           style={s.navBtn}
-          disabled={currentIndex >= flatTasks.length - 1}
+          disabled={displayIndex >= flatTasks.length - 1}
           onClick={() => {
-            const next = flatTasks[currentIndex + 1]
+            const next = flatTasks[displayIndex + 1]
             if (next) onTaskSelect?.(next.id)
           }}
         >
@@ -235,6 +246,10 @@ const s = {
     background: '#f0eafa',
     borderLeftColor: 'var(--colour-primary)',
   },
+  itemPreview: {
+    background: '#eff6ff',
+    borderLeftColor: '#3b82f6',
+  },
   num: {
     width: 22,
     height: 22,
@@ -267,6 +282,10 @@ const s = {
   groupHeaderActive: {
     background: '#ede8ff',
     borderLeftColor: 'var(--colour-primary)',
+  },
+  groupHeaderPreview: {
+    background: '#eff6ff',
+    borderLeftColor: '#3b82f6',
   },
   groupChevron: {
     fontSize: '0.8rem',
@@ -311,6 +330,10 @@ const s = {
     background: '#f0eafa',
     borderLeftColor: 'var(--colour-primary)',
   },
+  subtaskItemPreview: {
+    background: '#eff6ff',
+    borderLeftColor: '#3b82f6',
+  },
   subtaskDot: {
     width: 6,
     height: 6,
@@ -340,6 +363,7 @@ const s = {
     color: '#6b7280',
   },
   arrow: { fontSize: '0.7rem', color: 'var(--colour-primary)', flexShrink: 0 },
+  previewEye: { fontSize: '0.75rem', flexShrink: 0 },
   toggleBtn: {
     background: 'transparent',
     border: 'none',

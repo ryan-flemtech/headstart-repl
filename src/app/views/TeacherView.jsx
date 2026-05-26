@@ -61,6 +61,8 @@ export default function TeacherView({ lessonId }) {
   const [lesson, setLesson]             = useState(null)
   const [lessonLoading, setLessonLoading] = useState(true)
   const [currentTaskId, setCurrentTaskId] = useState(1)
+  // previewTaskId: non-null while the teacher is previewing a task locally without moving students
+  const [previewTaskId, setPreviewTaskId]   = useState(null)
   const [showEndModal, setShowEndModal]     = useState(false)
   const [leftCollapsed, setLeftCollapsed]   = useState(false)
   const [rightCollapsed, setRightCollapsed] = useState(false)
@@ -165,12 +167,12 @@ export default function TeacherView({ lessonId }) {
     return cloneScratchState(task?.starterBlocks ?? null)
   }
 
-  // Load task content when task changes
+  // Load task content when displayed task changes (preview or session task)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (sandboxStaging || session?.state === 'sandbox') return
-    loadCurrentTaskContent(currentTaskId)
-  }, [currentTaskId, lesson, sandboxStaging, session?.state])
+    loadCurrentTaskContent(previewTaskId ?? currentTaskId)
+  }, [currentTaskId, previewTaskId, lesson, sandboxStaging, session?.state])
 
   // If the teacher opens/reloads while the sandbox is already live, show the
   // live sandbox payload instead of the normal task starter.
@@ -188,17 +190,28 @@ export default function TeacherView({ lessonId }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lesson, sandboxStaging, session?.state, session?.sandboxCodePushedAt, session?.sandboxFilesUpdatedAt])
 
-  // Reset complete code tab when task changes
+  // Reset complete code tab when displayed task changes
   useEffect(() => {
     setTeacherCodeTab('starter')
-  }, [currentTaskId])
+  }, [currentTaskId, previewTaskId])
 
   async function handleTaskChange(taskId) {
+    setPreviewTaskId(null)
     setCurrentTaskId(taskId)
     await setTaskId(taskId)
   }
 
+  // Preview a task locally without moving students
+  function handlePreviewTask(taskId) {
+    if (taskId === currentTaskId) {
+      setPreviewTaskId(null)
+    } else {
+      setPreviewTaskId(taskId)
+    }
+  }
+
   function handleEnterSandbox() {
+    setPreviewTaskId(null)
     if (lesson.type === 'python') {
       setCode(getSandboxStarterCode())
     } else if (lesson.type === 'scratch') {
@@ -332,10 +345,14 @@ export default function TeacherView({ lessonId }) {
   const isSandbox = session?.state === 'sandbox'
   const isInSandbox = isSandbox || sandboxStaging
   const flatTasks = flattenTasks(lesson?.tasks ?? [])
-  const task = flatTasks.find(t => t.id === currentTaskId)
+  // displayTaskId: what the teacher's centre panel is currently showing
+  const displayTaskId = previewTaskId ?? currentTaskId
+  const task = flatTasks.find(t => t.id === displayTaskId)
+  const displayIndex = flatTasks.findIndex(t => t.id === displayTaskId)
   const showingComplete = teacherCodeTab === 'complete' && !isInSandbox
   const isInformationTask = task?.taskType === 'information'
   const students = session ? Object.entries(session.students ?? {}).map(([id, s]) => ({ ...s, anonymousId: id })) : []
+  const isPreviewing = previewTaskId !== null && !isInSandbox
 
   if (lessonLoading || !lesson) {
     return <div style={s.centre}><p>Loading…</p></div>
@@ -354,24 +371,22 @@ export default function TeacherView({ lessonId }) {
                 <button
                   className="btn-ghost"
                   style={{ fontSize: 13, padding: '4px 10px' }}
-                  disabled={flatTasks.findIndex(t => t.id === currentTaskId) <= 0}
+                  disabled={displayIndex <= 0}
                   onClick={() => {
-                    const idx = flatTasks.findIndex(t => t.id === currentTaskId)
-                    if (idx > 0) handleTaskChange(flatTasks[idx - 1].id)
+                    if (displayIndex > 0) handlePreviewTask(flatTasks[displayIndex - 1].id)
                   }}
                 >
                   ← Prev
                 </button>
                 <span style={{ fontSize: 13, opacity: 0.85, minWidth: 70, textAlign: 'center', fontFamily: 'var(--font-body)' }}>
-                  Task {flatTasks.findIndex(t => t.id === currentTaskId) + 1} / {flatTasks.length}
+                  Task {displayIndex + 1} / {flatTasks.length}
                 </span>
                 <button
                   className="btn-ghost"
                   style={{ fontSize: 13, padding: '4px 10px' }}
-                  disabled={flatTasks.findIndex(t => t.id === currentTaskId) >= flatTasks.length - 1}
+                  disabled={displayIndex >= flatTasks.length - 1}
                   onClick={() => {
-                    const idx = flatTasks.findIndex(t => t.id === currentTaskId)
-                    if (idx < flatTasks.length - 1) handleTaskChange(flatTasks[idx + 1].id)
+                    if (displayIndex < flatTasks.length - 1) handlePreviewTask(flatTasks[displayIndex + 1].id)
                   }}
                 >
                   Next →
@@ -461,9 +476,10 @@ export default function TeacherView({ lessonId }) {
           <TaskNavigator
             tasks={lesson.tasks}
             currentTaskId={currentTaskId}
+            previewTaskId={previewTaskId}
             session={session}
             students={students}
-            onTaskSelect={handleTaskChange}
+            onTaskSelect={handlePreviewTask}
             onSandbox={isSandbox ? handleDeactivateSandbox : sandboxStaging ? handleCancelSandbox : handleEnterSandbox}
             isSandbox={isSandbox}
             sandboxStaging={sandboxStaging}
@@ -476,6 +492,30 @@ export default function TeacherView({ lessonId }) {
         <main style={{ ...s.centre, ...(isInformationTask || lesson.type === 'html' || lesson.type === 'scratch' ? { overflow: 'hidden' } : {}) }}>
           {task?.explainer && !isInSandbox && task?.taskType !== 'quiz' && !isInformationTask && (
             <ExplainerPanel title={task.title} content={task.explainer} />
+          )}
+
+          {isPreviewing && (
+            <div style={s.previewBanner}>
+              <span style={s.previewBannerText}>
+                Preview — Task {displayIndex + 1}: {task?.title ?? ''}
+              </span>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  className="btn-ghost"
+                  style={{ ...s.previewBannerBtn, color: '#1e40af', borderColor: '#1e40af', background: 'transparent' }}
+                  onClick={() => setPreviewTaskId(null)}
+                >
+                  Back to Current Task
+                </button>
+                <button
+                  className="btn-primary"
+                  style={s.previewBannerBtn}
+                  onClick={() => handleTaskChange(previewTaskId)}
+                >
+                  Move All to This Task
+                </button>
+              </div>
+            </div>
           )}
 
           {isInSandbox && (
@@ -545,7 +585,7 @@ export default function TeacherView({ lessonId }) {
           ) : lesson.type === 'scratch' ? (
             <div style={s.scratchWrap}>
               <ScratchWorkspace
-                key={`teacher-scratch-${currentTaskId}-${isInSandbox ? 'sandbox' : 'task'}`}
+                key={`teacher-scratch-${displayTaskId}-${isInSandbox ? 'sandbox' : 'task'}`}
                 task={task}
                 unrestricted={isInSandbox}
                 assetsPath={resolveAssetsPath(lesson.assetsPath) || undefined}
@@ -826,6 +866,28 @@ const s = {
     display: 'flex',
     alignItems: 'center',
     paddingLeft: 8,
+  },
+  previewBanner: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    background: '#eff6ff',
+    border: '1px solid #93c5fd',
+    borderRadius: 8,
+    padding: '10px 14px',
+    flexShrink: 0,
+    flexWrap: 'wrap',
+  },
+  previewBannerText: {
+    fontFamily: 'var(--font-body)',
+    fontWeight: 600,
+    fontSize: '0.88rem',
+    color: '#1e40af',
+  },
+  previewBannerBtn: {
+    fontSize: 13,
+    padding: '5px 12px',
   },
   sandboxBanner: {
     display: 'flex',
