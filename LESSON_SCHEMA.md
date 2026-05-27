@@ -712,6 +712,15 @@ Variables:
 - Blockquotes
 - Tables
 - Paragraphs and line breaks
+- Topic-library links written as `[[topic-id]]` or `[[topic-id|visible text]]`
+
+Topic-library links resolve against `public/assets/topic-library.json`. The renderer displays a short definition on hover and opens the searchable, lesson-type-filtered library when the linked topic title is clicked. For example:
+
+```markdown
+Use a [[for-loop|for loop]] with [[range]] to repeat your instructions.
+```
+
+The builder's Markdown toolbar can insert topic links, and offers to link recognised topic words already written in explainer text.
 
 ## Scratch Block Markdown
 

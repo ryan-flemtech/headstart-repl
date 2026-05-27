@@ -1,0 +1,147 @@
+{
+  "topics": [
+    {
+      "id": "print",
+      "title": "print()",
+      "types": ["python"],
+      "category": "Function",
+      "summary": "Displays a value in the Python output console.",
+      "description": "Put text, numbers or variables inside the brackets. Strings must be surrounded by quotation marks.",
+      "syntax": "print(\"Hello, world!\")",
+      "aliases": ["print", "printing"],
+      "related": ["strings", "variables"]
+    },
+    {
+      "id": "variables",
+      "title": "Variables",
+      "types": ["python", "scratch"],
+      "category": "Concept",
+      "summary": "Named storage for a value that a program can use and change.",
+      "description": "A variable can hold text, numbers or other values. Give it a useful name so code is easy to understand.",
+      "syntax": "score = 0",
+      "aliases": ["variable"],
+      "related": ["strings", "for-loop", "repeat-block"]
+    },
+    {
+      "id": "strings",
+      "title": "Strings",
+      "types": ["python"],
+      "category": "Data type",
+      "summary": "Text data written between quotation marks.",
+      "description": "Strings can contain letters, spaces and symbols. Python can display them, join them and store them in variables.",
+      "syntax": "message = \"Hello\"",
+      "aliases": ["string", "text"],
+      "related": ["print", "variables"]
+    },
+    {
+      "id": "for-loop",
+      "title": "For loops",
+      "types": ["python"],
+      "category": "Loop",
+      "summary": "Repeats indented code once for each item in a sequence.",
+      "description": "Use range() when you want to repeat code a particular number of times.",
+      "syntax": "for i in range(5):\n    print(i)",
+      "aliases": ["for loop", "for loops"],
+      "related": ["range", "variables"]
+    },
+    {
+      "id": "range",
+      "title": "range()",
+      "types": ["python"],
+      "category": "Function",
+      "summary": "Creates a sequence of numbers, often used by a for loop.",
+      "description": "range(5) provides 0, 1, 2, 3 and 4. It creates five loop turns even though the final number is 4.",
+      "syntax": "range(5)",
+      "aliases": ["range"],
+      "related": ["for-loop"]
+    },
+    {
+      "id": "html-elements",
+      "title": "HTML elements",
+      "types": ["html"],
+      "category": "HTML",
+      "summary": "The building blocks that describe content on a web page.",
+      "description": "Elements usually have an opening tag, content and a closing tag. Headings and paragraphs are common examples.",
+      "syntax": "<p>Hello page!</p>",
+      "aliases": ["HTML element", "elements", "element"],
+      "related": ["headings", "css-properties"]
+    },
+    {
+      "id": "headings",
+      "title": "Headings",
+      "types": ["html"],
+      "category": "HTML element",
+      "summary": "Titles and subheadings represented by h1 through h6 tags.",
+      "description": "An h1 is normally the most important heading on a page. Smaller numbered headings introduce subsections.",
+      "syntax": "<h1>My Website</h1>",
+      "aliases": ["heading", "h1"],
+      "related": ["html-elements"]
+    },
+    {
+      "id": "css-properties",
+      "title": "CSS properties",
+      "types": ["html"],
+      "category": "CSS",
+      "summary": "Settings that control how selected HTML content looks.",
+      "description": "A property is followed by a colon, a value and a semicolon inside a CSS rule.",
+      "syntax": "p {\n  color: purple;\n}",
+      "aliases": ["CSS property", "property", "properties"],
+      "related": ["selectors", "background-image"]
+    },
+    {
+      "id": "selectors",
+      "title": "CSS selectors",
+      "types": ["html"],
+      "category": "CSS",
+      "summary": "Patterns that choose which HTML elements a CSS rule styles.",
+      "description": "Select a tag by name, a class with a dot or an id with a hash symbol.",
+      "syntax": ".card {\n  color: purple;\n}",
+      "aliases": ["selector", "CSS selector"],
+      "related": ["css-properties"]
+    },
+    {
+      "id": "background-image",
+      "title": "background-image",
+      "types": ["html"],
+      "category": "CSS property",
+      "summary": "Displays an image behind an element's content.",
+      "description": "Provide an image address using url(). Other background properties control its size, position and repetition.",
+      "syntax": "background-image: url(\"images/photo.jpg\");",
+      "aliases": ["background image", "background images"],
+      "related": ["css-properties"]
+    },
+    {
+      "id": "event-block",
+      "title": "Event blocks",
+      "types": ["scratch"],
+      "category": "Scratch event",
+      "summary": "Hat blocks that start scripts when something happens.",
+      "description": "A green-flag or key-pressed event starts the blocks connected beneath it.",
+      "syntax": "when green flag clicked",
+      "aliases": ["event block", "events", "green flag"],
+      "related": ["motion-block", "repeat-block"]
+    },
+    {
+      "id": "motion-block",
+      "title": "Motion blocks",
+      "types": ["scratch"],
+      "category": "Scratch motion",
+      "summary": "Blue blocks that move or turn a sprite on the stage.",
+      "description": "Sprites can move steps, turn, glide, or change their x and y positions.",
+      "syntax": "move (10) steps",
+      "aliases": ["motion block", "motion", "move steps"],
+      "related": ["event-block", "repeat-block"]
+    },
+    {
+      "id": "repeat-block",
+      "title": "Repeat blocks",
+      "types": ["scratch"],
+      "category": "Scratch control",
+      "summary": "Control blocks that run the blocks inside them several times.",
+      "description": "Set the repeat number to decide how many times the nested instructions run.",
+      "syntax": "repeat (10)",
+      "aliases": ["repeat block", "repeat", "loop"],
+      "related": ["event-block", "motion-block", "variables"]
+    }
+  ]
+}

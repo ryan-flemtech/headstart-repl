@@ -1,6 +1,6 @@
 import React from 'react'
-import { render, screen } from '@testing-library/react'
-import { describe, it, expect } from 'vitest'
+import { fireEvent, render, screen } from '@testing-library/react'
+import { describe, it, expect, vi } from 'vitest'
 import { MarkdownRenderer, InlineMarkdown } from '../markdown'
 
 describe('MarkdownRenderer', () => {
@@ -90,6 +90,31 @@ describe('MarkdownRenderer', () => {
     render(<MarkdownRenderer content="Scaled text." textScale={1.5} />)
     expect(screen.getByText('Scaled text.')).toBeInTheDocument()
   })
+
+  it('opens a linked topic from its hover preview', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        topics: [{
+          id: 'for-loop',
+          title: 'For loops',
+          types: ['python'],
+          category: 'Loop',
+          summary: 'Repeat code.',
+          description: 'Runs a block again.',
+          related: [],
+        }],
+      }),
+    }))
+
+    render(<MarkdownRenderer content="Try [[for-loop]]." topicType="python" />)
+    const topicLink = await screen.findByRole('button', { name: 'For loops' })
+    fireEvent.mouseEnter(topicLink)
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Repeat code.')
+    fireEvent.click(screen.getAllByRole('button', { name: 'For loops' })[1])
+    expect(screen.getByRole('dialog', { name: 'Topic library' })).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Search topics...')).toBeInTheDocument()
+  })
 })
 
 describe('InlineMarkdown', () => {
@@ -119,5 +144,10 @@ describe('InlineMarkdown', () => {
 
   it('renders without crashing when content is undefined', () => {
     render(<InlineMarkdown content={undefined} />)
+  })
+
+  it('renders topic references in inline markdown fields', async () => {
+    render(<InlineMarkdown content="Choose [[for-loop]]." topicType="python" />)
+    expect(await screen.findByRole('button', { name: 'For loops' })).toBeInTheDocument()
   })
 })

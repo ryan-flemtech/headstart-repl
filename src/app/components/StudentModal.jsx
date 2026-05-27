@@ -192,7 +192,7 @@ export default function StudentModal({ student, lesson, session, isLive, isLiveF
         {/* Content */}
         <div style={isInformation ? s.bodyInformation : isQuiz ? s.bodyQuiz : isPython ? s.bodyPython : isScratch ? s.bodyScratch : s.bodyHtml}>
           {isInformation ? (
-            <ExplainerPanel title={task?.title} content={task?.explainer ?? ''} collapsible={false} fill />
+            <ExplainerPanel title={task?.title} content={task?.explainer ?? ''} collapsible={false} fill topicType={lesson?.type} />
           ) : isQuiz ? (
             <QuizTask
               task={task}

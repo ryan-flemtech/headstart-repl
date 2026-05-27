@@ -7,6 +7,8 @@ import hljsPython from 'highlight.js/lib/languages/python'
 import hljsXml from 'highlight.js/lib/languages/xml'
 import hljsCss from 'highlight.js/lib/languages/css'
 import hljsJs from 'highlight.js/lib/languages/javascript'
+import { expandTopicLinks, parseTopicHref, useTopicLibrary } from './topicLibrary'
+import { TopicLibraryDialog, TopicReference } from './TopicLibraryView'
 
 hljs.registerLanguage('python', hljsPython)
 hljs.registerLanguage('xml', hljsXml)
@@ -342,16 +344,48 @@ function parseMarkdownTables(content) {
   return blocks
 }
 
-export function InlineMarkdown({ content }) {
+export function InlineMarkdown({ content, topicType = null }) {
+  const topicEnabled = String(content ?? '').includes('[[') || String(content ?? '').includes('#topic/')
+  const { topics } = useTopicLibrary(topicType, topicEnabled)
+  const [libraryOpen, setLibraryOpen] = React.useState(false)
+  const [selectedTopicId, setSelectedTopicId] = React.useState('')
+  const inlineComponents = {
+    ...components,
+    a({ href, children }) {
+      const topicId = parseTopicHref(href)
+      const topic = topicId && topics.find(item => item.id === topicId)
+      if (!topic) return <span>{children}</span>
+      return (
+        <TopicReference
+          topic={topic}
+          label={children}
+          onOpen={id => {
+            setSelectedTopicId(id)
+            setLibraryOpen(true)
+          }}
+        />
+      )
+    },
+  }
+
   return (
-    <ReactMarkdown
-      remarkPlugins={[remarkBreaks]}
-      components={components}
-      allowedElements={['strong', 'em', 'code', 'br', 'span']}
-      unwrapDisallowed
-    >
-      {content}
-    </ReactMarkdown>
+    <>
+      <ReactMarkdown
+        remarkPlugins={[remarkBreaks]}
+        components={inlineComponents}
+        allowedElements={['strong', 'em', 'code', 'br', 'span', 'a']}
+        unwrapDisallowed
+      >
+        {topicEnabled ? expandTopicLinks(content, topics) : content}
+      </ReactMarkdown>
+      {libraryOpen && (
+        <TopicLibraryDialog
+          topics={topics}
+          initialTopicId={selectedTopicId}
+          onClose={() => setLibraryOpen(false)}
+        />
+      )}
+    </>
   )
 }
 
@@ -639,9 +673,32 @@ const components = {
   },
 }
 
-export function MarkdownRenderer({ content, title, style, textScale = 1, inheritColor = false }) {
-  const blocks = parseMarkdownTables(content)
+export function MarkdownRenderer({ content, title, style, textScale = 1, inheritColor = false, topicType = null, showLibrary = false }) {
+  const topicEnabled = showLibrary || String(content ?? '').includes('[[') || String(content ?? '').includes('#topic/')
+  const { topics, loading } = useTopicLibrary(topicType, topicEnabled)
+  const [libraryOpen, setLibraryOpen] = React.useState(false)
+  const [selectedTopicId, setSelectedTopicId] = React.useState('')
+  const blocks = parseMarkdownTables(topicEnabled ? expandTopicLinks(content, topics) : content)
   const heading = String(title ?? '').trim()
+  const markdownComponents = {
+    ...components,
+    a({ href, children }) {
+      const topicId = parseTopicHref(href)
+      if (!topicId) return <a href={href}>{children}</a>
+      const topic = topics.find(item => item.id === topicId)
+      if (!topic) return <span>{children}</span>
+      return (
+        <TopicReference
+          topic={topic}
+          label={children}
+          onOpen={id => {
+            setSelectedTopicId(id)
+            setLibraryOpen(true)
+          }}
+        />
+      )
+    },
+  }
 
   return (
     <MarkdownInheritColorContext.Provider value={inheritColor}>
@@ -655,25 +712,53 @@ export function MarkdownRenderer({ content, title, style, textScale = 1, inherit
           ...style,
         }}
       >
+        {showLibrary && (
+          <button
+            type="button"
+            onClick={() => setLibraryOpen(true)}
+            style={{
+              float: 'right',
+              margin: '0 0 8px 10px',
+              padding: '5px 10px',
+              border: '1px solid #ded1f3',
+              borderRadius: 999,
+              background: '#f7f2ff',
+              color: 'var(--colour-primary)',
+              cursor: 'pointer',
+              fontFamily: 'var(--font-body)',
+              fontWeight: 700,
+              fontSize: '0.78rem',
+            }}
+          >
+            {loading ? 'Loading library...' : 'Topic library'}
+          </button>
+        )}
         {blocks.map((block, i) => block.type === 'table'
           ? <MarkdownTable key={i} headers={block.headers} align={block.align} rows={block.rows} />
           : (
             <ReactMarkdown
-              key={i}
-              remarkPlugins={[remarkBreaks]}
-              rehypePlugins={[rehypeHighlight]}
-              components={components}
-              allowedElements={[
-                'h1', 'h2', 'h3', 'h4',
-                'p', 'strong', 'em', 'code', 'pre', 'br', 'span',
-                'ul', 'ol', 'li', 'blockquote', 'img',
-              ]}
-              unwrapDisallowed
-            >
+               key={i}
+               remarkPlugins={[remarkBreaks]}
+               rehypePlugins={[rehypeHighlight]}
+               components={markdownComponents}
+               allowedElements={[
+                 'h1', 'h2', 'h3', 'h4',
+                 'p', 'strong', 'em', 'code', 'pre', 'br', 'span',
+                 'ul', 'ol', 'li', 'blockquote', 'img', 'a',
+               ]}
+               unwrapDisallowed
+             >
               {block.content}
             </ReactMarkdown>
-            ))}
+             ))}
       </div>
+      {libraryOpen && (
+        <TopicLibraryDialog
+          topics={topics}
+          initialTopicId={selectedTopicId}
+          onClose={() => setLibraryOpen(false)}
+        />
+      )}
     </MarkdownScaleContext.Provider>
     </MarkdownInheritColorContext.Provider>
   )

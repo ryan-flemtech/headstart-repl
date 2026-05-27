@@ -1202,7 +1202,7 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
           style={taskContentStyle}
         >
           {task?.explainer && !isSandbox && !isQuizTask && !isInformationTask && (
-            <ExplainerPanel title={task.title} content={task.explainer} />
+            <ExplainerPanel title={task.title} content={task.explainer} topicType={lesson.type} />
           )}
 
         <div style={editorAreaStyle} className={isForcedTeacherLive ? 'live-view-active' : undefined}>

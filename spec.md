@@ -737,6 +737,7 @@ Supports all task types: code (Python/HTML/Scratch), information, quiz (all 4 su
 
 Task type switching (`taskType`, `quizType`) clears incompatible fields. Interaction mode switching (`run` / `submit`) filters checks to only compatible types.
 Each task accepts optional estimated minutes; the task-list header shows their lesson-wide total.
+Markdown entry fields provide searchable topic-library insertion and prompt authors to link recognised topic terms.
 
 Quiz builders:
 - Multiple choice: options list with text inputs and correct-answer radio
@@ -780,11 +781,13 @@ Export: `normalizeTasksForExport()` remaps task IDs sequentially (1, 2, 3…) re
 | `src/shared/CodeEditor.jsx` | `CodeEditor({ value, language, readOnly, onChange, style })` — never remounts |
 | `src/shared/SplitPane.jsx` | `SplitPane({ left, right, defaultSplit?, rightCollapsed?, ... })` |
 | `src/shared/AssetBrowser.jsx` | `AssetBrowser({ assetsPath, assets, copyMode })` |
+| `src/shared/TopicLibraryView.jsx` | Topic-link hover preview and searchable library dialog |
+| `src/shared/topicLibrary.js` | Loads `public/assets/topic-library.json`; search, wiki-link expansion and author suggestions |
 | `src/shared/checks.js` | `evaluateCheckResults(check, output, context)`, `evaluateSingleCheck(...)`, `CHECK_TYPES` |
 | `src/shared/codemirror.js` | `createBaseExtensions(type, readOnly)`, `headstartTheme`, `headstartHighlight`, `getTabSize(type)` |
 | `src/shared/firebase.js` | `db` — Firebase Realtime Database reference |
 | `src/shared/iframe.js` | `buildIframeSrc(files, entryFile, options)`, `waitForIframeText(timeout)` |
-| `src/shared/markdown.jsx` | `MarkdownRenderer({ content, title, style })`, `InlineMarkdown({ content })` |
+| `src/shared/markdown.jsx` | `MarkdownRenderer({ content, title, style, topicType?, showLibrary? })`, `InlineMarkdown({ content })` |
 | `src/shared/pyodide.js` | `initPyodide(onProgress?)`, `runPython(code, callbacks)`, `stopPython()`, `provideInput(value)`, `isPyodideReady()` |
 | `src/shared/pyodide.worker.js` | Web Worker — Pyodide loader, async input() wrapper, stdout streamer |
 | `src/shared/scratch.js` | `createRunContext()`, `createSpriteState()`, `createRunSignal()`, block definitions, check evaluation |

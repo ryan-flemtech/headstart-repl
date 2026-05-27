@@ -32,10 +32,10 @@ export default function InformationTask({ task, lesson, fill = true }) {
     return (
       <section className="information-task information-task--recap">
         <div className="information-recap__left">
-          <MarkdownRenderer content={task?.leftContent ?? ''} textScale={markdownTextScale} inheritColor />
+          <MarkdownRenderer content={task?.leftContent ?? ''} textScale={markdownTextScale} inheritColor topicType={lesson?.type} />
         </div>
         <div className="information-recap__content">
-          <MarkdownRenderer content={task?.explainer ?? ''} textScale={markdownTextScale} />
+          <MarkdownRenderer content={task?.explainer ?? ''} textScale={markdownTextScale} topicType={lesson?.type} showLibrary />
         </div>
       </section>
     )
@@ -48,6 +48,7 @@ export default function InformationTask({ task, lesson, fill = true }) {
       collapsible={false}
       fill={fill}
       markdownTextScale={markdownTextScale}
+      topicType={lesson?.type}
     />
   )
 }
