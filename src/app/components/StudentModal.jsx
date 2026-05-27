@@ -58,14 +58,16 @@ export default function StudentModal({ student, lesson, session, isLive, isLiveF
     ? !!task?.completeBlocks
     : (task?.completeFiles?.length > 0)
 
-  const codeStages = (!isQuiz && !isScratch) ? (task?.codeStages ?? []) : []
+  const codeStages = !isQuiz ? (task?.codeStages ?? []) : []
 
   function buildStageOptions() {
-    const opts = [{ value: 'starter', label: 'Starter code' }]
+    const starterLabel = isScratch ? 'Starter blocks' : 'Starter code'
+    const completeLabel = isScratch ? 'Complete blocks' : 'Complete code'
+    const opts = [{ value: 'starter', label: starterLabel }]
     codeStages.forEach((stage, i) => {
       opts.push({ value: `stage_${i}`, label: stage.label || `Stage ${i + 1}` })
     })
-    if (hasComplete) opts.push({ value: 'complete', label: 'Complete code' })
+    if (hasComplete) opts.push({ value: 'complete', label: completeLabel })
     return opts
   }
 

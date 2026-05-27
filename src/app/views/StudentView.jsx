@@ -464,7 +464,14 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
       setRunStatus(null)
       resetCheckFeedback()
     } else if (lesson.type === 'scratch') {
-      const targetBlocks = action === 'starter' ? (task.starterBlocks ?? null) : (task.completeBlocks ?? null)
+      let targetBlocks
+      if (action === 'starter') targetBlocks = task.starterBlocks ?? null
+      else if (action === 'complete') targetBlocks = task.completeBlocks ?? null
+      else {
+        const stageMatch = action.match(/^stage_(\d+)$/)
+        const stage = stageMatch ? (task.codeStages ?? [])[parseInt(stageMatch[1], 10)] : null
+        targetBlocks = stage?.blocks ?? task.starterBlocks ?? null
+      }
       setScratchExternalState(targetBlocks)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -456,21 +456,37 @@ export default function TeacherView({ lessonId }) {
               />
             </div>
           ) : lesson.type === 'scratch' ? (
-            <div style={s.scratchWrap}>
-              <ScratchWorkspace
-                key={`teacher-scratch-${displayTaskId}-${isInSandbox ? 'sandbox' : 'task'}`}
-                task={task}
-                unrestricted={isInSandbox}
-                assetsPath={resolveAssetsPath(lesson.assetsPath) || undefined}
-                initialState={scratchState}
-                externalState={scratchState}
-                readOnly={showingComplete || !isInSandbox}
-                hideStage
-                onStateChange={showingComplete || !isInSandbox ? undefined : state => {
-                  setScratchState(state)
-                  if (isInSandbox) sandboxDraftRef.current.scratchState = cloneScratchState(state)
-                }}
-              />
+            <div style={!isInSandbox ? s.codeWorkspaceStack : s.scratchWrap}>
+              {!isInSandbox && (
+                <TeacherCodeTabs
+                  s={s}
+                  activeTab={teacherCodeTab}
+                  stages={taskCodeStages}
+                  onStarter={() => setTeacherCodeTab('starter')}
+                  onStage={i => setTeacherCodeTab(`stage_${i}`)}
+                  onComplete={task?.completeBlocks ? () => setTeacherCodeTab('complete') : undefined}
+                  onSendToAll={handleSendStageToAll}
+                  hasStudents={students.length > 0}
+                  starterLabel="Starter blocks"
+                  completeLabel="Complete blocks"
+                />
+              )}
+              <div style={s.scratchWrap}>
+                <ScratchWorkspace
+                  key={`teacher-scratch-${displayTaskId}-${isInSandbox ? 'sandbox' : 'task'}`}
+                  task={task}
+                  unrestricted={isInSandbox}
+                  assetsPath={resolveAssetsPath(lesson.assetsPath) || undefined}
+                  initialState={scratchState}
+                  externalState={isInSandbox ? scratchState : showingComplete ? (task?.completeBlocks ?? null) : isShowingStage ? (activeTeacherStage?.blocks ?? null) : (task?.starterBlocks ?? null)}
+                  readOnly={!isInSandbox}
+                  hideStage
+                  onStateChange={!isInSandbox ? undefined : state => {
+                    setScratchState(state)
+                    if (isInSandbox) sandboxDraftRef.current.scratchState = cloneScratchState(state)
+                  }}
+                />
+              </div>
             </div>
           ) : (
             <div style={!isInSandbox ? s.codeWorkspaceStack : s.htmlLeft}>
@@ -565,7 +581,7 @@ export default function TeacherView({ lessonId }) {
   )
 }
 
-function TeacherCodeTabs({ s, activeTab, stages = [], onStarter, onStage, onComplete, onSendToAll, hasStudents }) {
+function TeacherCodeTabs({ s, activeTab, stages = [], onStarter, onStage, onComplete, onSendToAll, hasStudents, starterLabel = 'Starter code', completeLabel = 'Complete code' }) {
   return (
     <div style={s.codeTabStrip} className="ui-tabs ui-tabs--editor" role="tablist" aria-label="Teacher code workspace">
       <button
@@ -576,7 +592,7 @@ function TeacherCodeTabs({ s, activeTab, stages = [], onStarter, onStage, onComp
         style={{ ...s.codeTabBtn, ...(activeTab === 'starter' ? s.codeTabBtnActive : {}) }}
         onClick={onStarter}
       >
-        Starter code
+        {starterLabel}
       </button>
       {stages.map((stage, i) => (
         <button
@@ -591,16 +607,18 @@ function TeacherCodeTabs({ s, activeTab, stages = [], onStarter, onStage, onComp
           {stage.label || `Stage ${i + 1}`}
         </button>
       ))}
-      <button
-        type="button"
-        className="ui-tab"
-        role="tab"
-        aria-selected={activeTab === 'complete'}
-        style={{ ...s.codeTabBtn, ...(activeTab === 'complete' ? s.codeTabBtnActive : {}) }}
-        onClick={onComplete}
-      >
-        Complete code
-      </button>
+      {onComplete && (
+        <button
+          type="button"
+          className="ui-tab"
+          role="tab"
+          aria-selected={activeTab === 'complete'}
+          style={{ ...s.codeTabBtn, ...(activeTab === 'complete' ? s.codeTabBtnActive : {}) }}
+          onClick={onComplete}
+        >
+          {completeLabel}
+        </button>
+      )}
       {hasStudents && onSendToAll && (
         <div style={s.codeTabActions}>
           <button
@@ -609,7 +627,7 @@ function TeacherCodeTabs({ s, activeTab, stages = [], onStarter, onStage, onComp
             title="Send this stage's code to all students"
             onClick={() => {
               const action = activeTab === 'complete' ? 'complete' : activeTab.startsWith('stage_') ? activeTab : 'starter'
-              if (window.confirm(`Send ${activeTab === 'starter' ? 'starter' : activeTab === 'complete' ? 'complete' : stages[parseInt(activeTab.replace('stage_', ''), 10)]?.label ?? activeTab} code to all students?`)) {
+              if (window.confirm(`Send ${activeTab === 'starter' ? starterLabel : activeTab === 'complete' ? completeLabel : stages[parseInt(activeTab.replace('stage_', ''), 10)]?.label ?? activeTab} to all students?`)) {
                 onSendToAll(action)
               }
             }}
