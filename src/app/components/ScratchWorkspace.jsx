@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import {
   loadBlocklyModules,
   DEFAULT_TOOLBOX,
@@ -32,7 +33,7 @@ const toCanvasY = y => STAGE_H / 2 - y
 
 export const SPRITE_TYPES = ['cat', 'ball', 'star', 'arrow', 'bat', 'parrot']
 
-export const SPRITE_TYPE_COLOR = { cat: '#FFA500', ball: '#4C97FF', star: '#FFD700', arrow: '#9966FF', bat: '#374151', parrot: '#22c55e' }
+const SPRITE_TYPE_COLOR = { cat: '#FFA500', ball: '#4C97FF', star: '#FFD700', arrow: '#9966FF', bat: '#374151', parrot: '#22c55e' }
 
 const ROT_STYLES = [
   { val: 'all around',  icon: '↺', title: 'Rotate all around' },
@@ -328,6 +329,7 @@ export default function ScratchWorkspace({
   hideStage = false,
   selectedSpriteId: controlledSpriteId = null,
   onSpriteSelect = null,
+  spritePanelTarget = null,
 }) {
   const sprites = task?.sprites?.length > 0 ? task.sprites : DEFAULT_SPRITES
   const backdrops = task?.backdrops?.length > 0 ? task.backdrops : []
@@ -1082,6 +1084,7 @@ export default function ScratchWorkspace({
 
       {/* Sprite panel above editor when stage is hidden and no external selector */}
       {hideStage && !onSpriteSelect && spritePanelCompact}
+      {spritePanelTarget && createPortal(spritePanelFull, spritePanelTarget)}
 
       {/* Block editor — all workspace divs stacked, only selected one visible */}
       <div style={s.editorPane}>

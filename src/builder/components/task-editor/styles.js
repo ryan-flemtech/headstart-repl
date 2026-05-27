@@ -397,6 +397,7 @@ export const s = {
   collapsibleField: {
     display: 'flex',
     flexDirection: 'column',
+    flexShrink: 0,
     gap: 0,
     border: '1px solid #e5e7eb',
     borderRadius: 8,
@@ -1252,39 +1253,10 @@ export const s = {
     fontSize: '0.82rem',
     lineHeight: 1,
   },
-  spriteSelectorRow: {
-    display: 'flex',
-    gap: 5,
-    flexWrap: 'wrap',
+  spritePanelHost: {
     padding: '8px 10px',
     borderTop: '1px solid #e5e7eb',
     background: '#fff',
-  },
-  spriteSelectorTile: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 5,
-    padding: '4px 9px 4px 6px',
-    border: '2px solid #e5e7eb',
-    borderRadius: 16,
-    background: '#fff',
-    cursor: 'pointer',
-    fontFamily: 'var(--font-body)',
-    fontSize: '0.8rem',
-    fontWeight: 600,
-    color: 'var(--colour-text)',
-    transition: 'border-color 0.12s, background 0.12s',
-  },
-  spriteSelectorTileActive: {
-    borderColor: 'var(--colour-primary)',
-    background: '#f3eeff',
-    color: 'var(--colour-primary)',
-  },
-  spriteSelectorDot: {
-    width: 10,
-    height: 10,
-    borderRadius: '50%',
-    flexShrink: 0,
   },
   variableRow: {
     display: 'flex',

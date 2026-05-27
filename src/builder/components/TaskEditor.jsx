@@ -10,7 +10,7 @@ import FileManager from './FileManager'
 import BuilderOutputPanel from './BuilderOutputPanel'
 import IframePreview from '../../app/components/IframePreview'
 import { CollapseTabButton } from '../../app/components/CollapsiblePanelControls'
-import ScratchWorkspace, { SPRITE_TYPE_COLOR } from '../../app/components/ScratchWorkspace'
+import ScratchWorkspace from '../../app/components/ScratchWorkspace'
 import QuizTask from '../../app/components/QuizTask'
 import InformationTask from '../../app/components/InformationTask'
 import { DEFAULT_SPRITES } from '../../shared/scratch'
@@ -59,6 +59,7 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
   const [starterBlocksSyncKey, setStarterBlocksSyncKey] = useState(0)
   const [scratchModalTab, setScratchModalTab] = useState('starter')
   const [modalSelectedSpriteId, setModalSelectedSpriteId] = useState(null)
+  const [modalSpritePanelTarget, setModalSpritePanelTarget] = useState(null)
   const [sidebarSections, setSidebarSections] = useState({ toolbox: true, sprites: true, backdrops: false, variables: false })
   const [modalStarterBlocks, setModalStarterBlocks] = useState(null)
   const modalStarterBlocksRef = React.useRef(null)
@@ -959,19 +960,7 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                           const activeSprites = task.sprites?.length > 0 ? task.sprites : DEFAULT_SPRITES
                           return (
                             <>
-                              <div style={s.spriteSelectorRow}>
-                                {activeSprites.map(sp => (
-                                  <button
-                                    key={sp.id}
-                                    type="button"
-                                    style={{ ...s.spriteSelectorTile, ...(sp.id === modalSelectedSpriteId ? s.spriteSelectorTileActive : {}) }}
-                                    onClick={() => setModalSelectedSpriteId(sp.id)}
-                                  >
-                                    <span style={{ ...s.spriteSelectorDot, background: SPRITE_TYPE_COLOR[sp.type ?? 'cat'] ?? '#9ca3af' }} />
-                                    <span>{sp.name}</span>
-                                  </button>
-                                ))}
-                              </div>
+                              <div ref={setModalSpritePanelTarget} style={s.spritePanelHost} />
                               <div style={{ padding: '10px 12px', borderTop: '1px solid #e5e7eb' }}>
                                 <SpriteManager
                                   sprites={activeSprites}
@@ -1047,6 +1036,7 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                         syncNowKey={starterBlocksSyncKey}
                         selectedSpriteId={modalSelectedSpriteId}
                         onSpriteSelect={setModalSelectedSpriteId}
+                        spritePanelTarget={modalSpritePanelTarget}
                       />
                     ) : scratchModalTab === 'complete' ? (
                       <ScratchWorkspace
