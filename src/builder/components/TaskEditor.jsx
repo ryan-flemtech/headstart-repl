@@ -15,6 +15,7 @@ import QuizTask from '../../app/components/QuizTask'
 import InformationTask from '../../app/components/InformationTask'
 import { DEFAULT_SPRITES } from '../../shared/scratch'
 import { resolveAssetsPath } from '../../shared/assetPaths'
+import { copyScratchSpriteStateToStarters } from '../lessonUtils'
 import { s } from './task-editor/styles'
 import { Field, TaskFormatIcon, QuizTypeIcon, CodeWorkspaceTabs, Modal, CarryThroughPicker, SpriteManager, BackdropManager } from './task-editor/TaskEditorFields'
 import { QuizTypePicker, MatchPairsBuilder, FillBlankBuilder, ShortAnswerBuilder, QuizOptionsBuilder } from './task-editor/QuizEditors'
@@ -64,6 +65,8 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
   const [modalStarterBlocks, setModalStarterBlocks] = useState(null)
   const modalStarterBlocksRef = React.useRef(null)
   const modalCompleteBlocksRef = React.useRef(null)
+  const modalCompleteSpriteStatesRef = React.useRef(null)
+  const modalStageSpriteStatesRef = React.useRef({})
   const isCompleteTab = codeTab === 'complete'
   const stageTabMatch = codeTab.match(/^stage_(\d+)$/)
   const activeStageIndex = stageTabMatch ? parseInt(stageTabMatch[1], 10) : null
@@ -274,6 +277,8 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
     const blocks = cloneBlocks(task.starterBlocks)
     modalStarterBlocksRef.current = blocks
     modalCompleteBlocksRef.current = cloneBlocks(task.completeBlocks)
+    modalCompleteSpriteStatesRef.current = null
+    modalStageSpriteStatesRef.current = {}
     setModalStarterBlocks(blocks)
     setTestScratchBlocks(cloneBlocks(blocks))
     setScratchModalTab('starter')
@@ -325,6 +330,16 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
     const updated = [...existing, newStage]
     onUpdate({ ...task, codeStages: updated })
     setScratchModalTab(`stage_${updated.length - 1}`)
+  }
+
+  function handleCopySpriteInfoToStarter() {
+    const stageMatch = scratchModalTab.match(/^stage_(\d+)$/)
+    const stageIndex = stageMatch ? parseInt(stageMatch[1], 10) : null
+    const spriteStates = scratchModalTab === 'complete'
+      ? modalCompleteSpriteStatesRef.current
+      : modalStageSpriteStatesRef.current[stageIndex]
+    const sprites = task.sprites?.length > 0 ? task.sprites : DEFAULT_SPRITES
+    set('sprites', copyScratchSpriteStateToStarters(sprites, spriteStates))
   }
 
   function handleRemoveScratchStage(idx) {
@@ -931,6 +946,11 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                       {checkResult === 'pass' ? 'Check passes' : 'Check not passing'}
                     </span>
                   )}
+                  {scratchModalTab !== 'starter' && (
+                    <button type="button" className="btn-ghost" style={s.secondaryBtn} onClick={handleCopySpriteInfoToStarter}>
+                      Copy Sprite Info to Starter
+                    </button>
+                  )}
                 </div>
 
                 <div style={s.scratchModalBody}>
@@ -1049,6 +1069,9 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                           setTestScratchBlocks(states)
                           set('completeBlocks', states)
                         }}
+                        onSpriteStatesChange={states => {
+                          modalCompleteSpriteStatesRef.current = states
+                        }}
                         onCheckResult={passed => {
                           setCheckResult(passed ? 'pass' : 'fail')
                           if (task.check) {
@@ -1085,6 +1108,9 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                             assetsPath={lesson.assetsPath ? resolveAssetsPath(lesson.assetsPath) : ''}
                             initialStates={stage.blocks ?? null}
                             onStateChange={states => updateStage(stageIdx, { blocks: states })}
+                            onSpriteStatesChange={states => {
+                              modalStageSpriteStatesRef.current[stageIdx] = states
+                            }}
                             syncNowKey={starterBlocksSyncKey}
                           />
                         </div>

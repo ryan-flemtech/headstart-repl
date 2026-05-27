@@ -48,7 +48,7 @@ function normaliseInitialStates(raw, sprites) {
 }
 
 function defaultSpriteState(sp) {
-  return { x: sp.x ?? 0, y: sp.y ?? 0, size: sp.size ?? 100, direction: sp.direction ?? 90, visible: true, bubble: '', bubbleType: 'say', rotationStyle: 'all around', costume: sp.costumes?.[0]?.name ?? null }
+  return { x: sp.x ?? 0, y: sp.y ?? 0, size: sp.size ?? 100, direction: sp.direction ?? 90, visible: sp.visible ?? true, bubble: '', bubbleType: 'say', rotationStyle: sp.rotationStyle ?? 'all around', costume: sp.costume ?? sp.costumes?.[0]?.name ?? null }
 }
 
 function initSpriteStates(sprites) {
@@ -322,6 +322,7 @@ export default function ScratchWorkspace({
   initialState  = null,      // legacy single-sprite alias
   initialSpriteStates = null,
   onStateChange,
+  onSpriteStatesChange,
   onCheckResult,
   externalStates = null,
   externalState  = null,     // legacy alias
@@ -353,6 +354,7 @@ export default function ScratchWorkspace({
   const statusRef           = useRef('loading')
   const runningRef          = useRef(false)
   const onStateChangeRef    = useRef(onStateChange)
+  const onSpriteStatesChangeRef = useRef(onSpriteStatesChange)
   const onCheckResultRef    = useRef(onCheckResult)
   const askResolveRef       = useRef(null)
   const inputStateRef       = useRef({ keysPressed: new Set(), mouseDown: false, mouseX: 0, mouseY: 0 })
@@ -392,6 +394,7 @@ export default function ScratchWorkspace({
   statusRef.current = status
   runningRef.current = running
   onStateChangeRef.current = onStateChange
+  onSpriteStatesChangeRef.current = onSpriteStatesChange
   onCheckResultRef.current = onCheckResult
 
   // ── Draw stage ──────────────────────────────────────────────────────────────
@@ -510,16 +513,20 @@ export default function ScratchWorkspace({
       state: spriteStatesRef.current[sp.id],
       costumes: sp.costumes ?? [],
       onUpdate: s => {
-        spriteStatesRef.current = { ...spriteStatesRef.current, [sp.id]: s }
-        setSpriteStates(prev => ({ ...prev, [sp.id]: s }))
+        commitSpriteStates({ ...spriteStatesRef.current, [sp.id]: s })
       },
     })).filter(sp => sp.workspace)
   }, [sprites])
 
+  function commitSpriteStates(nextStates) {
+    spriteStatesRef.current = nextStates
+    setSpriteStates(nextStates)
+    onSpriteStatesChangeRef.current?.(nextStates)
+  }
+
   function updateSpriteStateOverride(id, updates) {
     const newState = { ...spriteStatesRef.current[id], ...updates }
-    spriteStatesRef.current = { ...spriteStatesRef.current, [id]: newState }
-    setSpriteStates(prev => ({ ...prev, [id]: newState }))
+    commitSpriteStates({ ...spriteStatesRef.current, [id]: newState })
     if ('x' in updates || 'y' in updates) refreshSpriteToolbox(id)
   }
 
@@ -826,8 +833,7 @@ export default function ScratchWorkspace({
   function handleResetStage() {
     handleStop()
     const reset = initSpriteStates(sprites)
-    spriteStatesRef.current = reset
-    setSpriteStates(reset)
+    commitSpriteStates(reset)
     const defaultBackdrop = backdrops[0]?.name ?? null
     backdropNameRef.current = defaultBackdrop
     setBackdropName(defaultBackdrop)
@@ -882,8 +888,7 @@ export default function ScratchWorkspace({
         const newX = Math.max(-240, Math.min(240, dragStartRef.current.spriteX + dx))
         const newY = Math.max(-180, Math.min(180, dragStartRef.current.spriteY - dy))
         const updated = { ...spriteStatesRef.current[id], x: newX, y: newY }
-        spriteStatesRef.current = { ...spriteStatesRef.current, [id]: updated }
-        setSpriteStates(prev => ({ ...prev, [id]: updated }))
+        commitSpriteStates({ ...spriteStatesRef.current, [id]: updated })
       }
       return
     }
