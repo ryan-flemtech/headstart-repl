@@ -1,6 +1,21 @@
 import { checkAllowedForSubmit, normalizeChecks } from '../shared/checks'
 import { flattenTasks } from '../shared/taskUtils'
 
+const SCRATCH_STARTER_SPRITE_STATE_FIELDS = ['x', 'y', 'size', 'direction', 'visible', 'rotationStyle', 'costume']
+
+export function copyScratchSpriteStateToStarters(sprites, spriteStates) {
+  return sprites.map(sprite => {
+    const state = spriteStates?.[sprite.id]
+    if (!state) return { ...sprite }
+
+    const next = { ...sprite }
+    for (const field of SCRATCH_STARTER_SPRITE_STATE_FIELDS) {
+      if (state[field] !== undefined) next[field] = state[field]
+    }
+    return next
+  })
+}
+
 export function validateLesson(lesson) {
   const errors = []
   const warnings = []

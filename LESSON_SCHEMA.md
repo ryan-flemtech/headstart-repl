@@ -263,6 +263,9 @@ Sprite object:
 | `y` | No | number | Scratch stage y coordinate, clamped around `-180` to `180`. |
 | `size` | No | number | Percent size. Defaults to `100`. |
 | `direction` | No | number | Scratch direction. Defaults to `90`. |
+| `visible` | No | boolean | Initial visibility. Defaults to `true`. |
+| `rotationStyle` | No | string | Initial rotation style: `all around`, `left-right`, or `don't rotate`. Defaults to `all around`. |
+| `costume` | No | string | Initial costume name when `costumes` are configured. Defaults to the first costume. |
 | `costumes` | No | costume array | Optional image costumes. First costume is default. |
 
 Costume object:

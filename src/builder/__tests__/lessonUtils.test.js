@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { normalizeTasksForExport, quizHasCheckValue, quizHasStarter, validateLesson } from '../lessonUtils'
+import { copyScratchSpriteStateToStarters, normalizeTasksForExport, quizHasCheckValue, quizHasStarter, validateLesson } from '../lessonUtils'
 
 function lesson(type, tasks) {
   return { id: 'test-lesson', title: 'Test lesson', type, tasks }
@@ -58,6 +58,34 @@ describe('quiz helpers', () => {
     expect(quizHasStarter({ quizType: 'fill_blank', text: 'Hi ___', blanks: [] })).toBe(true)
     expect(quizHasCheckValue({ quizType: 'match', pairs: [{ prompt: 'a', answer: 'b' }] })).toBe(true)
     expect(quizHasCheckValue({ quizType: 'short_answer', check: { value: '' } })).toBe(false)
+  })
+})
+
+describe('copyScratchSpriteStateToStarters', () => {
+  it('copies stage presentation state while preserving sprite identity and artwork', () => {
+    const sprites = [
+      { id: 'rocket', name: 'Rocket', type: 'cat', costumes: [{ name: 'idle', image: 'idle.png' }], x: 0 },
+      { id: 'star', name: 'Star', type: 'star', x: 5 },
+    ]
+
+    expect(copyScratchSpriteStateToStarters(sprites, {
+      rocket: { x: 80, y: -20, size: 130, direction: -90, visible: false, rotationStyle: 'left-right', costume: 'boost', bubble: 'skip me' },
+    })).toEqual([
+      {
+        id: 'rocket',
+        name: 'Rocket',
+        type: 'cat',
+        costumes: [{ name: 'idle', image: 'idle.png' }],
+        x: 80,
+        y: -20,
+        size: 130,
+        direction: -90,
+        visible: false,
+        rotationStyle: 'left-right',
+        costume: 'boost',
+      },
+      { id: 'star', name: 'Star', type: 'star', x: 5 },
+    ])
   })
 })
 
