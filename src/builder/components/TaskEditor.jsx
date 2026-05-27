@@ -62,10 +62,27 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
   const modalStarterBlocksRef = React.useRef(null)
   const modalCompleteBlocksRef = React.useRef(null)
   const isCompleteTab = codeTab === 'complete'
-  const activePythonCode = isCompleteTab ? (task.completeCode ?? '') : (task.starterCode ?? '')
-  const activeFiles = isCompleteTab ? (task.completeFiles ?? []) : (task.starterFiles ?? [])
+  const stageTabMatch = codeTab.match(/^stage_(\d+)$/)
+  const activeStageIndex = stageTabMatch ? parseInt(stageTabMatch[1], 10) : null
+  const isStageTab = activeStageIndex !== null
+  const codeStages = task.codeStages ?? []
+  const activeStage = isStageTab ? (codeStages[activeStageIndex] ?? null) : null
+  const activePythonCode = isCompleteTab
+    ? (task.completeCode ?? '')
+    : isStageTab
+    ? (activeStage?.code ?? '')
+    : (task.starterCode ?? '')
+  const activeFiles = isCompleteTab
+    ? (task.completeFiles ?? [])
+    : isStageTab
+    ? (activeStage?.files ?? [])
+    : (task.starterFiles ?? [])
   const activeSelectedFile = isCompleteTab ? selectedCompleteFile : selectedFile
-  const activeEntryFile = isCompleteTab ? (task.completeEntryFile ?? task.entryFile ?? 'index.html') : (task.entryFile ?? 'index.html')
+  const activeEntryFile = isCompleteTab
+    ? (task.completeEntryFile ?? task.entryFile ?? 'index.html')
+    : isStageTab
+    ? (activeStage?.entryFile ?? task.entryFile ?? 'index.html')
+    : (task.entryFile ?? 'index.html')
   const activeCodeForChecks = isPython
     ? activePythonCode
     : activeFiles.map(file => `--- ${file.name} ---\n${file.content ?? ''}`).join('\n\n')
@@ -108,7 +125,42 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
       }
     }
 
+    const stageMatch = tab.match(/^stage_(\d+)$/)
+    if (stageMatch) {
+      const idx = parseInt(stageMatch[1], 10)
+      const stage = (task.codeStages ?? [])[idx]
+      if (stage && !isPython && !isScratch) {
+        setSelectedFile(stage.files?.[0]?.name ?? '')
+      }
+    }
+
     setCodeTab(tab)
+  }
+
+  function handleAddStage() {
+    const existing = task.codeStages ?? []
+    const newStage = isPython
+      ? { label: `Stage ${existing.length + 1}`, code: task.starterCode ?? '' }
+      : { label: `Stage ${existing.length + 1}`, files: (task.starterFiles ?? []).map(f => ({ ...f })), entryFile: task.entryFile ?? 'index.html' }
+    const updated = [...existing, newStage]
+    onUpdate({ ...task, codeStages: updated })
+    setCodeTab(`stage_${updated.length - 1}`)
+    if (!isPython && !isScratch) {
+      setSelectedFile(newStage.files?.[0]?.name ?? '')
+    }
+  }
+
+  function handleRemoveStage(idx) {
+    const existing = task.codeStages ?? []
+    const updated = existing.filter((_, i) => i !== idx)
+    onUpdate({ ...task, codeStages: updated.length > 0 ? updated : undefined })
+    setCodeTab('starter')
+  }
+
+  function updateStage(idx, updates) {
+    const existing = task.codeStages ?? []
+    const updated = existing.map((s, i) => i === idx ? { ...s, ...updates } : s)
+    onUpdate({ ...task, codeStages: updated })
   }
 
   function handleStop() {
@@ -716,13 +768,29 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
       ) : isPython ? (
         <>
           <div style={s.codeWorkspaceStack}>
-            <CodeWorkspaceTabs activeTab={codeTab} onChange={handleCodeTabChange} />
-
+            <CodeWorkspaceTabs
+              activeTab={codeTab}
+              onChange={handleCodeTabChange}
+              stages={codeStages}
+              onAddStage={handleAddStage}
+              onRemoveStage={handleRemoveStage}
+            />
+            {isStageTab && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: '#f5f3ff', border: '1px solid #e5e7eb', borderTop: 0, borderBottom: 0 }}>
+                <span style={{ fontFamily: 'var(--font-body)', fontSize: '0.8rem', color: '#6b7280', fontWeight: 600 }}>Stage label:</span>
+                <input
+                  style={{ ...s.input, width: 200, padding: '4px 8px', fontSize: '0.82rem' }}
+                  value={activeStage?.label ?? ''}
+                  onChange={e => updateStage(activeStageIndex, { label: e.target.value })}
+                  placeholder={`Stage ${activeStageIndex + 1}`}
+                />
+              </div>
+            )}
             <div style={s.pythonEditor}>
               <CodeEditor
                 value={activePythonCode}
                 language="python"
-                onChange={v => isCompleteTab ? set('completeCode', v) : set('starterCode', v)}
+                onChange={v => isCompleteTab ? set('completeCode', v) : isStageTab ? updateStage(activeStageIndex, { code: v }) : set('starterCode', v)}
                 style={s.attachedCodeEditor}
               />
             </div>
@@ -919,6 +987,9 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
             <CodeWorkspaceTabs
               activeTab={codeTab}
               onChange={handleCodeTabChange}
+              stages={codeStages}
+              onAddStage={handleAddStage}
+              onRemoveStage={handleRemoveStage}
               rightAction={
                 <button
                   type="button"
@@ -931,6 +1002,17 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                 </button>
               }
             />
+            {isStageTab && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: '#f5f3ff', border: '1px solid #e5e7eb', borderTop: 0, borderBottom: 0 }}>
+                <span style={{ fontFamily: 'var(--font-body)', fontSize: '0.8rem', color: '#6b7280', fontWeight: 600 }}>Stage label:</span>
+                <input
+                  style={{ ...s.input, width: 200, padding: '4px 8px', fontSize: '0.82rem' }}
+                  value={activeStage?.label ?? ''}
+                  onChange={e => updateStage(activeStageIndex, { label: e.target.value })}
+                  placeholder={`Stage ${activeStageIndex + 1}`}
+                />
+              </div>
+            )}
 
             <div style={s.htmlSplit}>
             <SplitPane
@@ -947,6 +1029,9 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                       if (isCompleteTab) {
                         set('completeFiles', [...(task.completeFiles ?? []), f])
                         setSelectedCompleteFile(f.name)
+                      } else if (isStageTab) {
+                        updateStage(activeStageIndex, { files: [...(activeStage?.files ?? []), f] })
+                        setSelectedFile(f.name)
                       } else {
                         set('starterFiles', [...(task.starterFiles ?? []), f])
                         setSelectedFile(f.name)
@@ -956,17 +1041,23 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                       if (isCompleteTab) {
                         onUpdate({ ...task, completeFiles: newFiles, completeEntryFile: newEntry })
                         setSelectedCompleteFile(newFiles[0]?.name ?? '')
+                      } else if (isStageTab) {
+                        updateStage(activeStageIndex, { files: newFiles, entryFile: newEntry })
+                        setSelectedFile(newFiles[0]?.name ?? '')
                       } else {
                         onUpdate({ ...task, starterFiles: newFiles, entryFile: newEntry })
                         setSelectedFile(newFiles[0]?.name ?? '')
                       }
                     }}
                     onDeleteFile={name => {
-                      const current = isCompleteTab ? (task.completeFiles ?? []) : (task.starterFiles ?? [])
+                      const current = isCompleteTab ? (task.completeFiles ?? []) : isStageTab ? (activeStage?.files ?? []) : (task.starterFiles ?? [])
                       const next = current.filter(f => f.name !== name)
                       if (isCompleteTab) {
                         set('completeFiles', next)
                         setSelectedCompleteFile(next[0]?.name ?? '')
+                      } else if (isStageTab) {
+                        updateStage(activeStageIndex, { files: next })
+                        setSelectedFile(next[0]?.name ?? '')
                       } else {
                         set('starterFiles', next)
                         setSelectedFile(next[0]?.name ?? '')
@@ -974,9 +1065,14 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                     }}
                     onChangeType={(name, type) => {
                       if (isCompleteTab) set('completeFiles', (task.completeFiles ?? []).map(f => f.name === name ? { ...f, type } : f))
+                      else if (isStageTab) updateStage(activeStageIndex, { files: (activeStage?.files ?? []).map(f => f.name === name ? { ...f, type } : f) })
                       else set('starterFiles', (task.starterFiles ?? []).map(f => f.name === name ? { ...f, type } : f))
                     }}
-                    onChangeEntryFile={name => isCompleteTab ? set('completeEntryFile', name) : set('entryFile', name)}
+                    onChangeEntryFile={name => {
+                      if (isCompleteTab) set('completeEntryFile', name)
+                      else if (isStageTab) updateStage(activeStageIndex, { entryFile: name })
+                      else set('entryFile', name)
+                    }}
                     attachedTop
                   />
                 </div>
@@ -1030,6 +1126,7 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                           language={activeFiles.find(f => f.name === activeSelectedFile)?.type ?? 'html'}
                           onChange={v => {
                             if (isCompleteTab) set('completeFiles', (task.completeFiles ?? []).map(f => f.name === activeSelectedFile ? { ...f, content: v } : f))
+                            else if (isStageTab) updateStage(activeStageIndex, { files: (activeStage?.files ?? []).map(f => f.name === activeSelectedFile ? { ...f, content: v } : f) })
                             else set('starterFiles', (task.starterFiles ?? []).map(f => f.name === activeSelectedFile ? { ...f, content: v } : f))
                           }}
                           style={s.htmlCodeEditor}
