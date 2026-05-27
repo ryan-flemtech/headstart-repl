@@ -1,5 +1,9 @@
-import { describe, it, expect } from 'vitest'
+import { afterEach, describe, it, expect, vi } from 'vitest'
 import { buildIframeSrc } from '../iframe.js'
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
 
 // getMime is not exported, so it is tested indirectly via buildIframeSrc
 // by confirming the function succeeds for each file type. Direct MIME type
@@ -118,12 +122,48 @@ describe('buildIframeSrc — cross-file reference rewriting', () => {
 // ─── buildIframeSrc — assets path rewriting ───────────────────────────────────
 
 describe('buildIframeSrc — assetsPath option', () => {
-  it('rewrites an asset reference to the static server URL without throwing', () => {
+  it('rewrites an HTML asset reference to the static server URL', async () => {
+    const blobs = []
+    vi.spyOn(URL, 'createObjectURL').mockImplementation(blob => {
+      blobs.push(blob)
+      return `blob:test-${blobs.length}`
+    })
     const files = [
       { name: 'index.html', type: 'html', content: '<html><body><img src="cat.png"></body></html>' },
     ]
     const options = { assets: ['cat.png'], assetsPath: 'https://cdn.example.com/' }
-    expect(() => buildIframeSrc(files, 'index.html', options)).not.toThrow()
-    expect(buildIframeSrc(files, 'index.html', options)).toBe('blob:mock-url')
+    expect(buildIframeSrc(files, 'index.html', options)).toBe('blob:test-2')
+    expect(await blobs[1].text()).toContain('src="https://cdn.example.com/cat.png"')
+  })
+
+  it('rewrites relative asset references inside linked CSS files', async () => {
+    const blobs = []
+    vi.spyOn(URL, 'createObjectURL').mockImplementation(blob => {
+      blobs.push(blob)
+      return `blob:test-${blobs.length}`
+    })
+    const files = [
+      { name: 'index.html', type: 'html', content: '<html><head><link href="style.css"></head></html>' },
+      { name: 'style.css', type: 'css', content: ".poster { background: url('skiing.jpg') center/cover; }" },
+    ]
+    const options = { assets: ['skiing.jpg'], assetsPath: 'https://cdn.example.com/' }
+    buildIframeSrc(files, 'index.html', options)
+    expect(await blobs[1].text()).toContain("url('https://cdn.example.com/skiing.jpg')")
+  })
+
+  it('keeps editable files ahead of same-named static assets', async () => {
+    const blobs = []
+    vi.spyOn(URL, 'createObjectURL').mockImplementation(blob => {
+      blobs.push(blob)
+      return `blob:test-${blobs.length}`
+    })
+    const files = [
+      { name: 'index.html', type: 'html', content: '<html><head><link href="style.css"></head></html>' },
+      { name: 'style.css', type: 'css', content: 'body { color: red; }' },
+    ]
+    const options = { assets: ['style.css'], assetsPath: 'https://cdn.example.com/' }
+    buildIframeSrc(files, 'index.html', options)
+    expect(await blobs[2].text()).toContain('href="blob:test-2"')
+    expect(await blobs[2].text()).not.toContain('https://cdn.example.com/style.css')
   })
 })
