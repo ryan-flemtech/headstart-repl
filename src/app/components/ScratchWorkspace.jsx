@@ -331,6 +331,8 @@ export default function ScratchWorkspace({
   selectedSpriteId: controlledSpriteId = null,
   onSpriteSelect = null,
   spritePanelTarget = null,
+  onAddSprite = null,
+  spritePanelEditor = null,
 }) {
   const sprites = task?.sprites?.length > 0 ? task.sprites : DEFAULT_SPRITES
   const backdrops = task?.backdrops?.length > 0 ? task.backdrops : []
@@ -1053,8 +1055,21 @@ export default function ScratchWorkspace({
             <span style={s.spriteTileName}>{sp.name}</span>
           </button>
         ))}
+        {!readOnly && onAddSprite && (
+          <button
+            type="button"
+            style={s.spriteAddTile}
+            onClick={onAddSprite}
+            aria-label="Add sprite"
+            title="Add sprite"
+          >
+            <span style={s.spriteAddIcon}>+</span>
+            <span style={s.spriteTileName}>Add</span>
+          </button>
+        )}
       </div>
       {renderSpriteProps(false)}
+      {spritePanelEditor && <div style={s.spritePanelEditor}>{spritePanelEditor}</div>}
     </div>
   )
 
@@ -1239,7 +1254,14 @@ const s = {
   spriteTileThumb: { width: 52, height: 52, borderRadius: 6, overflow: 'hidden', background: '#f8f8f8', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' },
   spriteTileHiddenBadge: { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, background: 'rgba(0,0,0,0.35)', borderRadius: 6 },
   spriteTileName: { fontSize: '0.72rem', fontWeight: 600, color: 'var(--colour-text)', maxWidth: 64, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  spriteAddTile: {
+    width: 70, minHeight: 82, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4,
+    padding: '6px 8px', border: '2px dashed var(--colour-primary)', borderRadius: 8,
+    background: '#fff', cursor: 'pointer', fontFamily: 'var(--font-body)', color: 'var(--colour-primary)',
+  },
+  spriteAddIcon: { fontSize: '1.5rem', lineHeight: 1, fontWeight: 500 },
   spritePropBar: { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', padding: '4px 2px', borderTop: '1px solid #e5e7eb' },
+  spritePanelEditor: { paddingTop: 4, borderTop: '1px solid #e5e7eb' },
   spritePropField: { display: 'flex', flexDirection: 'column', gap: 2 },
   spritePropLabel: { fontSize: '0.65rem', fontWeight: 700, color: '#6b7280', fontFamily: 'var(--font-body)', textTransform: 'uppercase', letterSpacing: '0.03em' },
   spritePropInput: { width: 58, padding: '3px 5px', border: '1px solid #d1d5db', borderRadius: 5, fontFamily: 'var(--font-body)', fontSize: '0.8rem', color: 'var(--colour-text)', textAlign: 'center', background: '#fff' },

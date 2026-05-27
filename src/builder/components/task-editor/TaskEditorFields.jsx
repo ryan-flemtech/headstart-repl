@@ -285,8 +285,9 @@ function QuizTypeIcon({ type }) {
 
 const SPRITE_TYPE_OPTIONS = SPRITE_TYPES.map(t => ({ value: t, label: t.charAt(0).toUpperCase() + t.slice(1) }))
 
-export function SpriteManager({ sprites, onChange, assetsPath = '', lessonId, lessonType }) {
+export function SpriteManager({ sprites, onChange, assetsPath = '', lessonId, lessonType, focusedSpriteId = null, hidePosition = false, hideAdd = false }) {
   const [expandedCostumes, setExpandedCostumes] = React.useState({})
+  const displayedSprites = focusedSpriteId ? sprites.filter(sp => sp.id === focusedSpriteId) : sprites
 
   function addSprite() {
     const next = sprites.length + 1
@@ -325,7 +326,7 @@ export function SpriteManager({ sprites, onChange, assetsPath = '', lessonId, le
 
   return (
     <div style={s.spriteManager}>
-      {sprites.map(sp => (
+      {displayedSprites.map(sp => (
         <div key={sp.id}>
           <div style={s.spriteRow}>
             <input
@@ -337,22 +338,26 @@ export function SpriteManager({ sprites, onChange, assetsPath = '', lessonId, le
             <select style={{ ...s.select, flex: '0 0 auto' }} value={sp.type ?? 'cat'} onChange={e => update(sp.id, 'type', e.target.value)}>
               {SPRITE_TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
-            <label style={s.spriteField}>
-              <span style={s.spriteFieldLabel}>X</span>
-              <input style={{ ...s.input, width: 56 }} type="number" value={sp.x ?? 0} onChange={e => update(sp.id, 'x', Number(e.target.value))} />
-            </label>
-            <label style={s.spriteField}>
-              <span style={s.spriteFieldLabel}>Y</span>
-              <input style={{ ...s.input, width: 56 }} type="number" value={sp.y ?? 0} onChange={e => update(sp.id, 'y', Number(e.target.value))} />
-            </label>
-            <label style={s.spriteField}>
-              <span style={s.spriteFieldLabel}>Size</span>
-              <input style={{ ...s.input, width: 60 }} type="number" min="10" max="500" value={sp.size ?? 100} onChange={e => update(sp.id, 'size', Number(e.target.value))} />
-            </label>
-            <label style={s.spriteField}>
-              <span style={s.spriteFieldLabel}>Dir</span>
-              <input style={{ ...s.input, width: 56 }} type="number" value={sp.direction ?? 90} onChange={e => update(sp.id, 'direction', Number(e.target.value))} />
-            </label>
+            {!hidePosition && (
+              <>
+                <label style={s.spriteField}>
+                  <span style={s.spriteFieldLabel}>X</span>
+                  <input style={{ ...s.input, width: 56 }} type="number" value={sp.x ?? 0} onChange={e => update(sp.id, 'x', Number(e.target.value))} />
+                </label>
+                <label style={s.spriteField}>
+                  <span style={s.spriteFieldLabel}>Y</span>
+                  <input style={{ ...s.input, width: 56 }} type="number" value={sp.y ?? 0} onChange={e => update(sp.id, 'y', Number(e.target.value))} />
+                </label>
+                <label style={s.spriteField}>
+                  <span style={s.spriteFieldLabel}>Size</span>
+                  <input style={{ ...s.input, width: 60 }} type="number" min="10" max="500" value={sp.size ?? 100} onChange={e => update(sp.id, 'size', Number(e.target.value))} />
+                </label>
+                <label style={s.spriteField}>
+                  <span style={s.spriteFieldLabel}>Dir</span>
+                  <input style={{ ...s.input, width: 56 }} type="number" value={sp.direction ?? 90} onChange={e => update(sp.id, 'direction', Number(e.target.value))} />
+                </label>
+              </>
+            )}
             <button
               type="button"
               style={s.costumeToggleBtn}
@@ -384,9 +389,11 @@ export function SpriteManager({ sprites, onChange, assetsPath = '', lessonId, le
           )}
         </div>
       ))}
-      <button type="button" className="btn-ghost" style={s.addSpriteBtn} onClick={addSprite}>
-        + Add sprite
-      </button>
+      {!hideAdd && (
+        <button type="button" className="btn-ghost" style={s.addSpriteBtn} onClick={addSprite}>
+          + Add sprite
+        </button>
+      )}
     </div>
   )
 }
