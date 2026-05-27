@@ -69,6 +69,8 @@ Referenced from AGENTS.md. Use this for navigation before opening files.
 | `TeacherTimers.jsx` | Timer strip for elapsed lesson time, planned duration, and active-task countdown |
 | `TeacherSessionControls.jsx` | Teacher top-bar task navigation, presentation/share links, and session action controls |
 | `TeacherCodeTabs.jsx` | Starter/stage/complete tab strip shown above teacher code editors; includes "Send to all" action |
+| `TeacherPreviewBanner.jsx` | Status banner shown when the teacher previews a task without moving students |
+| `TeacherSandboxBanner.jsx` | Status banner shown in sandbox staging/live mode with action buttons |
 | `InformationTask.jsx` | Read-only information/introduction task rendering for lesson flow |
 | `CollapsiblePanelControls.jsx` | Shared collapse/expand tab controls for classroom and builder panels |
 
