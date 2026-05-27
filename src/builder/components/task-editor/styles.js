@@ -397,6 +397,7 @@ export const s = {
   collapsibleField: {
     display: 'flex',
     flexDirection: 'column',
+    flexShrink: 0,
     gap: 0,
     border: '1px solid #e5e7eb',
     borderRadius: 8,
@@ -1251,6 +1252,11 @@ export const s = {
     fontWeight: 600,
     fontSize: '0.82rem',
     lineHeight: 1,
+  },
+  spritePanelHost: {
+    padding: '8px 10px',
+    borderTop: '1px solid #e5e7eb',
+    background: '#fff',
   },
   variableRow: {
     display: 'flex',
