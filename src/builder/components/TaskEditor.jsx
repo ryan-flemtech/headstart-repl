@@ -1345,7 +1345,7 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
               <AssetBrowser
                 assetsPath={resolveAssetsPath(lesson.assetsPath)}
                 assets={lesson.assets}
-                copyMode="full"
+                copyMode="relative"
               />
             </Field>
           )}

@@ -669,9 +669,9 @@ Worker message protocol:
 
 `buildIframeSrc(files, entryFile, options) → string | null` in `src/shared/iframe.js`:
 
-1. Each file converted to a Blob URL
-2. HTML entry file scanned for `href`/`src` references to other files
-3. References rewritten to Blob URLs
+1. Listed asset references in HTML `href`/`src` attributes and CSS `url(...)` values are rewritten to their static lesson asset URLs
+2. Each editable file is converted to a Blob URL
+3. HTML entry file references to other editable files are rewritten to Blob URLs
 4. CSP injected — blocks fetch, XHR, WebSocket except `ws://localhost:5173`
 5. Console interceptor injected — posts `{ source: 'hsc-console', level, args }` via postMessage
 6. Rewritten HTML injected into sandboxed iframe

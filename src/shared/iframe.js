@@ -23,23 +23,30 @@ let _lastLoadId = null
  * Each file becomes a Blob URL; cross-references in the entry HTML are
  * rewritten before injection so that href/src attributes resolve correctly.
  *
- * Asset references (paths in `assets`) that don't match any editable file
- * are rewritten to their static server URL: `assetsPath + assetPath`.
+ * Asset references (paths in `assets`) in HTML attributes or CSS url(...)
+ * values are rewritten to their static server URL: `assetsPath + assetPath`.
  */
 export function buildIframeSrc(files, entryFile = 'index.html', { assets = [], assetsPath = '' } = {}) {
   if (!files || files.length === 0) return null
 
+  const editableFileNames = new Set(files.map(file => file.name))
+  const staticAssets = assets.filter(assetPath => !editableFileNames.has(assetPath))
+  const resolvedFiles = files.map(file => ({
+    ...file,
+    content: rewriteAssetReferences(file, staticAssets, assetsPath),
+  }))
+
   // Build filename → Blob URL map for editable files
   const blobUrls = {}
-  for (const file of files) {
+  for (const file of resolvedFiles) {
     const mime = getMime(file.type || file.name)
     const blob = new Blob([file.content], { type: mime })
     blobUrls[file.name] = URL.createObjectURL(blob)
   }
 
   // Find entry HTML file
-  const entry = files.find(f => f.name === entryFile)
-    ?? files.find(f => f.type === 'html' || f.name.endsWith('.html'))
+  const entry = resolvedFiles.find(f => f.name === entryFile)
+    ?? resolvedFiles.find(f => f.type === 'html' || f.name.endsWith('.html'))
   if (!entry) return null
 
   // Rewrite href/src references to other editable files → Blob URLs
@@ -53,21 +60,6 @@ export function buildIframeSrc(files, entryFile = 'index.html', { assets = [], a
     )
   }
 
-  // Rewrite asset references → static server URLs
-  if (assetsPath && assets.length > 0) {
-    for (const assetPath of assets) {
-      // Match the raw path as the student would write it
-      const escaped = assetPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-      // Encode each path segment so spaces and special chars are valid in URLs
-      const encodedAssetPath = assetPath.split('/').map(encodeURIComponent).join('/')
-      const staticUrl = assetsPath + encodedAssetPath
-      html = html.replace(
-        new RegExp(`(href|src)=["']${escaped}["']`, 'g'),
-        `$1="${staticUrl}"`,
-      )
-    }
-  }
-
   // Inject security (CSP + console interceptor + text reporter)
   const loadId = Math.random().toString(36).slice(2)
   _lastLoadId = loadId
@@ -76,6 +68,34 @@ export function buildIframeSrc(files, entryFile = 'index.html', { assets = [], a
   // Return new Blob URL for the rewritten HTML
   const rewrittenBlob = new Blob([html], { type: 'text/html' })
   return URL.createObjectURL(rewrittenBlob)
+}
+
+function rewriteAssetReferences(file, assets, assetsPath) {
+  if (!assetsPath || assets.length === 0) return file.content
+
+  const isHtml = file.type === 'html' || file.name.endsWith('.html')
+  const isCss = file.type === 'css' || file.name.endsWith('.css')
+  if (!isHtml && !isCss) return file.content
+
+  let content = file.content
+  for (const assetPath of assets) {
+    const escaped = assetPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const encodedAssetPath = assetPath.split('/').map(encodeURIComponent).join('/')
+    const staticUrl = assetsPath + encodedAssetPath
+
+    if (isHtml) {
+      content = content.replace(
+        new RegExp(`((?:href|src)\\s*=\\s*["'])${escaped}(["'])`, 'g'),
+        `$1${staticUrl}$2`,
+      )
+    }
+
+    content = content.replace(
+      new RegExp(`(url\\(\\s*["']?)${escaped}(["']?\\s*\\))`, 'g'),
+      `$1${staticUrl}$2`,
+    )
+  }
+  return content
 }
 
 /**
