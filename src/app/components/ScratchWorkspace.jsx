@@ -32,7 +32,7 @@ const toCanvasY = y => STAGE_H / 2 - y
 
 export const SPRITE_TYPES = ['cat', 'ball', 'star', 'arrow', 'bat', 'parrot']
 
-const SPRITE_TYPE_COLOR = { cat: '#FFA500', ball: '#4C97FF', star: '#FFD700', arrow: '#9966FF', bat: '#374151', parrot: '#22c55e' }
+export const SPRITE_TYPE_COLOR = { cat: '#FFA500', ball: '#4C97FF', star: '#FFD700', arrow: '#9966FF', bat: '#374151', parrot: '#22c55e' }
 
 const ROT_STYLES = [
   { val: 'all around',  icon: '↺', title: 'Rotate all around' },
@@ -326,6 +326,8 @@ export default function ScratchWorkspace({
   externalState  = null,     // legacy alias
   syncNowKey = null,
   hideStage = false,
+  selectedSpriteId: controlledSpriteId = null,
+  onSpriteSelect = null,
 }) {
   const sprites = task?.sprites?.length > 0 ? task.sprites : DEFAULT_SPRITES
   const backdrops = task?.backdrops?.length > 0 ? task.backdrops : []
@@ -359,7 +361,12 @@ export default function ScratchWorkspace({
   const backdropNameRef     = useRef(backdrops[0]?.name ?? null)
   const imageCacheRef       = useRef({})
 
-  const [selectedSpriteId, setSelectedSpriteId] = useState(sprites[0]?.id ?? 'sprite1')
+  const [internalSelectedSpriteId, setInternalSelectedSpriteId] = useState(sprites[0]?.id ?? 'sprite1')
+  const selectedSpriteId = controlledSpriteId ?? internalSelectedSpriteId
+  function setSelectedSpriteId(id) {
+    if (controlledSpriteId !== null) onSpriteSelect?.(id)
+    else setInternalSelectedSpriteId(id)
+  }
   setCostumeContext((sprites.find(sp => sp.id === selectedSpriteId) ?? sprites[0])?.costumes ?? [])
 
   const [status, setStatus]         = useState('loading')
@@ -1073,8 +1080,8 @@ export default function ScratchWorkspace({
         </div>
       )}
 
-      {/* Sprite panel above editor when stage is hidden */}
-      {hideStage && spritePanelCompact}
+      {/* Sprite panel above editor when stage is hidden and no external selector */}
+      {hideStage && !onSpriteSelect && spritePanelCompact}
 
       {/* Block editor — all workspace divs stacked, only selected one visible */}
       <div style={s.editorPane}>

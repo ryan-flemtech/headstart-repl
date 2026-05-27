@@ -10,7 +10,7 @@ import FileManager from './FileManager'
 import BuilderOutputPanel from './BuilderOutputPanel'
 import IframePreview from '../../app/components/IframePreview'
 import { CollapseTabButton } from '../../app/components/CollapsiblePanelControls'
-import ScratchWorkspace from '../../app/components/ScratchWorkspace'
+import ScratchWorkspace, { SPRITE_TYPE_COLOR } from '../../app/components/ScratchWorkspace'
 import QuizTask from '../../app/components/QuizTask'
 import InformationTask from '../../app/components/InformationTask'
 import { DEFAULT_SPRITES } from '../../shared/scratch'
@@ -58,6 +58,8 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
   const [starterBlocksOpen, setStarterBlocksOpen] = useState(false)
   const [starterBlocksSyncKey, setStarterBlocksSyncKey] = useState(0)
   const [scratchModalTab, setScratchModalTab] = useState('starter')
+  const [modalSelectedSpriteId, setModalSelectedSpriteId] = useState(null)
+  const [sidebarSections, setSidebarSections] = useState({ toolbox: true, sprites: true, backdrops: false, variables: false })
   const [modalStarterBlocks, setModalStarterBlocks] = useState(null)
   const modalStarterBlocksRef = React.useRef(null)
   const modalCompleteBlocksRef = React.useRef(null)
@@ -276,11 +278,17 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
     setScratchModalTab('starter')
     setStarterBlocksOpen(true)
     setCheckResult(null)
+    const activeSprites = task.sprites?.length > 0 ? task.sprites : DEFAULT_SPRITES
+    setModalSelectedSpriteId(activeSprites[0]?.id ?? null)
   }
 
   function handleCloseStarterBlocks() {
     setStarterBlocksSyncKey(key => key + 1)
     requestAnimationFrame(() => setStarterBlocksOpen(false))
+  }
+
+  function toggleSidebarSection(name) {
+    setSidebarSections(prev => ({ ...prev, [name]: !prev[name] }))
   }
 
   function handleScratchModalTabChange(tab) {
@@ -927,39 +935,98 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                 <div style={s.scratchModalBody}>
                   {scratchModalTab === 'starter' && (
                     <div style={s.scratchConfigSidebar}>
-                      <div style={s.sidebarSection}>
-                        <span style={s.sidebarSectionTitle}>Toolbox blocks</span>
-                        <ScratchToolboxPicker
-                          toolbox={task.toolbox ?? ''}
-                          onChange={toolbox => set('toolbox', toolbox)}
-                        />
+                      {/* Toolbox blocks */}
+                      <div style={s.collapsibleField}>
+                        <button type="button" style={s.collapsibleHeader} onClick={() => toggleSidebarSection('toolbox')}>
+                          <span style={s.collapsibleLabel}>Toolbox blocks</span>
+                          <span style={{ ...s.collapsibleChevron, transform: sidebarSections.toolbox ? 'rotate(180deg)' : 'none' }}>▾</span>
+                        </button>
+                        {sidebarSections.toolbox && (
+                          <ScratchToolboxPicker
+                            toolbox={task.toolbox ?? ''}
+                            onChange={toolbox => set('toolbox', toolbox)}
+                          />
+                        )}
                       </div>
-                      <div style={s.sidebarSection}>
-                        <span style={s.sidebarSectionTitle}>Sprites</span>
-                        <SpriteManager
-                          sprites={task.sprites?.length > 0 ? task.sprites : DEFAULT_SPRITES}
-                          onChange={sprites => set('sprites', sprites)}
-                          assetsPath={lesson.assetsPath ? resolveAssetsPath(lesson.assetsPath) : ''}
-                          lessonId={lesson.id}
-                          lessonType={lesson.type}
-                        />
+
+                      {/* Sprites */}
+                      <div style={s.collapsibleField}>
+                        <button type="button" style={s.collapsibleHeader} onClick={() => toggleSidebarSection('sprites')}>
+                          <span style={s.collapsibleLabel}>Sprites</span>
+                          <span style={{ ...s.collapsibleChevron, transform: sidebarSections.sprites ? 'rotate(180deg)' : 'none' }}>▾</span>
+                        </button>
+                        {sidebarSections.sprites && (() => {
+                          const activeSprites = task.sprites?.length > 0 ? task.sprites : DEFAULT_SPRITES
+                          return (
+                            <>
+                              <div style={s.spriteSelectorRow}>
+                                {activeSprites.map(sp => (
+                                  <button
+                                    key={sp.id}
+                                    type="button"
+                                    style={{ ...s.spriteSelectorTile, ...(sp.id === modalSelectedSpriteId ? s.spriteSelectorTileActive : {}) }}
+                                    onClick={() => setModalSelectedSpriteId(sp.id)}
+                                  >
+                                    <span style={{ ...s.spriteSelectorDot, background: SPRITE_TYPE_COLOR[sp.type ?? 'cat'] ?? '#9ca3af' }} />
+                                    <span>{sp.name}</span>
+                                  </button>
+                                ))}
+                              </div>
+                              <div style={{ padding: '10px 12px', borderTop: '1px solid #e5e7eb' }}>
+                                <SpriteManager
+                                  sprites={activeSprites}
+                                  onChange={newSprites => {
+                                    set('sprites', newSprites)
+                                    const currentIds = new Set(activeSprites.map(sp => sp.id))
+                                    const added = newSprites.find(sp => !currentIds.has(sp.id))
+                                    if (added) setModalSelectedSpriteId(added.id)
+                                    else if (!newSprites.find(sp => sp.id === modalSelectedSpriteId)) {
+                                      setModalSelectedSpriteId(newSprites[0]?.id ?? null)
+                                    }
+                                  }}
+                                  assetsPath={lesson.assetsPath ? resolveAssetsPath(lesson.assetsPath) : ''}
+                                  lessonId={lesson.id}
+                                  lessonType={lesson.type}
+                                />
+                              </div>
+                            </>
+                          )
+                        })()}
                       </div>
-                      <div style={s.sidebarSection}>
-                        <span style={s.sidebarSectionTitle}>Backdrops</span>
-                        <BackdropManager
-                          backdrops={task.backdrops?.length > 0 ? task.backdrops : [{ id: 'backdrop1', name: 'Backdrop 1', colour: '#ffffff' }]}
-                          onChange={backdrops => set('backdrops', backdrops)}
-                          assetsPath={lesson.assetsPath ? resolveAssetsPath(lesson.assetsPath) : ''}
-                          lessonId={lesson.id}
-                          lessonType={lesson.type}
-                        />
+
+                      {/* Backdrops */}
+                      <div style={s.collapsibleField}>
+                        <button type="button" style={s.collapsibleHeader} onClick={() => toggleSidebarSection('backdrops')}>
+                          <span style={s.collapsibleLabel}>Backdrops</span>
+                          <span style={{ ...s.collapsibleChevron, transform: sidebarSections.backdrops ? 'rotate(180deg)' : 'none' }}>▾</span>
+                        </button>
+                        {sidebarSections.backdrops && (
+                          <div style={{ padding: '10px 12px', borderTop: '1px solid #e5e7eb' }}>
+                            <BackdropManager
+                              backdrops={task.backdrops?.length > 0 ? task.backdrops : [{ id: 'backdrop1', name: 'Backdrop 1', colour: '#ffffff' }]}
+                              onChange={backdrops => set('backdrops', backdrops)}
+                              assetsPath={lesson.assetsPath ? resolveAssetsPath(lesson.assetsPath) : ''}
+                              lessonId={lesson.id}
+                              lessonType={lesson.type}
+                            />
+                          </div>
+                        )}
                       </div>
-                      <div style={s.sidebarSection}>
-                        <span style={s.sidebarSectionTitle}>Variables</span>
-                        <VariableManager
-                          variables={task.variables ?? []}
-                          onChange={variables => set('variables', variables.length > 0 ? variables : undefined)}
-                        />
+
+                      {/* Variables */}
+                      <div style={s.collapsibleField}>
+                        <button type="button" style={s.collapsibleHeader} onClick={() => toggleSidebarSection('variables')}>
+                          <span style={s.collapsibleLabel}>Variables</span>
+                          <span style={{ ...s.collapsibleChevron, transform: sidebarSections.variables ? 'rotate(180deg)' : 'none' }}>▾</span>
+                        </button>
+                        {sidebarSections.variables && (
+                          <div style={{ padding: '10px 12px', borderTop: '1px solid #e5e7eb' }}>
+                            <VariableManager
+                              variables={task.variables ?? []}
+                              onChange={variables => set('variables', variables.length > 0 ? variables : undefined)}
+                            />
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -978,6 +1045,8 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                           set('starterBlocks', states)
                         }}
                         syncNowKey={starterBlocksSyncKey}
+                        selectedSpriteId={modalSelectedSpriteId}
+                        onSpriteSelect={setModalSelectedSpriteId}
                       />
                     ) : scratchModalTab === 'complete' ? (
                       <ScratchWorkspace
