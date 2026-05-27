@@ -186,9 +186,16 @@ Carry-through is per-file matched by filename. Files not present in the carried 
 }
 ```
 
-Sprite: `{ id, name, type?, x?, y?, size?, direction?, costumes? }`  
+Sprite: `{ id, name, type?, x?, y?, size?, direction?, rotationStyle?, visible?, costume?, costumes? }`
 Backdrop: `{ id, name, colour?, image? }` — use `colour` for solid, `image` for file-based.  
 Toolbox omitted or empty → full default toolbox.
+
+The lesson builder loads reusable Scratch sprite presets from
+`public/scratch-assets/sprites.json`. A selected preset is copied into task or
+sandbox `sprites` with a new unique lesson sprite ID. Presets may provide
+starting position, size, direction, `rotationStyle`, visibility and costumes.
+Costume and backdrop images can be relative to lesson `assetsPath`, or use a
+shared public root path such as `/assets/shared/sprites/rocket.png`.
 
 ## 10. Information Tasks
 
