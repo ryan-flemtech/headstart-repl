@@ -1,17 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import ReactMarkdown from 'react-markdown'
-import remarkBreaks from 'remark-breaks'
 import { searchTopics } from './topicLibrary'
-
-const descriptionComponents = {
-  p({ children }) {
-    return <p style={s.descriptionParagraph}>{children}</p>
-  },
-  code({ children }) {
-    return <code style={s.descriptionCode}>{children}</code>
-  },
-}
 
 export function TopicReference({ topic, label, onOpen }) {
   const [showPreview, setShowPreview] = useState(false)
@@ -90,7 +79,7 @@ export function TopicReference({ topic, label, onOpen }) {
   )
 }
 
-export function TopicLibraryDialog({ topics, initialTopicId, onClose }) {
+export function TopicLibraryDialog({ topics, initialTopicId, onClose, renderMarkdown: MarkdownContent, topicType = null }) {
   const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState(initialTopicId || topics[0]?.id || '')
   const filteredTopics = useMemo(() => searchTopics(topics, query), [topics, query])
@@ -151,12 +140,14 @@ export function TopicLibraryDialog({ topics, initialTopicId, onClose }) {
                 <p style={s.detailSummary}>{selectedTopic.summary}</p>
                 {selectedTopic.description && (
                   <div style={s.detailText}>
-                    <ReactMarkdown remarkPlugins={[remarkBreaks]} components={descriptionComponents}>
-                      {selectedTopic.description}
-                    </ReactMarkdown>
+                    <MarkdownContent content={selectedTopic.description} textScale={0.95} topicType={topicType} />
                   </div>
                 )}
-                {selectedTopic.syntax && <pre style={s.syntax}><code>{selectedTopic.syntax}</code></pre>}
+                {selectedTopic.syntax && (
+                  <div style={s.syntaxContent}>
+                    <MarkdownContent content={selectedTopic.syntax} textScale={0.95} topicType={topicType} />
+                  </div>
+                )}
                 {selectedTopic.related.length > 0 && (
                   <div style={s.related}>
                     <div style={s.relatedLabel}>Related topics</div>
@@ -237,15 +228,7 @@ const s = {
   detailTitle: { margin: '6px 0 10px', color: 'var(--colour-primary-dark)', fontFamily: 'var(--font-title)', fontSize: '1.55rem' },
   detailSummary: { margin: '0 0 16px', color: 'var(--colour-text)', fontWeight: 700, fontSize: '1.02rem', lineHeight: 1.5 },
   detailText: { color: 'var(--colour-text)', lineHeight: 1.6, margin: '0 0 16px' },
-  descriptionParagraph: { margin: '0 0 10px' },
-  descriptionCode: {
-    borderRadius: 4, background: '#f0eafa', color: 'var(--colour-primary-dark)',
-    fontFamily: "'JetBrains Mono', monospace", fontSize: '0.9em', padding: '1px 4px',
-  },
-  syntax: {
-    padding: '12px 14px', border: '1px solid #e5e7eb', borderRadius: 8, background: '#fafafa',
-    fontFamily: "'JetBrains Mono', monospace", fontSize: '0.88rem', whiteSpace: 'pre-wrap',
-  },
+  syntaxContent: { marginTop: 10 },
   related: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 7, marginTop: 22 },
   relatedLabel: { width: '100%', color: '#6b7280', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' },
   relatedButton: {

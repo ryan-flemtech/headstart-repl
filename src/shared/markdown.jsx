@@ -382,6 +382,8 @@ export function InlineMarkdown({ content, topicType = null }) {
         <TopicLibraryDialog
           topics={topics}
           initialTopicId={selectedTopicId}
+          renderMarkdown={MarkdownRenderer}
+          topicType={topicType}
           onClose={() => setLibraryOpen(false)}
         />
       )}
@@ -756,6 +758,8 @@ export function MarkdownRenderer({ content, title, style, textScale = 1, inherit
         <TopicLibraryDialog
           topics={topics}
           initialTopicId={selectedTopicId}
+          renderMarkdown={MarkdownRenderer}
+          topicType={topicType}
           onClose={() => setLibraryOpen(false)}
         />
       )}

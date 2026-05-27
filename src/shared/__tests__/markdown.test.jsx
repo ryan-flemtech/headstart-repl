@@ -101,7 +101,8 @@ describe('MarkdownRenderer', () => {
           types: ['python'],
           category: 'Loop',
           summary: 'Repeat code.',
-          description: 'Runs a **block** again.',
+          description: 'Runs a **block** with `python:print()` again.',
+          syntax: 'Use `python:for i in range(3):`.',
           related: [],
         }],
       }),
@@ -119,6 +120,11 @@ describe('MarkdownRenderer', () => {
     expect(screen.getByRole('dialog', { name: 'Topic library' })).toBeInTheDocument()
     expect(screen.getByPlaceholderText('Search topics...')).toBeInTheDocument()
     expect(screen.getByText('block').tagName).toBe('STRONG')
+    const highlightedTokens = document.querySelectorAll('.language-python')
+    expect(Array.from(highlightedTokens).map(element => element.textContent)).toEqual(expect.arrayContaining([
+      'print()',
+      'for i in range(3):',
+    ]))
   })
 })
 
