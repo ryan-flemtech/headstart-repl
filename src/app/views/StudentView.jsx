@@ -24,6 +24,7 @@ import SplitPane from '../../shared/SplitPane'
 import { resolveAssetsPath } from '../../shared/assetPaths'
 import { loadSavedCode, loadSavedFile, saveCode, saveFile } from '../studentStorage'
 import { selectHtmlTaskFiles, selectPythonTaskCode, selectScratchInitialProject } from '../studentTaskContent'
+import { deriveStudentLiveDisplay, toTeacherLiveFiles } from '../studentLiveDisplay'
 
 const TASK_TRANSITION_MS = 380
 
@@ -234,11 +235,7 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
       setTeacherLiveIframeSrc(null)
       return
     }
-    const liveFiles = Object.entries(session.teacherLive.files).map(([name, content]) => ({
-      name,
-      content,
-      type: name.endsWith('.html') ? 'html' : name.endsWith('.css') ? 'css' : 'javascript',
-    }))
+    const liveFiles = toTeacherLiveFiles(session.teacherLive.files)
     const liveTask = flattenTasks(lesson.tasks).find(t => t.id === session.teacherLive.taskId)
     setHtmlPreviewCollapsed(false)
     setTeacherLiveIframeSrc(buildIframeSrc(liveFiles, liveTask?.entryFile ?? 'index.html', {
@@ -1001,44 +998,45 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
     )
   }
 
-  const forcedTeacherTaskId = session?.teacherLive?.taskId ?? currentTaskId
   const flatTasks = flattenTasks(lesson.tasks)
   const currentIndex = flatTasks.findIndex(t => t.id === currentTaskId)
-  const isTeacherLiveViewer = !teacherPresentation
-    && (phase === 'lesson' || phase === 'sandbox')
-    && session?.teacherLive?.active
-    && session.teacherLive.source === 'teacher'
-  const isPresentationStudentViewer = teacherPresentation
-    && session?.teacherLive?.active
-    && session.teacherLive.source === 'student'
-  const isStudentGoLiveViewer = !teacherPresentation
-    && (phase === 'lesson' || phase === 'sandbox')
-    && session?.teacherLive?.active
-    && session.teacherLive.source === 'student'
-    && session.teacherLive.sourceStudentId !== identity?.anonymousId
-  const task = flatTasks.find(t => t.id === ((isTeacherLiveViewer || isPresentationStudentViewer || isStudentGoLiveViewer) ? forcedTeacherTaskId : (viewingTaskId ?? currentTaskId)))
+  const {
+    isPresentationStudentViewer,
+    isStudentGoLiveViewer,
+    isTeacherLiveActive,
+    isForcedTeacherLive,
+    displayedTaskId,
+    displayCode,
+    displayFiles,
+    displayActiveFile,
+    displayOutput,
+    displayRunStatus,
+    displayCheckPassed,
+    displayCheckAttempted,
+    displayCheckSuggestion,
+    displaySelection,
+    displayActivity,
+  } = deriveStudentLiveDisplay({
+    teacherPresentation,
+    phase,
+    teacherLive: session?.teacherLive,
+    identityId: identity?.anonymousId,
+    currentTaskId,
+    viewingTaskId,
+    code,
+    files,
+    activeFile,
+    output,
+    runStatus,
+    checkPassed,
+    checkAttempted,
+    checkSuggestion,
+    editorActivity,
+  })
+  const task = flatTasks.find(t => t.id === displayedTaskId)
   const isViewingPrev = viewingTaskId !== null && viewingTaskId !== currentTaskId
   const isSandbox = phase === 'sandbox'
   const isSolo = phase === 'solo'
-  const isTeacherLiveActive = teacherPresentation && session?.teacherLive?.active && session.teacherLive.source === 'teacher'
-  const isForcedTeacherLive = isTeacherLiveViewer || isPresentationStudentViewer || isStudentGoLiveViewer
-  const teacherLiveFiles = session?.teacherLive?.files
-    ? Object.entries(session.teacherLive.files).map(([name, content]) => ({
-      name,
-      content,
-      type: name.endsWith('.html') ? 'html' : name.endsWith('.css') ? 'css' : 'javascript',
-    }))
-    : []
-  const displayCode = isForcedTeacherLive ? (session.teacherLive.code ?? '') : code
-  const displayFiles = isForcedTeacherLive ? teacherLiveFiles : files
-  const displayActiveFile = isForcedTeacherLive ? (session.teacherLive.activeFile ?? teacherLiveFiles[0]?.name ?? '') : activeFile
-  const displayOutput = isForcedTeacherLive ? (session.teacherLive.output ?? '') : output
-  const displayRunStatus = isForcedTeacherLive ? (session.teacherLive.runStatus ?? null) : runStatus
-  const displayCheckPassed = isForcedTeacherLive ? !!session.teacherLive.checkPassed : checkPassed
-  const displayCheckAttempted = isForcedTeacherLive ? !!session.teacherLive.checkAttempted : checkAttempted
-  const displayCheckSuggestion = isForcedTeacherLive ? (session.teacherLive.checkSuggestion ?? '') : checkSuggestion
-  const displaySelection = isForcedTeacherLive ? (session.teacherLive.selection ?? null) : null
-  const displayActivity = isForcedTeacherLive ? (session.teacherLive.activity ?? null) : editorActivity
   const isQuizTask = task?.taskType === 'quiz'
   const isAutoEvaluatedQuiz = isQuizTask && (task?.quizType === 'match' || task?.quizType === 'fill_blank')
   const isInformationTask = task?.taskType === 'information'

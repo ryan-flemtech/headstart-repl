@@ -56,6 +56,14 @@ Implemented on 26 May 2026 in [`codex/refactor-teacher-presentation-controls`](h
 - Moved its static popover/control styling into the established CSS layer.
 - Added focused component coverage for navigation, share callbacks, and state-specific actions.
 
+## Progress Update - PR #76
+
+Implemented on 26 May 2026 in [`refactor/student-task-content`](https://github.com/Headstart-Coding-Launchpad/editor/pull/76):
+
+- Extracted StudentView task-content precedence into `src/app/studentTaskContent.js` for Python, HTML, and Scratch content selection.
+- Added characterization coverage for solo restore, carry-through, starter fallback, and the existing standalone-task carry behaviour.
+- Updated maintenance inventories while leaving session effects, Firebase writes, localStorage keys, and lesson output unchanged.
+
 ## Guiding Rules
 
 - Preserve current public props, exports, lesson JSON shape, Firebase paths, and localStorage keys during refactors.
