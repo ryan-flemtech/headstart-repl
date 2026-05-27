@@ -974,6 +974,12 @@ export const s = {
     fontFamily: 'var(--font-body)',
     fontWeight: 600,
   },
+  addSpriteRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
   backdropManager: {
     display: 'flex',
     flexDirection: 'column',

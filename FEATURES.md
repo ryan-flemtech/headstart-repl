@@ -189,6 +189,7 @@ All features listed here are implemented in the current codebase. Replaces `Quiz
 - ID, type (python/html/scratch), title, description, level
 - Asset path and asset list (for AssetBrowser)
 - Sandbox starter: Python code, HTML files, Scratch state, toolbox, sprites, backdrops
+- Scratch sprite preset picker backed by reusable `public/scratch-assets/sprites.json` definitions
 
 ### Task Management
 - All task types: code (all 3 lesson types), information, quiz (all 4 sub-types)

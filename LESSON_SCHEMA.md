@@ -252,6 +252,9 @@ Sprite object:
 | `y` | No | number | Scratch stage y coordinate, clamped around `-180` to `180`. |
 | `size` | No | number | Percent size. Defaults to `100`. |
 | `direction` | No | number | Scratch direction. Defaults to `90`. |
+| `rotationStyle` | No | string | Initial rotation: `all around`, `left-right`, or `don't rotate`. |
+| `visible` | No | boolean | Initial stage visibility. Defaults to `true`. |
+| `costume` | No | string | Initial costume name; defaults to the first costume. |
 | `costumes` | No | costume array | Optional image costumes. First costume is default. |
 
 Costume object:
@@ -259,7 +262,7 @@ Costume object:
 | Field | Required | Type | Notes |
 |---|---:|---|---|
 | `name` | Yes | string | Costume name used by costume blocks. |
-| `image` | No | string | Path relative to lesson `assetsPath`. |
+| `image` | No | string | Path relative to lesson `assetsPath`, or a public root path such as `/assets/shared/cat.png`. |
 
 Backdrop object:
 
@@ -268,7 +271,7 @@ Backdrop object:
 | `id` | Yes | string | Stable backdrop ID. |
 | `name` | Yes | string | Display name used by backdrop blocks. |
 | `colour` | No | string | CSS colour for solid backdrop. |
-| `image` | No | string | Path relative to lesson `assetsPath`. If present, image mode is used. |
+| `image` | No | string | Path relative to lesson `assetsPath`, or a public root path. If present, image mode is used. |
 
 Supported combinations:
 
@@ -278,10 +281,37 @@ Supported combinations:
 - Multi-sprite project: multiple `sprites`, with `starterBlocks` keyed by each sprite ID.
 - Shape sprites: use `type` with no costumes.
 - Image sprites: add `costumes` and set lesson-level `assetsPath`.
+- Shared image sprites: use a public root path in `costumes[].image`; no lesson `assetsPath` is required.
 - Solid backdrop: use `colour`.
 - Image backdrop: use `image` and lesson-level `assetsPath`.
 - Manual checks: `evaluation: "manual"` shows a Check button.
 - After-run checks: `evaluation: "after_run"` evaluates after running.
+
+### Public Sprite Presets
+
+The builder loads reusable Scratch sprite definitions from `public/scratch-assets/sprites.json`.
+Each object is a normal sprite object whose `id` is used only as the catalogue key.
+When selected in the builder, it is copied into the lesson with a new unique `spriteN` ID.
+
+```json
+[
+  {
+    "id": "rocket",
+    "name": "Rocket",
+    "type": "arrow",
+    "x": -120,
+    "y": 0,
+    "size": 80,
+    "direction": 90,
+    "rotationStyle": "all around",
+    "costumes": [
+      { "name": "rocket", "image": "/assets/shared/sprites/rocket.png" }
+    ]
+  }
+]
+```
+
+Preset definitions may use the same location, rotation, visibility, costume, and built-in type fields as lesson sprites. Root-relative costume paths allow one public preset catalogue to be shared across lessons.
 
 ## Information Tasks
 

@@ -16,6 +16,7 @@ import {
   setBackdropContext,
   setCostumeContext,
 } from '../../shared/scratch'
+import { resolveAssetFileUrl } from '../../shared/assetPaths'
 
 const STAGE_W = 480
 const STAGE_H = 360
@@ -46,7 +47,7 @@ function normaliseInitialStates(raw, sprites) {
 }
 
 function defaultSpriteState(sp) {
-  return { x: sp.x ?? 0, y: sp.y ?? 0, size: sp.size ?? 100, direction: sp.direction ?? 90, visible: true, bubble: '', bubbleType: 'say', rotationStyle: 'all around', costume: sp.costumes?.[0]?.name ?? null }
+  return { x: sp.x ?? 0, y: sp.y ?? 0, size: sp.size ?? 100, direction: sp.direction ?? 90, visible: sp.visible ?? true, bubble: '', bubbleType: 'say', rotationStyle: sp.rotationStyle ?? 'all around', costume: sp.costume ?? sp.costumes?.[0]?.name ?? null }
 }
 
 function initSpriteStates(sprites) {
@@ -192,8 +193,8 @@ function drawSpriteThumb(ctx, sprite, state, imageCache, assetsPath, size) {
   const costumeEntry = sprite.costumes?.length > 0
     ? (sprite.costumes.find(c => c.name === state?.costume) ?? sprite.costumes[0])
     : null
-  if (costumeEntry?.image && assetsPath && imageCache) {
-    const url = assetsPath.replace(/\/$/, '') + '/' + costumeEntry.image.replace(/^\//, '')
+  if (costumeEntry?.image && imageCache) {
+    const url = resolveAssetFileUrl(assetsPath, costumeEntry.image)
     const img = imageCache[url]
     if (img) {
       ctx.save(); ctx.translate(cx, cy); ctx.rotate(rot)
@@ -390,8 +391,8 @@ export default function ScratchWorkspace({
     const currentName = backdropNameRef.current
     const backdrop = (currentName ? backdrops.find(b => b.name === currentName) : null) ?? backdrops[0]
 
-    if (backdrop?.image && assetsPath) {
-      const url = assetsPath.replace(/\/$/, '') + '/' + backdrop.image.replace(/^\//, '')
+    if (backdrop?.image) {
+      const url = resolveAssetFileUrl(assetsPath, backdrop.image)
       const img = imageCacheRef.current[url]
       if (img) {
         ctx.drawImage(img, 0, 0, STAGE_W, STAGE_H)
@@ -410,8 +411,8 @@ export default function ScratchWorkspace({
       const costumeEntry = sp.costumes?.length > 0
         ? (sp.costumes.find(c => c.name === state.costume) ?? sp.costumes[0])
         : null
-      if (costumeEntry?.image && assetsPath) {
-        const url = assetsPath.replace(/\/$/, '') + '/' + costumeEntry.image.replace(/^\//, '')
+      if (costumeEntry?.image) {
+        const url = resolveAssetFileUrl(assetsPath, costumeEntry.image)
         const img = imageCacheRef.current[url]
         if (img) { drawSpriteImage(ctx, state, img); continue }
       }
@@ -427,10 +428,10 @@ export default function ScratchWorkspace({
 
   // ── Preload backdrop images ──────────────────────────────────────────────────
   useEffect(() => {
-    if (!assetsPath) return
     for (const backdrop of backdrops) {
       if (!backdrop.image) continue
-      const url = assetsPath.replace(/\/$/, '') + '/' + backdrop.image.replace(/^\//, '')
+      const url = resolveAssetFileUrl(assetsPath, backdrop.image)
+      if (!url) continue
       if (imageCacheRef.current[url] !== undefined) continue
       imageCacheRef.current[url] = null
       const img = new Image()
@@ -444,11 +445,11 @@ export default function ScratchWorkspace({
 
   // ── Preload sprite costume images ────────────────────────────────────────────
   useEffect(() => {
-    if (!assetsPath) return
     for (const sp of sprites) {
       for (const costume of sp.costumes ?? []) {
         if (!costume.image) continue
-        const url = assetsPath.replace(/\/$/, '') + '/' + costume.image.replace(/^\//, '')
+        const url = resolveAssetFileUrl(assetsPath, costume.image)
+        if (!url) continue
         if (imageCacheRef.current[url] !== undefined) continue
         imageCacheRef.current[url] = null
         const img = new Image()

@@ -1,1 +1,62 @@
-[]
+[
+  {
+    "id": "cat",
+    "name": "Cat",
+    "type": "cat",
+    "x": 0,
+    "y": 0,
+    "size": 100,
+    "direction": 90,
+    "rotationStyle": "all around"
+  },
+  {
+    "id": "ball",
+    "name": "Ball",
+    "type": "ball",
+    "x": 0,
+    "y": 0,
+    "size": 100,
+    "direction": 90,
+    "rotationStyle": "all around"
+  },
+  {
+    "id": "star",
+    "name": "Star",
+    "type": "star",
+    "x": 0,
+    "y": 0,
+    "size": 100,
+    "direction": 90,
+    "rotationStyle": "all around"
+  },
+  {
+    "id": "arrow",
+    "name": "Arrow",
+    "type": "arrow",
+    "x": 0,
+    "y": 0,
+    "size": 100,
+    "direction": 90,
+    "rotationStyle": "all around"
+  },
+  {
+    "id": "bat",
+    "name": "Bat",
+    "type": "bat",
+    "x": 0,
+    "y": 0,
+    "size": 100,
+    "direction": 90,
+    "rotationStyle": "left-right"
+  },
+  {
+    "id": "parrot",
+    "name": "Parrot",
+    "type": "parrot",
+    "x": 0,
+    "y": 0,
+    "size": 100,
+    "direction": 90,
+    "rotationStyle": "left-right"
+  }
+]

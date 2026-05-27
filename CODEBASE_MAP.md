@@ -15,6 +15,7 @@ Referenced from AGENTS.md. Use this for navigation before opening files.
 | `src/index.css` | Global styles: brand CSS custom properties, button variants, status dots, animations, syntax highlight overrides |
 | `src/builder/main.jsx` | Lesson builder DOM entry |
 | `src/builder/App.jsx` | Builder root: lesson lifecycle, localStorage auto-save, lesson type chooser, restore/save dialogs |
+| `src/builder/spritePresets.js` | Pure reusable Scratch sprite preset validation and unique lesson-sprite creation helpers |
 
 ---
 

@@ -1,7 +1,9 @@
 import React from 'react'
 import AssetBrowser from '../../../shared/AssetBrowser'
 import { useAssets } from '../../../shared/useAssets'
+import { resolveAssetFileUrl } from '../../../shared/assetPaths'
 import { SPRITE_TYPES } from '../../../app/components/ScratchWorkspace'
+import { createSpriteFromPreset, normalizeSpritePresets, SPRITE_PRESETS_PATH } from '../../spritePresets'
 import { s } from './styles'
 
 function CodeWorkspaceTabs({ activeTab, onChange, starterLabel = 'Starter code', testLabel = 'Complete code', rightAction = null }) {
@@ -252,10 +254,33 @@ const SPRITE_TYPE_OPTIONS = SPRITE_TYPES.map(t => ({ value: t, label: t.charAt(0
 
 export function SpriteManager({ sprites, onChange, assetsPath = '', lessonId, lessonType }) {
   const [expandedCostumes, setExpandedCostumes] = React.useState({})
+  const [presets, setPresets] = React.useState([])
+  const [selectedPresetId, setSelectedPresetId] = React.useState('')
+  const [presetsLoading, setPresetsLoading] = React.useState(true)
+
+  React.useEffect(() => {
+    let mounted = true
+    fetch(`${import.meta.env.BASE_URL}${SPRITE_PRESETS_PATH}`)
+      .then(response => {
+        if (!response.ok) throw new Error(`sprite presets fetch failed: ${response.status}`)
+        return response.json()
+      })
+      .then(data => {
+        if (mounted) setPresets(normalizeSpritePresets(data))
+      })
+      .catch(() => {
+        if (mounted) setPresets([])
+      })
+      .finally(() => {
+        if (mounted) setPresetsLoading(false)
+      })
+    return () => { mounted = false }
+  }, [])
 
   function addSprite() {
-    const next = sprites.length + 1
-    onChange([...sprites, { id: `sprite${next}`, name: `Sprite ${next}`, type: 'cat', x: 0, y: 0, size: 100, direction: 90 }])
+    const preset = presets.find(item => item.id === selectedPresetId) ?? null
+    onChange([...sprites, createSpriteFromPreset(sprites, preset)])
+    setSelectedPresetId('')
   }
 
   function removeSprite(id) {
@@ -349,9 +374,23 @@ export function SpriteManager({ sprites, onChange, assetsPath = '', lessonId, le
           )}
         </div>
       ))}
-      <button type="button" className="btn-ghost" style={s.addSpriteBtn} onClick={addSprite}>
-        + Add sprite
-      </button>
+      <div style={s.addSpriteRow}>
+        <select
+          style={{ ...s.select, minWidth: 168 }}
+          aria-label="Choose sprite preset"
+          value={selectedPresetId}
+          onChange={event => setSelectedPresetId(event.target.value)}
+        >
+          <option value="">New blank sprite</option>
+          {presetsLoading && <option disabled>Loading presets...</option>}
+          {presets.map(preset => (
+            <option key={preset.id} value={preset.id}>{preset.name}</option>
+          ))}
+        </select>
+        <button type="button" className="btn-ghost" style={s.addSpriteBtn} onClick={addSprite}>
+          + Add sprite
+        </button>
+      </div>
     </div>
   )
 }
@@ -367,9 +406,7 @@ function CostumeManager({ costumes, assetsPath, lessonId, lessonType, onAdd, onR
         <p style={s.costumeEmpty}>No costumes — sprite uses its built-in shape. Add a costume to use an image from the assets folder.</p>
       )}
       {costumes.map((c, idx) => {
-        const resolvedUrl = c.image && assetsPath
-          ? assetsPath.replace(/\/$/, '') + '/' + c.image.replace(/^\//, '')
-          : null
+        const resolvedUrl = resolveAssetFileUrl(assetsPath, c.image)
         const isBrowsing = browsingIdx === idx
         return (
           <div key={idx} style={s.costumeBlock}>
@@ -453,9 +490,7 @@ export function BackdropManager({ backdrops, onChange, assetsPath, lessonId, les
     <div style={s.backdropManager}>
       {backdrops.map((b, i) => {
         const isImage = b.image !== undefined
-        const resolvedUrl = isImage && b.image && assetsPath
-          ? assetsPath.replace(/\/$/, '') + '/' + b.image.replace(/^\//, '')
-          : null
+        const resolvedUrl = isImage ? resolveAssetFileUrl(assetsPath, b.image) : ''
         const isBrowsing = browsingId === b.id
         return (
           <div key={b.id} style={s.backdropBlock}>
