@@ -6,7 +6,7 @@
       "types": ["python"],
       "category": "Function",
       "summary": "Displays a value in the Python output console.",
-      "description": "Put text, numbers or variables inside the brackets. Strings must be surrounded by quotation marks.",
+      "description": "Put **text**, numbers or variables inside the brackets. Strings must be surrounded by quotation marks.\n\nFor example, `print(\"Hello!\")` displays a greeting.",
       "syntax": "print(\"Hello, world!\")",
       "aliases": ["print", "printing"],
       "related": ["strings", "variables"]

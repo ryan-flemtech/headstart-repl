@@ -1,5 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkBreaks from 'remark-breaks'
 import { searchTopics } from './topicLibrary'
+
+const descriptionComponents = {
+  p({ children }) {
+    return <p style={s.descriptionParagraph}>{children}</p>
+  },
+  code({ children }) {
+    return <code style={s.descriptionCode}>{children}</code>
+  },
+}
 
 export function TopicReference({ topic, label, onOpen }) {
   const [showPreview, setShowPreview] = useState(false)
@@ -87,7 +98,13 @@ export function TopicLibraryDialog({ topics, initialTopicId, onClose }) {
                 <div style={s.detailCategory}>{selectedTopic.category}</div>
                 <h3 style={s.detailTitle}>{selectedTopic.title}</h3>
                 <p style={s.detailSummary}>{selectedTopic.summary}</p>
-                {selectedTopic.description && <p style={s.detailText}>{selectedTopic.description}</p>}
+                {selectedTopic.description && (
+                  <div style={s.detailText}>
+                    <ReactMarkdown remarkPlugins={[remarkBreaks]} components={descriptionComponents}>
+                      {selectedTopic.description}
+                    </ReactMarkdown>
+                  </div>
+                )}
                 {selectedTopic.syntax && <pre style={s.syntax}><code>{selectedTopic.syntax}</code></pre>}
                 {selectedTopic.related.length > 0 && (
                   <div style={s.related}>
@@ -120,7 +137,7 @@ const s = {
     font: 'inherit', fontWeight: 700, padding: '0 3px',
   },
   preview: {
-    position: 'absolute', left: 0, bottom: 'calc(100% + 7px)', zIndex: 120,
+    position: 'absolute', left: 0, top: 'calc(100% + 7px)', zIndex: 120,
     display: 'flex', flexDirection: 'column', gap: 5, width: 250,
     background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8,
     boxShadow: '0 8px 26px rgba(35,18,76,0.18)', padding: 10,
@@ -138,7 +155,7 @@ const s = {
   },
   dialog: {
     display: 'flex', flexDirection: 'column', width: 'min(850px, 100%)', height: 'min(620px, 90vh)',
-    background: '#fff', borderRadius: 14, boxShadow: '0 18px 60px rgba(0,0,0,0.28)', overflow: 'hidden',
+    background: '#fff', color: 'var(--colour-text)', borderRadius: 14, boxShadow: '0 18px 60px rgba(0,0,0,0.28)', overflow: 'hidden',
   },
   header: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16,
@@ -151,7 +168,7 @@ const s = {
     background: 'transparent', color: '#fff', cursor: 'pointer', fontSize: '1rem',
   },
   body: { display: 'grid', gridTemplateColumns: '290px 1fr', minHeight: 0, flex: 1 },
-  listPane: { display: 'flex', flexDirection: 'column', borderRight: '1px solid #e5e7eb', minHeight: 0 },
+  listPane: { display: 'flex', flexDirection: 'column', borderRight: '1px solid #e5e7eb', background: '#fff', minHeight: 0 },
   search: {
     margin: 14, padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8,
     fontFamily: 'var(--font-body)', fontSize: '0.9rem',
@@ -164,11 +181,16 @@ const s = {
   topicResultActive: { background: '#f0eafa' },
   resultTitle: { color: 'var(--colour-text)', fontFamily: 'var(--font-body)', fontWeight: 700 },
   resultMeta: { color: '#6b7280', fontSize: '0.75rem' },
-  detail: { overflowY: 'auto', padding: '28px 32px', fontFamily: 'var(--font-body)' },
+  detail: { overflowY: 'auto', padding: '28px 32px', background: '#fff', color: 'var(--colour-text)', fontFamily: 'var(--font-body)' },
   detailCategory: { color: 'var(--colour-primary)', fontSize: '0.76rem', fontWeight: 700, textTransform: 'uppercase' },
   detailTitle: { margin: '6px 0 10px', color: 'var(--colour-primary-dark)', fontFamily: 'var(--font-title)', fontSize: '1.55rem' },
-  detailSummary: { margin: '0 0 16px', fontWeight: 700, fontSize: '1.02rem', lineHeight: 1.5 },
-  detailText: { lineHeight: 1.6, margin: '0 0 16px' },
+  detailSummary: { margin: '0 0 16px', color: 'var(--colour-text)', fontWeight: 700, fontSize: '1.02rem', lineHeight: 1.5 },
+  detailText: { color: 'var(--colour-text)', lineHeight: 1.6, margin: '0 0 16px' },
+  descriptionParagraph: { margin: '0 0 10px' },
+  descriptionCode: {
+    borderRadius: 4, background: '#f0eafa', color: 'var(--colour-primary-dark)',
+    fontFamily: "'JetBrains Mono', monospace", fontSize: '0.9em', padding: '1px 4px',
+  },
   syntax: {
     padding: '12px 14px', border: '1px solid #e5e7eb', borderRadius: 8, background: '#fafafa',
     fontFamily: "'JetBrains Mono', monospace", fontSize: '0.88rem', whiteSpace: 'pre-wrap',

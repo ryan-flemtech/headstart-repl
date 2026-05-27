@@ -101,7 +101,7 @@ describe('MarkdownRenderer', () => {
           types: ['python'],
           category: 'Loop',
           summary: 'Repeat code.',
-          description: 'Runs a block again.',
+          description: 'Runs a **block** again.',
           related: [],
         }],
       }),
@@ -111,9 +111,11 @@ describe('MarkdownRenderer', () => {
     const topicLink = await screen.findByRole('button', { name: 'For loops' })
     fireEvent.mouseEnter(topicLink)
     expect(screen.getByRole('tooltip')).toHaveTextContent('Repeat code.')
+    expect(screen.getByRole('tooltip')).toHaveStyle({ top: 'calc(100% + 7px)' })
     fireEvent.click(screen.getAllByRole('button', { name: 'For loops' })[1])
     expect(screen.getByRole('dialog', { name: 'Topic library' })).toBeInTheDocument()
     expect(screen.getByPlaceholderText('Search topics...')).toBeInTheDocument()
+    expect(screen.getByText('block').tagName).toBe('STRONG')
   })
 })
 

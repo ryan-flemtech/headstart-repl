@@ -494,7 +494,7 @@ function MarkdownToolbar({ lessonType, inlineCodeLanguages, onAction, imageAsset
             setOpenDropdown(value => value === 'topic' ? null : 'topic')
           }}
         >
-          Topic v
+          Topic ▾
         </button>
         {openDropdown === 'topic' && (
           <div style={{ ...s.dropdown, width: 260, maxHeight: 310, overflowY: 'auto' }}>
