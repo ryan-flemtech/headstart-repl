@@ -1229,4 +1229,21 @@ export const s = {
     fontSize: '0.82rem',
     lineHeight: 1,
   },
+  variableRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+  },
+  variableStageLabel: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 4,
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.78rem',
+    fontWeight: 600,
+    color: '#6b7280',
+    whiteSpace: 'nowrap',
+    cursor: 'pointer',
+    flexShrink: 0,
+  },
 }

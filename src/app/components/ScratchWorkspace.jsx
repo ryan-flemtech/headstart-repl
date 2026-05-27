@@ -15,6 +15,7 @@ import {
   setSpriteContext,
   setBackdropContext,
   setCostumeContext,
+  setVariableContext,
 } from '../../shared/scratch'
 
 const STAGE_W = 480
@@ -328,8 +329,10 @@ export default function ScratchWorkspace({
 }) {
   const sprites = task?.sprites?.length > 0 ? task.sprites : DEFAULT_SPRITES
   const backdrops = task?.backdrops?.length > 0 ? task.backdrops : []
+  const variables = task?.variables ?? []
   setSpriteContext(sprites)
   setBackdropContext(backdrops)
+  setVariableContext(variables)
 
   const normInitStates  = normaliseInitialStates(initialStates ?? initialState, sprites)
   const normExtStates   = externalStates ?? (externalState ? normaliseInitialStates(externalState, sprites) : null)
@@ -364,6 +367,7 @@ export default function ScratchWorkspace({
   const [checkPassed, setCheckPassed] = useState(false)
   const [checkAttempted, setCheckAttempted] = useState(false)
   const [spriteStates, setSpriteStates] = useState(() => initSpriteStates(sprites))
+  const [variableValues, setVariableValues] = useState({})
   const [askPrompt, setAskPrompt]   = useState(null)
   const [askValue, setAskValue]     = useState('')
   const [broadcastToasts, setBroadcastToasts] = useState([])
@@ -710,6 +714,7 @@ export default function ScratchWorkspace({
       setAskValue('')
       setAskPrompt(q)
     })
+    signal.onVariablesChange = vars => setVariableValues({ ...vars })
     signal.onBroadcast = msg => {
       const id = Date.now() + Math.random()
       setBroadcastToasts(prev => [...prev, { id, message: msg }])
@@ -812,6 +817,7 @@ export default function ScratchWorkspace({
     const defaultBackdrop = backdrops[0]?.name ?? null
     backdropNameRef.current = defaultBackdrop
     setBackdropName(defaultBackdrop)
+    setVariableValues({})
     lastCheckRef.current = null
     setCheckPassed(false)
     setCheckAttempted(false)
@@ -1127,6 +1133,16 @@ export default function ScratchWorkspace({
           </div>
 
           <div style={{ ...s.stageFrame, width: STAGE_W * stageScale, height: STAGE_H * stageScale }}>
+            {variables.some(v => v.showOnStage) && (
+              <div style={s.variableMonitors}>
+                {variables.filter(v => v.showOnStage).map(v => (
+                  <div key={v.name} style={s.variableMonitor}>
+                    <span style={s.variableMonitorName}>{v.name}</span>
+                    <span style={s.variableMonitorValue}>{variableValues[v.name] ?? 0}</span>
+                  </div>
+                ))}
+              </div>
+            )}
             {broadcastToasts.length > 0 && (
               <div style={s.broadcastToastStack}>
                 {broadcastToasts.map(t => (
@@ -1226,6 +1242,10 @@ const s = {
   spriteTileCompactThumb: { width: 24, height: 24, borderRadius: 4, overflow: 'hidden', background: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   spriteTileCompactName: { fontSize: '0.78rem', fontWeight: 600, color: 'var(--colour-text)', maxWidth: 72, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   spritePropBarCompact: { display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', padding: '4px 8px 6px', borderTop: '1px solid #e5e7eb' },
+  variableMonitors: { position: 'absolute', top: 6, left: 6, display: 'flex', flexDirection: 'column', gap: 3, zIndex: 5, pointerEvents: 'none' },
+  variableMonitor: { display: 'flex', alignItems: 'center', gap: 0, background: 'rgba(255,140,26,0.92)', borderRadius: 4, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.18)', fontFamily: 'var(--font-body)', fontSize: '0.7rem', fontWeight: 700 },
+  variableMonitorName: { padding: '2px 6px', color: '#fff', background: 'rgba(0,0,0,0.18)' },
+  variableMonitorValue: { padding: '2px 6px', color: '#fff', minWidth: 24, textAlign: 'right' },
   broadcastToastStack: { position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center', zIndex: 6, pointerEvents: 'none' },
   broadcastToast: { background: 'rgba(255, 171, 25, 0.96)', color: '#fff', padding: '4px 14px', borderRadius: 20, fontFamily: 'var(--font-body)', fontSize: '0.78rem', fontWeight: 700, boxShadow: '0 2px 8px rgba(0,0,0,0.22)', whiteSpace: 'nowrap', animation: 'scratch-toast-in 0.18s ease' },
   broadcastToastIcon: { fontSize: '0.75rem' },

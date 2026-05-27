@@ -19,7 +19,7 @@ import { s } from './task-editor/styles'
 import { Field, TaskFormatIcon, QuizTypeIcon, CodeWorkspaceTabs, Modal, CarryThroughPicker, SpriteManager, BackdropManager } from './task-editor/TaskEditorFields'
 import { QuizTypePicker, MatchPairsBuilder, FillBlankBuilder, ShortAnswerBuilder, QuizOptionsBuilder } from './task-editor/QuizEditors'
 import { CopyButtons, IncorrectCheckResultsDisplay, formatCheckFailure, formatCheckFailureDetail, CheckListEditor } from './task-editor/CheckEditors'
-import { ScratchToolboxPicker, ScratchCheckListEditor } from './task-editor/ScratchEditors'
+import { ScratchToolboxPicker, ScratchCheckListEditor, VariableManager } from './task-editor/ScratchEditors'
 
 // Re-export for backward compatibility
 export { ScratchToolboxPicker, SpriteManager, BackdropManager }
@@ -863,6 +863,13 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                           assetsPath={lesson.assetsPath ? resolveAssetsPath(lesson.assetsPath) : ''}
                           lessonId={lesson.id}
                           lessonType={lesson.type}
+                        />
+                      </div>
+                      <div style={s.sidebarSection}>
+                        <span style={s.sidebarSectionTitle}>Variables</span>
+                        <VariableManager
+                          variables={task.variables ?? []}
+                          onChange={variables => set('variables', variables.length > 0 ? variables : undefined)}
                         />
                       </div>
                     </div>

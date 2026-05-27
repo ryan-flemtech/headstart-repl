@@ -237,9 +237,18 @@ Supported combinations:
 | `toolbox` | No | string | Scratch toolbox XML. Empty or omitted means the default toolbox. |
 | `sprites` | No | sprite array | Defaults to one cat sprite if omitted. |
 | `backdrops` | No | backdrop array | Defaults to plain white if omitted. |
+| `variables` | No | variable array | Predefined variables available in variable blocks. Omit or empty means a single `score` variable is available as fallback. |
 | `starterBlocks` | No | object or null | Blockly workspace state. Multi-sprite projects are keyed by sprite ID. |
 | `completeBlocks` | No | object or null | Reference solution workspace state. |
+| `codeStages` | No | stage array | Optional intermediate stages between starter and complete. Each stage has a `label` and `blocks` (Blockly workspace state). Teacher can send any stage to students. |
 | `carryBlocksFrom` | No | integer or null | Previous task ID to carry saved Scratch blocks from. |
+
+Variable object:
+
+| Field | Required | Type | Notes |
+|---|---:|---|---|
+| `name` | Yes | string | Variable name used in blocks and checks. |
+| `showOnStage` | No | boolean | When `true`, a monitor overlay is displayed on the stage showing the variable's current value. |
 
 Sprite object:
 
