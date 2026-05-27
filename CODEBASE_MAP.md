@@ -75,6 +75,9 @@ Referenced from AGENTS.md. Use this for navigation before opening files.
 | `TeacherEndSessionModal.jsx` | Confirmation modal for ending a live session, with End and End+Home actions |
 | `InformationTask.jsx` | Read-only information/introduction task rendering for lesson flow |
 | `CollapsiblePanelControls.jsx` | Shared collapse/expand tab controls for classroom and builder panels |
+| `TaskSlideTransition.jsx` | Animated slide transition wrapper used when switching between tasks |
+| `StudentEditorHeader.jsx` | Shared editor header bar (Code label + Run/Submit/Reset buttons) for HTML task editors |
+| `LoadingScreen.jsx` | Centred loading/error message screen for StudentView phases |
 
 ---
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useState, useRef } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { useIsMobile } from '../../shared/useIsMobile'
 import { useSession, decodeFileKey } from '../hooks/useSession'
 import { useIdentity } from '../hooks/useIdentity'
@@ -26,53 +26,9 @@ import { loadSavedCode, loadSavedFile, saveCode, saveFile } from '../studentStor
 import { selectHtmlTaskFiles, selectPythonTaskCode, selectScratchInitialProject } from '../studentTaskContent'
 import { deriveStudentLiveDisplay, toTeacherLiveFiles } from '../studentLiveDisplay'
 import { getQuizSuggestion } from '../studentQuizContent'
-
-const TASK_TRANSITION_MS = 380
-
-function TaskSlideTransition({ transitionKey, children, style }) {
-  const previousRenderRef = useRef({ key: transitionKey, children })
-  const [leavingRender, setLeavingRender] = useState(null)
-
-  useLayoutEffect(() => {
-    if (previousRenderRef.current.key === transitionKey) return undefined
-
-    setLeavingRender(previousRenderRef.current)
-    previousRenderRef.current = { key: transitionKey, children }
-
-    const timeoutId = window.setTimeout(() => {
-      setLeavingRender(null)
-    }, TASK_TRANSITION_MS)
-
-    return () => window.clearTimeout(timeoutId)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [transitionKey])
-
-  useEffect(() => {
-    if (!leavingRender && previousRenderRef.current.key === transitionKey) {
-      previousRenderRef.current = { key: transitionKey, children }
-    }
-  }, [transitionKey, children, leavingRender])
-
-  return (
-    <div className="task-slide-viewport" style={{ ...style, overflow: leavingRender ? 'hidden' : style?.overflow }}>
-      {leavingRender && (
-        <div
-          key={`leaving-${leavingRender.key}`}
-          className="task-slide-panel task-slide-panel--leaving"
-          aria-hidden="true"
-        >
-          {leavingRender.children}
-        </div>
-      )}
-      <div
-        key={`entering-${transitionKey}`}
-        className="task-slide-panel task-slide-panel--entering"
-      >
-        {children}
-      </div>
-    </div>
-  )
-}
+import TaskSlideTransition from '../components/TaskSlideTransition'
+import StudentEditorHeader from '../components/StudentEditorHeader'
+import LoadingScreen from '../components/LoadingScreen'
 
 export default function StudentView({ lessonId: lessonIdProp, soloMode = false, lesson: lessonProp = null, teacherPresentation = false, initialTaskId = null }) {
   const lessonId = lessonIdProp ?? lessonProp?.id ?? 'preview'
@@ -1487,42 +1443,6 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
           </button>
         </div>
       )}
-    </div>
-  )
-}
-
-function LoadingScreen({ message }) {
-  return (
-    <div style={styles.centreScreen}>
-      <p style={{ color: 'var(--colour-text)', fontFamily: 'var(--font-body)' }}>{message}</p>
-    </div>
-  )
-}
-
-function StudentEditorHeader({ task, running, onRun, onSubmit, onReset }) {
-  const isSubmit = task?.interactionMode === 'submit'
-
-  return (
-    <div style={styles.studentEditorHeader} className="ui-tabs ui-tabs--editor">
-      <span style={styles.studentEditorTitle}>Code</span>
-      <div style={styles.studentEditorActions}>
-        <button
-          className="btn-primary"
-          style={styles.studentEditorPrimaryBtn}
-          onClick={isSubmit ? onSubmit : onRun}
-          disabled={running}
-        >
-          {isSubmit ? 'Submit' : running ? 'Running…' : 'Run'}
-        </button>
-        <button
-          className="btn-ghost-outline"
-          style={styles.resetBtn}
-          onClick={onReset}
-          title="Reset code to the starter code for this task"
-        >
-          Reset Code
-        </button>
-      </div>
     </div>
   )
 }
