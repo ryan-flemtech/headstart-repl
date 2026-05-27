@@ -684,6 +684,53 @@ select {
   pointer-events: none;
 }
 
+/* Teacher end-session confirmation modal */
+.teacher-end-modal__overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.teacher-end-modal {
+  background: #fff;
+  border-radius: 12px;
+  padding: 28px 32px;
+  max-width: 420px;
+  width: 90%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+}
+
+.teacher-end-modal__title {
+  font-family: var(--font-title);
+  font-weight: 700;
+  font-size: 1.2rem;
+  color: var(--colour-text);
+  margin: 0 0 12px;
+}
+
+.teacher-end-modal__body {
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  color: var(--colour-text);
+  margin: 0 0 24px;
+  line-height: 1.5;
+}
+
+.teacher-end-modal__actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.teacher-end-modal__btn {
+  font-size: 14px;
+}
+
 .information-task {
   flex: 1;
   min-height: 0;
