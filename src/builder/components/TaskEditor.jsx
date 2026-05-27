@@ -304,6 +304,24 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
       return
     }
 
+    setScratchModalTab(tab)
+  }
+
+  function handleAddScratchStage() {
+    const existing = task.codeStages ?? []
+    const srcBlocks = existing.length > 0
+      ? cloneBlocks(existing[existing.length - 1].blocks)
+      : cloneBlocks(modalStarterBlocksRef.current ?? task.starterBlocks)
+    const newStage = { label: `Stage ${existing.length + 1}`, blocks: srcBlocks }
+    const updated = [...existing, newStage]
+    onUpdate({ ...task, codeStages: updated })
+    setScratchModalTab(`stage_${updated.length - 1}`)
+  }
+
+  function handleRemoveScratchStage(idx) {
+    const existing = task.codeStages ?? []
+    const updated = existing.filter((_, i) => i !== idx)
+    onUpdate({ ...task, codeStages: updated.length > 0 ? updated : undefined })
     setScratchModalTab('starter')
   }
 
@@ -895,6 +913,9 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                     onChange={handleScratchModalTabChange}
                     starterLabel="Starter blocks"
                     testLabel="Complete blocks"
+                    stages={codeStages}
+                    onAddStage={handleAddScratchStage}
+                    onRemoveStage={handleRemoveScratchStage}
                   />
                   {scratchModalTab === 'complete' && checkResult !== null && (
                     <span style={checkResult === 'pass' ? s.scratchCheckPass : s.scratchCheckFail}>
@@ -958,7 +979,7 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                         }}
                         syncNowKey={starterBlocksSyncKey}
                       />
-                    ) : (
+                    ) : scratchModalTab === 'complete' ? (
                       <ScratchWorkspace
                         key={`builder-scratch-complete-${task.id}-${(task.sprites ?? []).map(sp => sp.id).join(',')}`}
                         task={task}
@@ -981,7 +1002,35 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                         }}
                         syncNowKey={starterBlocksSyncKey}
                       />
-                    )}
+                    ) : (() => {
+                      const stageMatch = scratchModalTab.match(/^stage_(\d+)$/)
+                      if (!stageMatch) return null
+                      const stageIdx = parseInt(stageMatch[1], 10)
+                      const stage = codeStages[stageIdx]
+                      if (!stage) return null
+                      return (
+                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderBottom: '1px solid #e5e7eb', flexShrink: 0 }}>
+                            <span style={{ fontFamily: 'var(--font-body)', fontSize: '0.8rem', color: '#6b7280', fontWeight: 600 }}>Stage label:</span>
+                            <input
+                              style={{ ...s.input, width: 200, padding: '4px 8px', fontSize: '0.82rem' }}
+                              value={stage.label ?? ''}
+                              onChange={e => updateStage(stageIdx, { label: e.target.value })}
+                              placeholder={`Stage ${stageIdx + 1}`}
+                            />
+                          </div>
+                          <ScratchWorkspace
+                            key={`builder-scratch-stage-${task.id}-${stageIdx}-${(task.sprites ?? []).map(sp => sp.id).join(',')}`}
+                            task={task}
+                            hideStage
+                            assetsPath={lesson.assetsPath ? resolveAssetsPath(lesson.assetsPath) : ''}
+                            initialStates={stage.blocks ?? null}
+                            onStateChange={states => updateStage(stageIdx, { blocks: states })}
+                            syncNowKey={starterBlocksSyncKey}
+                          />
+                        </div>
+                      )
+                    })()}
                   </div>
                 </div>
               </div>
