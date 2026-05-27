@@ -358,6 +358,7 @@ export default function ScratchWorkspace({
   const draggingSpriteIdRef = useRef(null)
   const backdropNameRef     = useRef(backdrops[0]?.name ?? null)
   const imageCacheRef       = useRef({})
+  const variableRuntimeRef  = useRef({})
 
   const [selectedSpriteId, setSelectedSpriteId] = useState(sprites[0]?.id ?? 'sprite1')
   setCostumeContext((sprites.find(sp => sp.id === selectedSpriteId) ?? sprites[0])?.costumes ?? [])
@@ -714,7 +715,11 @@ export default function ScratchWorkspace({
       setAskValue('')
       setAskPrompt(q)
     })
-    signal.onVariablesChange = vars => setVariableValues({ ...vars })
+    signal.variables = { ...variableRuntimeRef.current }
+    signal.onVariablesChange = vars => {
+      variableRuntimeRef.current = { ...vars }
+      setVariableValues({ ...vars })
+    }
     signal.onBroadcast = msg => {
       const id = Date.now() + Math.random()
       setBroadcastToasts(prev => [...prev, { id, message: msg }])
@@ -817,6 +822,7 @@ export default function ScratchWorkspace({
     const defaultBackdrop = backdrops[0]?.name ?? null
     backdropNameRef.current = defaultBackdrop
     setBackdropName(defaultBackdrop)
+    variableRuntimeRef.current = {}
     setVariableValues({})
     lastCheckRef.current = null
     setCheckPassed(false)
