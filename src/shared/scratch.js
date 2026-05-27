@@ -7,6 +7,7 @@ let activeOscillators = []
 let _currentSprites = []
 let _currentBackdrops = []
 let _currentCostumes = []
+let _currentVariables = []
 
 export function setSpriteContext(sprites) {
   _currentSprites = sprites ?? []
@@ -20,6 +21,10 @@ export function setCostumeContext(costumes) {
   _currentCostumes = costumes ?? []
 }
 
+export function setVariableContext(variables) {
+  _currentVariables = variables ?? []
+}
+
 export async function loadBlocklyModules() {
   if (!_Blockly) {
     _Blockly = await import('blockly')
@@ -31,12 +36,8 @@ export async function loadBlocklyModules() {
 
 function registerScratchFieldExtensions(Blockly) {
   if (Blockly.Extensions.isRegistered('scratch_variable_field')) return
-  Blockly.Extensions.register('scratch_variable_field', function () {
-    const field = this.getField('VARIABLE')
-    if (field?.getVariable?.()) return
-    const variable = this.workspace?.createVariable?.('score')
-    if (variable) field?.setValue?.(variable.getId())
-  })
+  // No-op: kept for compatibility with any serialized workspaces that reference this extension
+  Blockly.Extensions.register('scratch_variable_field', function () {})
 }
 
 function numberInput(name, value = 0) {
@@ -390,16 +391,21 @@ function blockStop() {
   }
 }
 
+function variableOptions() {
+  return _currentVariables.length
+    ? _currentVariables.map(v => [v.name, v.name])
+    : [['score', 'score']]
+}
+
 function variableReporter() {
   return {
     init() {
       this.jsonInit({
         type: 'data_variable',
         message0: '%1',
-        args0: [{ type: 'field_variable', name: 'VARIABLE', variable: 'score' }],
+        args0: [{ type: 'field_dropdown', name: 'VARIABLE', options: variableOptions }],
         output: ['Number', 'String'],
         colour: '#FF8C1A',
-        extensions: ['scratch_variable_field'],
       })
     },
   }
@@ -411,11 +417,10 @@ function variableStatement(type, message0, valueInput) {
       this.jsonInit({
         type,
         message0,
-        args0: [{ type: 'field_variable', name: 'VARIABLE', variable: 'score' }, valueInput],
+        args0: [{ type: 'field_dropdown', name: 'VARIABLE', options: variableOptions }, valueInput],
         previousStatement: null,
         nextStatement: null,
         colour: '#FF8C1A',
-        extensions: ['scratch_variable_field'],
       })
     },
   }
@@ -961,12 +966,14 @@ async function runBlock(block, context) {
 
     case 'data_setvariableto':
       setVariable(block, evaluateInput(block, 'VALUE', context), signal)
+      signal.onVariablesChange?.({ ...signal.variables })
       await tick()
       break
     case 'data_changevariableby': {
       const name = variableName(block)
       const current = Number(signal.variables[name] ?? 0)
       signal.variables[name] = current + numberValue(block, 'VALUE', context, 1)
+      signal.onVariablesChange?.({ ...signal.variables })
       await tick()
       break
     }
@@ -1053,8 +1060,7 @@ function booleanValue(block, inputName, context) {
 }
 
 function variableName(block) {
-  const id = block.getFieldValue('VARIABLE')
-  return block.workspace?.getVariableById?.(id)?.name ?? id ?? 'score'
+  return block.getFieldValue('VARIABLE') ?? 'score'
 }
 
 function setVariable(block, value, signal) {
@@ -1257,7 +1263,7 @@ export function saveWorkspace(Blockly, workspace) {
 }
 
 export function loadWorkspace(Blockly, workspace, state) {
-  Blockly.serialization.workspaces.load(migrateBroadcastState(state), workspace)
+  Blockly.serialization.workspaces.load(migrateVariableFields(migrateBroadcastState(state)), workspace)
 }
 
 // Converts old input_value+shadow format for broadcast blocks to the new field_input format.
@@ -1282,5 +1288,35 @@ function migrateBroadcastBlock(block) {
   if (block.next?.block) migrateBroadcastBlock(block.next.block)
   for (const inp of Object.values(block.inputs ?? {})) {
     if (inp?.block) migrateBroadcastBlock(inp.block)
+  }
+}
+
+// Converts old field_variable format { id, name } to plain name string for field_dropdown.
+function migrateVariableFields(state) {
+  if (!state?.blocks?.blocks?.length) return state
+  const varMap = {}
+  for (const v of state.variables ?? []) {
+    if (v.id && v.name) varMap[v.id] = v.name
+  }
+  const clone = JSON.parse(JSON.stringify(state))
+  delete clone.variables
+  for (const block of clone.blocks.blocks) migrateVariableBlock(block, varMap)
+  return clone
+}
+
+function migrateVariableBlock(block, varMap) {
+  if (!block) return
+  if (block.type === 'data_variable' || block.type === 'data_setvariableto' || block.type === 'data_changevariableby') {
+    const field = block.fields?.VARIABLE
+    if (field && typeof field === 'object') {
+      block.fields.VARIABLE = field.name ?? varMap[field.id] ?? 'score'
+    } else if (typeof field === 'string' && varMap[field]) {
+      block.fields.VARIABLE = varMap[field]
+    }
+  }
+  if (block.next?.block) migrateVariableBlock(block.next.block, varMap)
+  for (const inp of Object.values(block.inputs ?? {})) {
+    if (inp?.block) migrateVariableBlock(inp.block, varMap)
+    if (inp?.shadow) migrateVariableBlock(inp.shadow, varMap)
   }
 }
