@@ -1,6 +1,6 @@
 import React from 'react'
-import { render, screen } from '@testing-library/react'
-import { describe, it, expect } from 'vitest'
+import { fireEvent, render, screen } from '@testing-library/react'
+import { describe, it, expect, vi } from 'vitest'
 import { MarkdownRenderer, InlineMarkdown } from '../markdown'
 
 describe('MarkdownRenderer', () => {
@@ -90,6 +90,42 @@ describe('MarkdownRenderer', () => {
     render(<MarkdownRenderer content="Scaled text." textScale={1.5} />)
     expect(screen.getByText('Scaled text.')).toBeInTheDocument()
   })
+
+  it('opens a linked topic from its hover preview', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        topics: [{
+          id: 'for-loop',
+          title: 'For loops',
+          types: ['python'],
+          category: 'Loop',
+          summary: 'Repeat code.',
+          description: 'Runs a **block** with `python:print()` again.',
+          syntax: 'Use `python:for i in range(3):`.',
+          related: [],
+        }],
+      }),
+    }))
+
+    render(<MarkdownRenderer content="Try [[for-loop]]." topicType="python" />)
+    const topicLink = await screen.findByRole('button', { name: 'For loops' })
+    fireEvent.mouseEnter(topicLink)
+    const tooltip = screen.getByRole('tooltip')
+    expect(tooltip).toHaveTextContent('Repeat code.')
+    expect(tooltip).toHaveStyle({ position: 'fixed', zIndex: '1200' })
+    expect(tooltip.parentElement).toBe(document.body)
+    expect(topicLink.parentElement).not.toContainElement(tooltip)
+    fireEvent.click(screen.getAllByRole('button', { name: 'For loops' })[1])
+    expect(screen.getByRole('dialog', { name: 'Topic library' })).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Search topics...')).toBeInTheDocument()
+    expect(screen.getByText('block').tagName).toBe('STRONG')
+    const highlightedTokens = document.querySelectorAll('.language-python')
+    expect(Array.from(highlightedTokens).map(element => element.textContent)).toEqual(expect.arrayContaining([
+      'print()',
+      'for i in range(3):',
+    ]))
+  })
 })
 
 describe('InlineMarkdown', () => {
@@ -119,5 +155,10 @@ describe('InlineMarkdown', () => {
 
   it('renders without crashing when content is undefined', () => {
     render(<InlineMarkdown content={undefined} />)
+  })
+
+  it('renders topic references in inline markdown fields', async () => {
+    render(<InlineMarkdown content="Choose [[for-loop]]." topicType="python" />)
+    expect(await screen.findByRole('button', { name: 'For loops' })).toBeInTheDocument()
   })
 })

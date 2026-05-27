@@ -359,7 +359,7 @@ export default function TeacherView({ lessonId }) {
         {/* Centre — Teacher Editor */}
         <main style={{ ...s.centre, ...(isInformationTask || lesson.type === 'html' || lesson.type === 'scratch' ? { overflow: 'hidden' } : {}) }}>
           {task?.explainer && !isInSandbox && task?.taskType !== 'quiz' && !isInformationTask && (
-            <ExplainerPanel title={task.title} content={task.explainer} />
+            <ExplainerPanel title={task.title} content={task.explainer} topicType={lesson.type} />
           )}
 
           {isPreviewing && (

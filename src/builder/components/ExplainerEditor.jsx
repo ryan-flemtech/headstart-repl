@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { MarkdownRenderer } from '../../shared/markdown'
+import { findTopicSuggestion, searchTopics, useTopicLibrary } from '../../shared/topicLibrary'
 
 const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'])
 
@@ -127,6 +128,8 @@ export function MarkdownFieldEditor({
   const [tab, setTab] = useState('entry')
   const textareaRef = useRef(null)
   const content = value ?? ''
+  const { topics } = useTopicLibrary(lessonType)
+  const topicSuggestion = findTopicSuggestion(content, topics)
 
   function applyFormat(action) {
     const el = textareaRef.current
@@ -219,6 +222,12 @@ export function MarkdownFieldEditor({
       newVal = val.slice(0, firstLineStart) + indented + val.slice(regionEnd)
       cursorStart = start + 2
       cursorEnd = end + 2 * lines.length
+    } else if (action.startsWith('topic:')) {
+      const id = action.slice('topic:'.length)
+      const toInsert = selected ? `[[${id}|${selected}]]` : `[[${id}]]`
+      newVal = before + toInsert + after
+      cursorStart = start + toInsert.length
+      cursorEnd = cursorStart
     } else if (action.startsWith('scratch:')) {
       const blockText = action.slice('scratch:'.length)
       const toInsert = '`scratch:' + blockText + '`'
@@ -244,6 +253,14 @@ export function MarkdownFieldEditor({
         }
       })
     }
+  }
+
+  function applyTopicSuggestion() {
+    if (!topicSuggestion) return
+    const { topic, start, end, label } = topicSuggestion
+    const nextValue = content.slice(0, start) + `[[${topic.id}|${label}]]` + content.slice(end)
+    onChange(nextValue)
+    requestAnimationFrame(() => textareaRef.current?.focus())
   }
 
   return (
@@ -274,10 +291,22 @@ export function MarkdownFieldEditor({
       {tab === 'entry' && (
         <MarkdownToolbar
           lessonType={lessonType}
-          inlineCodeLanguages={inlineCodeLanguages}
-          onAction={applyFormat}
-          imageAssets={(assets ?? []).filter(p => IMAGE_EXTS.has(p.split('.').pop().toLowerCase()))}
-        />
+           inlineCodeLanguages={inlineCodeLanguages}
+           onAction={applyFormat}
+           imageAssets={(assets ?? []).filter(p => IMAGE_EXTS.has(p.split('.').pop().toLowerCase()))}
+           topics={topics}
+         />
+       )}
+
+      {tab === 'entry' && topicSuggestion && (
+        <div style={s.topicSuggestion}>
+          <span>
+            Link <strong>{topicSuggestion.label}</strong> to the topic library?
+          </span>
+          <button type="button" style={s.topicSuggestionButton} onClick={applyTopicSuggestion}>
+            Link to {topicSuggestion.topic.title}
+          </button>
+        </div>
       )}
 
       <div style={s.pane}>
@@ -293,7 +322,7 @@ export function MarkdownFieldEditor({
         ) : (
           <div style={s.preview}>
             {content || (showTitle && title)
-              ? <MarkdownRenderer title={showTitle ? title : undefined} content={content} />
+              ? <MarkdownRenderer title={showTitle ? title : undefined} content={content} topicType={lessonType} showLibrary />
               : <span style={s.empty}>Preview will appear here...</span>}
           </div>
         )}
@@ -302,8 +331,9 @@ export function MarkdownFieldEditor({
   )
 }
 
-function MarkdownToolbar({ lessonType, inlineCodeLanguages, onAction, imageAssets = [] }) {
+function MarkdownToolbar({ lessonType, inlineCodeLanguages, onAction, imageAssets = [], topics = [] }) {
   const [openDropdown, setOpenDropdown] = useState(null)
+  const [topicQuery, setTopicQuery] = useState('')
   const toolbarRef = useRef(null)
 
   useEffect(() => {
@@ -336,6 +366,7 @@ function MarkdownToolbar({ lessonType, inlineCodeLanguages, onAction, imageAsset
 
   const singleCodeBlock = codeBlockOptions.length === 1
   const inlineCodeOptions = getInlineCodeOptions(lessonType, inlineCodeLanguages)
+  const matchingTopics = searchTopics(topics, topicQuery)
 
   return (
     <div style={s.toolbar} ref={toolbarRef}>
@@ -447,6 +478,50 @@ function MarkdownToolbar({ lessonType, inlineCodeLanguages, onAction, imageAsset
                 {label}
               </button>
             ))}
+          </div>
+        )}
+      </div>
+
+      <span style={s.sep} />
+
+      <div style={s.toolbarGroup}>
+        <button
+          type="button"
+          title="Insert topic library link"
+          style={s.toolbarBtn}
+          onMouseDown={event => {
+            event.preventDefault()
+            setOpenDropdown(value => value === 'topic' ? null : 'topic')
+          }}
+        >
+          Topic ▾
+        </button>
+        {openDropdown === 'topic' && (
+          <div style={{ ...s.dropdown, width: 260, maxHeight: 310, overflowY: 'auto' }}>
+            <input
+              type="search"
+              value={topicQuery}
+              placeholder="Search topics..."
+              style={s.topicSearch}
+              onChange={event => setTopicQuery(event.target.value)}
+              onMouseDown={event => event.stopPropagation()}
+            />
+            {matchingTopics.map(topic => (
+              <button
+                key={topic.id}
+                type="button"
+                style={s.dropdownItem}
+                onMouseDown={event => {
+                  event.preventDefault()
+                  onAction(`topic:${topic.id}`)
+                  setOpenDropdown(null)
+                  setTopicQuery('')
+                }}
+              >
+                {topic.title}
+              </button>
+            ))}
+            {matchingTopics.length === 0 && <div style={s.topicEmpty}>No matching topics</div>}
           </div>
         )}
       </div>
@@ -711,6 +786,47 @@ const s = {
     textTransform: 'uppercase',
     letterSpacing: '0.06em',
     borderTop: '1px solid #f3f4f6',
+  },
+  topicSearch: {
+    boxSizing: 'border-box',
+    width: 'calc(100% - 16px)',
+    margin: 8,
+    padding: '7px 8px',
+    border: '1px solid #d1d5db',
+    borderRadius: 5,
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.82rem',
+  },
+  topicEmpty: {
+    padding: '8px 10px',
+    color: '#6b7280',
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.82rem',
+  },
+  topicSuggestion: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    padding: '6px 10px',
+    borderLeft: '1px solid #e5e7eb',
+    borderRight: '1px solid #e5e7eb',
+    background: '#f7f2ff',
+    color: 'var(--colour-text)',
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.79rem',
+  },
+  topicSuggestionButton: {
+    border: '1px solid #ded1f3',
+    borderRadius: 999,
+    padding: '4px 10px',
+    background: '#fff',
+    color: 'var(--colour-primary)',
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.76rem',
+    fontWeight: 700,
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
   },
   pane: {
     display: 'flex',

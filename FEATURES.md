@@ -145,6 +145,7 @@ All features listed here are implemented in the current codebase. Replaces `Quiz
 - Top bar: lesson title, level badge, SOLO/LIVE/SANDBOX badge, student name, progress dots
 - Task progress dots: clickable (past tasks), locked (future), current highlighted
 - Collapsible explainer panel (Markdown with Scratch block visualization)
+- Searchable topic library in explainers, with hover definitions and linked related topics
 - Retro typing animation on Python output
 
 ### Task Navigation
@@ -199,6 +200,7 @@ All features listed here are implemented in the current codebase. Replaces `Quiz
 
 ### Task Editor
 - Explainer editor with Edit / Preview tabs (live Markdown rendering)
+- Topic-library link picker and recognised-topic link suggestions in Markdown fields
 - Optional estimated minutes per task with summed lesson duration in the task list
 - Starter code / starter files (per lesson type)
 - Complete code / complete files (reference solution)
@@ -241,6 +243,7 @@ All features listed here are implemented in the current codebase. Replaces `Quiz
 - Pyodide Web Worker: terminate-on-stop, pre-warm after each run
 - Blob URL virtual filesystem: cross-reference rewriting, CSP injection, console interceptor
 - Markdown renderer: tables, callouts (warning/error/success/info), code blocks, Scratch block display
+- Shared topic-library JSON loader, type-filtered search, hover cards and library dialog
 - Task group utilities: flatten, progress tracking, auto-title subtasks
 - Responsive layout via `useIsMobile` hook (640px breakpoint)
 - SplitPane: draggable [15%, 85%] clamped, collapsible right pane
