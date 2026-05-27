@@ -209,7 +209,7 @@ All features listed here are implemented in the current codebase. Replaces `Quiz
 
 ### Scratch Tools
 - Starter / Complete workspace tabs with isolated state
-- Sprite manager (add, configure, remove)
+- Unified starter sprite panel (add/remove, appearance, costumes, and initial stage metadata)
 - Backdrop manager (colour or image)
 - Toolbox XML editor (block category toggles)
 

@@ -6,7 +6,7 @@ import { SPRITE_TYPES } from '../../../app/components/ScratchWorkspace'
 import { createSpriteFromPreset, normalizeSpritePresets, SPRITE_PRESETS_PATH } from '../../spritePresets'
 import { s } from './styles'
 
-function CodeWorkspaceTabs({ activeTab, onChange, starterLabel = 'Starter code', testLabel = 'Complete code', rightAction = null }) {
+function CodeWorkspaceTabs({ activeTab, onChange, starterLabel = 'Starter code', testLabel = 'Complete code', rightAction = null, stages = [], onAddStage = null, onRemoveStage = null }) {
   return (
     <div style={s.workspaceTabs} className="ui-tabs ui-tabs--editor" role="tablist" aria-label="Code workspace">
       <button
@@ -19,6 +19,41 @@ function CodeWorkspaceTabs({ activeTab, onChange, starterLabel = 'Starter code',
       >
         {starterLabel}
       </button>
+      {stages.map((stage, i) => (
+        <div key={i} style={{ display: 'flex', alignItems: 'center' }}>
+          <button
+            type="button"
+            className="ui-tab"
+            role="tab"
+            aria-selected={activeTab === `stage_${i}`}
+            style={{ ...s.workspaceTab, ...(activeTab === `stage_${i}` ? s.workspaceTabActive : {}) }}
+            onClick={() => onChange(`stage_${i}`)}
+          >
+            {stage.label || `Stage ${i + 1}`}
+          </button>
+          {onRemoveStage && (
+            <button
+              type="button"
+              style={s.stageRemoveBtn}
+              title="Remove this stage"
+              onClick={e => { e.stopPropagation(); onRemoveStage(i) }}
+            >
+              ✕
+            </button>
+          )}
+        </div>
+      ))}
+      {onAddStage && (
+        <button
+          type="button"
+          className="ui-tab"
+          style={s.workspaceTabAdd}
+          onClick={onAddStage}
+          title="Add a code stage"
+        >
+          + Stage
+        </button>
+      )}
       <button
         type="button"
         className="ui-tab"
@@ -252,7 +287,7 @@ function QuizTypeIcon({ type }) {
 
 const SPRITE_TYPE_OPTIONS = SPRITE_TYPES.map(t => ({ value: t, label: t.charAt(0).toUpperCase() + t.slice(1) }))
 
-export function SpriteManager({ sprites, onChange, assetsPath = '', lessonId, lessonType }) {
+export function SpriteManager({ sprites, onChange, assetsPath = '', lessonId, lessonType, focusedSpriteId = null, hidePosition = false, hideAdd = false }) {
   const [expandedCostumes, setExpandedCostumes] = React.useState({})
   const [presets, setPresets] = React.useState([])
   const [selectedPresetId, setSelectedPresetId] = React.useState('')
@@ -276,6 +311,7 @@ export function SpriteManager({ sprites, onChange, assetsPath = '', lessonId, le
       })
     return () => { mounted = false }
   }, [])
+  const displayedSprites = focusedSpriteId ? sprites.filter(sp => sp.id === focusedSpriteId) : sprites
 
   function addSprite() {
     const preset = presets.find(item => item.id === selectedPresetId) ?? null
@@ -315,7 +351,7 @@ export function SpriteManager({ sprites, onChange, assetsPath = '', lessonId, le
 
   return (
     <div style={s.spriteManager}>
-      {sprites.map(sp => (
+      {displayedSprites.map(sp => (
         <div key={sp.id}>
           <div style={s.spriteRow}>
             <input
@@ -327,22 +363,26 @@ export function SpriteManager({ sprites, onChange, assetsPath = '', lessonId, le
             <select style={{ ...s.select, flex: '0 0 auto' }} value={sp.type ?? 'cat'} onChange={e => update(sp.id, 'type', e.target.value)}>
               {SPRITE_TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
-            <label style={s.spriteField}>
-              <span style={s.spriteFieldLabel}>X</span>
-              <input style={{ ...s.input, width: 56 }} type="number" value={sp.x ?? 0} onChange={e => update(sp.id, 'x', Number(e.target.value))} />
-            </label>
-            <label style={s.spriteField}>
-              <span style={s.spriteFieldLabel}>Y</span>
-              <input style={{ ...s.input, width: 56 }} type="number" value={sp.y ?? 0} onChange={e => update(sp.id, 'y', Number(e.target.value))} />
-            </label>
-            <label style={s.spriteField}>
-              <span style={s.spriteFieldLabel}>Size</span>
-              <input style={{ ...s.input, width: 60 }} type="number" min="10" max="500" value={sp.size ?? 100} onChange={e => update(sp.id, 'size', Number(e.target.value))} />
-            </label>
-            <label style={s.spriteField}>
-              <span style={s.spriteFieldLabel}>Dir</span>
-              <input style={{ ...s.input, width: 56 }} type="number" value={sp.direction ?? 90} onChange={e => update(sp.id, 'direction', Number(e.target.value))} />
-            </label>
+            {!hidePosition && (
+              <>
+                <label style={s.spriteField}>
+                  <span style={s.spriteFieldLabel}>X</span>
+                  <input style={{ ...s.input, width: 56 }} type="number" value={sp.x ?? 0} onChange={e => update(sp.id, 'x', Number(e.target.value))} />
+                </label>
+                <label style={s.spriteField}>
+                  <span style={s.spriteFieldLabel}>Y</span>
+                  <input style={{ ...s.input, width: 56 }} type="number" value={sp.y ?? 0} onChange={e => update(sp.id, 'y', Number(e.target.value))} />
+                </label>
+                <label style={s.spriteField}>
+                  <span style={s.spriteFieldLabel}>Size</span>
+                  <input style={{ ...s.input, width: 60 }} type="number" min="10" max="500" value={sp.size ?? 100} onChange={e => update(sp.id, 'size', Number(e.target.value))} />
+                </label>
+                <label style={s.spriteField}>
+                  <span style={s.spriteFieldLabel}>Dir</span>
+                  <input style={{ ...s.input, width: 56 }} type="number" value={sp.direction ?? 90} onChange={e => update(sp.id, 'direction', Number(e.target.value))} />
+                </label>
+              </>
+            )}
             <button
               type="button"
               style={s.costumeToggleBtn}
@@ -374,23 +414,25 @@ export function SpriteManager({ sprites, onChange, assetsPath = '', lessonId, le
           )}
         </div>
       ))}
-      <div style={s.addSpriteRow}>
-        <select
-          style={{ ...s.select, minWidth: 168 }}
-          aria-label="Choose sprite preset"
-          value={selectedPresetId}
-          onChange={event => setSelectedPresetId(event.target.value)}
-        >
-          <option value="">New blank sprite</option>
-          {presetsLoading && <option disabled>Loading presets...</option>}
-          {presets.map(preset => (
-            <option key={preset.id} value={preset.id}>{preset.name}</option>
-          ))}
-        </select>
-        <button type="button" className="btn-ghost" style={s.addSpriteBtn} onClick={addSprite}>
-          + Add sprite
-        </button>
-      </div>
+      {!hideAdd && (
+        <div style={s.addSpriteRow}>
+          <select
+            style={{ ...s.select, minWidth: 168 }}
+            aria-label="Choose sprite preset"
+            value={selectedPresetId}
+            onChange={event => setSelectedPresetId(event.target.value)}
+          >
+            <option value="">New blank sprite</option>
+            {presetsLoading && <option disabled>Loading presets...</option>}
+            {presets.map(preset => (
+              <option key={preset.id} value={preset.id}>{preset.name}</option>
+            ))}
+          </select>
+          <button type="button" className="btn-ghost" style={s.addSpriteBtn} onClick={addSprite}>
+            + Add sprite
+          </button>
+        </div>
+      )}
     </div>
   )
 }

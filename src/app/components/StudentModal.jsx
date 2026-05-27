@@ -58,14 +58,26 @@ export default function StudentModal({ student, lesson, session, isLive, isLiveF
     ? !!task?.completeBlocks
     : (task?.completeFiles?.length > 0)
 
-  function handleResetToStarter() {
-    if (!window.confirm(`Reset ${student.displayName}'s code to the starter code?`)) return
-    onRemoteReset?.(student.anonymousId, 'starter')
+  const codeStages = !isQuiz ? (task?.codeStages ?? []) : []
+
+  function buildStageOptions() {
+    const starterLabel = isScratch ? 'Starter blocks' : 'Starter code'
+    const completeLabel = isScratch ? 'Complete blocks' : 'Complete code'
+    const opts = [{ value: 'starter', label: starterLabel }]
+    codeStages.forEach((stage, i) => {
+      opts.push({ value: `stage_${i}`, label: stage.label || `Stage ${i + 1}` })
+    })
+    if (hasComplete) opts.push({ value: 'complete', label: completeLabel })
+    return opts
   }
 
-  function handleSetToComplete() {
-    if (!window.confirm(`Set ${student.displayName}'s code to the complete code?`)) return
-    onRemoteReset?.(student.anonymousId, 'complete')
+  const stageOptions = buildStageOptions()
+
+  function handleSetToStage(action) {
+    const opt = stageOptions.find(o => o.value === action)
+    const label = opt?.label ?? action
+    if (!window.confirm(`Set ${student.displayName}'s code to ${label}?`)) return
+    onRemoteReset?.(student.anonymousId, action)
   }
 
   // Close on Escape
@@ -118,24 +130,25 @@ export default function StudentModal({ student, lesson, session, isLive, isLiveF
                 →
               </button>
             </div>
-            {onRemoteReset && !isInformation && !isQuiz && (
-              <>
-                <button
-                  style={s.teacherActionBtn}
-                  onClick={handleResetToStarter}
-                  title="Reset this student's code to the task starter code"
+            {onRemoteReset && !isInformation && !isQuiz && stageOptions.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={s.setToLabel}>Set to</span>
+                <select
+                  style={s.setToSelect}
+                  defaultValue=""
+                  onChange={e => {
+                    if (e.target.value) {
+                      handleSetToStage(e.target.value)
+                      e.target.value = ''
+                    }
+                  }}
                 >
-                  Reset to Starter
-                </button>
-                <button
-                  style={{ ...s.teacherActionBtn, ...s.teacherActionBtnComplete, opacity: hasComplete ? 1 : 0.4 }}
-                  disabled={!hasComplete}
-                  onClick={hasComplete ? handleSetToComplete : undefined}
-                  title={hasComplete ? 'Set this student\'s code to the complete code' : 'No complete code for this task'}
-                >
-                  Set to Complete
-                </button>
-              </>
+                  <option value="" disabled>Choose stage…</option>
+                  {stageOptions.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
             )}
             {!isInformation && !isQuiz && (
               isLive ? (
@@ -438,6 +451,24 @@ const s = {
     background: 'rgba(134,239,172,0.15)',
     color: '#86efac',
     border: '1px solid rgba(134,239,172,0.4)',
+  },
+  setToLabel: {
+    fontFamily: 'var(--font-body)',
+    fontSize: 12,
+    fontWeight: 600,
+    color: '#fde68a',
+    whiteSpace: 'nowrap',
+  },
+  setToSelect: {
+    fontSize: 12,
+    padding: '3px 8px',
+    background: 'rgba(255,255,255,0.1)',
+    color: '#fff',
+    border: '1px solid rgba(255,255,255,0.3)',
+    borderRadius: 5,
+    cursor: 'pointer',
+    fontFamily: 'var(--font-body)',
+    fontWeight: 600,
   },
   submitNotice: {
     padding: '10px 14px',

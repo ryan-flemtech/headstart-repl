@@ -283,9 +283,19 @@ export default function TeacherView({ lessonId }) {
   const currentTask = flatTasks.find(t => t.id === (session?.currentTaskId ?? currentTaskId))
   const displayIndex = flatTasks.findIndex(t => t.id === displayTaskId)
   const showingComplete = teacherCodeTab === 'complete' && !isInSandbox
+  const teacherStageMatch = teacherCodeTab.match(/^stage_(\d+)$/)
+  const teacherActiveStageIndex = teacherStageMatch ? parseInt(teacherStageMatch[1], 10) : null
+  const isShowingStage = teacherActiveStageIndex !== null && !isInSandbox
+  const taskCodeStages = task?.codeStages ?? []
+  const activeTeacherStage = isShowingStage ? (taskCodeStages[teacherActiveStageIndex] ?? null) : null
   const isInformationTask = task?.taskType === 'information'
   const students = session ? Object.entries(session.students ?? {}).map(([id, s]) => ({ ...s, anonymousId: id })) : []
   const isPreviewing = previewTaskId !== null && !isInSandbox
+
+  async function handleSendStageToAll(action) {
+    const studentIds = Object.keys(session?.students ?? {})
+    await Promise.all(studentIds.map(id => pushResetToStudent(id, action)))
+  }
 
   if (lessonLoading || !lesson) {
     return <div style={s.centre}><p>Loading…</p></div>
@@ -425,38 +435,58 @@ export default function TeacherView({ lessonId }) {
                 <TeacherCodeTabs
                   s={s}
                   activeTab={teacherCodeTab}
+                  stages={taskCodeStages}
                   onStarter={() => setTeacherCodeTab('starter')}
+                  onStage={i => setTeacherCodeTab(`stage_${i}`)}
                   onComplete={() => { setTeacherCodeTab('complete'); setActiveCompleteFile(task?.completeFiles?.[0]?.name ?? '') }}
+                  onSendToAll={handleSendStageToAll}
+                  hasStudents={students.length > 0}
                 />
               )}
               <PythonEditor
-                code={showingComplete ? (task?.completeCode ?? '') : code}
-                onChange={showingComplete || !isInSandbox ? undefined : value => {
+                code={showingComplete ? (task?.completeCode ?? '') : isShowingStage ? (activeTeacherStage?.code ?? '') : code}
+                onChange={showingComplete || isShowingStage || !isInSandbox ? undefined : value => {
                   setCode(value)
                   if (isInSandbox) sandboxDraftRef.current.code = value
                 }}
                 onActivity={setEditorActivity}
-                readOnly={showingComplete || !isInSandbox}
+                readOnly={showingComplete || isShowingStage || !isInSandbox}
                 pyodideStatus="idle"
                 editorStyle={isInSandbox ? undefined : s.attachedCodeEditor}
               />
             </div>
           ) : lesson.type === 'scratch' ? (
-            <div style={s.scratchWrap}>
-              <ScratchWorkspace
-                key={`teacher-scratch-${displayTaskId}-${isInSandbox ? 'sandbox' : 'task'}`}
-                task={task}
-                unrestricted={isInSandbox}
-                assetsPath={resolveAssetsPath(lesson.assetsPath) || undefined}
-                initialState={scratchState}
-                externalState={scratchState}
-                readOnly={showingComplete || !isInSandbox}
-                hideStage
-                onStateChange={showingComplete || !isInSandbox ? undefined : state => {
-                  setScratchState(state)
-                  if (isInSandbox) sandboxDraftRef.current.scratchState = cloneScratchState(state)
-                }}
-              />
+            <div style={!isInSandbox ? s.codeWorkspaceStack : s.scratchWrap}>
+              {!isInSandbox && (
+                <TeacherCodeTabs
+                  s={s}
+                  activeTab={teacherCodeTab}
+                  stages={taskCodeStages}
+                  onStarter={() => setTeacherCodeTab('starter')}
+                  onStage={i => setTeacherCodeTab(`stage_${i}`)}
+                  onComplete={task?.completeBlocks ? () => setTeacherCodeTab('complete') : undefined}
+                  onSendToAll={handleSendStageToAll}
+                  hasStudents={students.length > 0}
+                  starterLabel="Starter blocks"
+                  completeLabel="Complete blocks"
+                />
+              )}
+              <div style={s.scratchWrap}>
+                <ScratchWorkspace
+                  key={`teacher-scratch-${displayTaskId}-${isInSandbox ? 'sandbox' : 'task'}`}
+                  task={task}
+                  unrestricted={isInSandbox}
+                  assetsPath={resolveAssetsPath(lesson.assetsPath) || undefined}
+                  initialState={scratchState}
+                  externalState={isInSandbox ? scratchState : showingComplete ? (task?.completeBlocks ?? null) : isShowingStage ? (activeTeacherStage?.blocks ?? null) : (task?.starterBlocks ?? null)}
+                  readOnly={!isInSandbox}
+                  hideStage
+                  onStateChange={!isInSandbox ? undefined : state => {
+                    setScratchState(state)
+                    if (isInSandbox) sandboxDraftRef.current.scratchState = cloneScratchState(state)
+                  }}
+                />
+              </div>
             </div>
           ) : (
             <div style={!isInSandbox ? s.codeWorkspaceStack : s.htmlLeft}>
@@ -464,16 +494,20 @@ export default function TeacherView({ lessonId }) {
                 <TeacherCodeTabs
                   s={s}
                   activeTab={teacherCodeTab}
+                  stages={taskCodeStages}
                   onStarter={() => setTeacherCodeTab('starter')}
+                  onStage={i => setTeacherCodeTab(`stage_${i}`)}
                   onComplete={() => { setTeacherCodeTab('complete'); setActiveCompleteFile(task?.completeFiles?.[0]?.name ?? '') }}
+                  onSendToAll={handleSendStageToAll}
+                  hasStudents={students.length > 0}
                 />
               )}
               <div style={s.htmlLeft}>
                 <HtmlEditor
-                  files={showingComplete ? (task?.completeFiles ?? []) : files}
+                  files={showingComplete ? (task?.completeFiles ?? []) : isShowingStage ? (activeTeacherStage?.files ?? []) : files}
                   activeFile={showingComplete ? activeCompleteFile : activeFile}
                   onTabChange={showingComplete ? setActiveCompleteFile : setActiveFile}
-                  onFileChange={showingComplete || !isInSandbox ? undefined : (name, content) =>
+                  onFileChange={showingComplete || isShowingStage || !isInSandbox ? undefined : (name, content) =>
                     setFiles(prev => {
                       const next = prev.map(f => f.name === name ? { ...f, content } : f)
                       if (isInSandbox) sandboxDraftRef.current.files = cloneFiles(next)
@@ -481,7 +515,7 @@ export default function TeacherView({ lessonId }) {
                     })
                   }
                   onActivity={setEditorActivity}
-                  readOnly={showingComplete || !isInSandbox}
+                  readOnly={showingComplete || isShowingStage || !isInSandbox}
                   assetsPath={resolveAssetsPath(lesson.assetsPath) || undefined}
                   assets={lesson.assets}
                   attachedTop={!isInSandbox}
@@ -547,7 +581,7 @@ export default function TeacherView({ lessonId }) {
   )
 }
 
-function TeacherCodeTabs({ s, activeTab, onStarter, onComplete }) {
+function TeacherCodeTabs({ s, activeTab, stages = [], onStarter, onStage, onComplete, onSendToAll, hasStudents, starterLabel = 'Starter code', completeLabel = 'Complete code' }) {
   return (
     <div style={s.codeTabStrip} className="ui-tabs ui-tabs--editor" role="tablist" aria-label="Teacher code workspace">
       <button
@@ -558,18 +592,50 @@ function TeacherCodeTabs({ s, activeTab, onStarter, onComplete }) {
         style={{ ...s.codeTabBtn, ...(activeTab === 'starter' ? s.codeTabBtnActive : {}) }}
         onClick={onStarter}
       >
-        Starter code
+        {starterLabel}
       </button>
-      <button
-        type="button"
-        className="ui-tab"
-        role="tab"
-        aria-selected={activeTab === 'complete'}
-        style={{ ...s.codeTabBtn, ...(activeTab === 'complete' ? s.codeTabBtnActive : {}) }}
-        onClick={onComplete}
-      >
-        Complete code
-      </button>
+      {stages.map((stage, i) => (
+        <button
+          key={i}
+          type="button"
+          className="ui-tab"
+          role="tab"
+          aria-selected={activeTab === `stage_${i}`}
+          style={{ ...s.codeTabBtn, ...(activeTab === `stage_${i}` ? s.codeTabBtnActive : {}) }}
+          onClick={() => onStage?.(i)}
+        >
+          {stage.label || `Stage ${i + 1}`}
+        </button>
+      ))}
+      {onComplete && (
+        <button
+          type="button"
+          className="ui-tab"
+          role="tab"
+          aria-selected={activeTab === 'complete'}
+          style={{ ...s.codeTabBtn, ...(activeTab === 'complete' ? s.codeTabBtnActive : {}) }}
+          onClick={onComplete}
+        >
+          {completeLabel}
+        </button>
+      )}
+      {hasStudents && onSendToAll && (
+        <div style={s.codeTabActions}>
+          <button
+            type="button"
+            style={s.sendStageBtn}
+            title="Send this stage's code to all students"
+            onClick={() => {
+              const action = activeTab === 'complete' ? 'complete' : activeTab.startsWith('stage_') ? activeTab : 'starter'
+              if (window.confirm(`Send ${activeTab === 'starter' ? starterLabel : activeTab === 'complete' ? completeLabel : stages[parseInt(activeTab.replace('stage_', ''), 10)]?.label ?? activeTab} to all students?`)) {
+                onSendToAll(action)
+              }
+            }}
+          >
+            Send to all
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -666,6 +732,18 @@ const s = {
     display: 'flex',
     alignItems: 'center',
     paddingLeft: 8,
+  },
+  sendStageBtn: {
+    fontSize: 12,
+    padding: '4px 10px',
+    background: 'rgba(124,58,237,0.12)',
+    color: 'var(--colour-primary)',
+    border: '1px solid rgba(124,58,237,0.35)',
+    borderRadius: 5,
+    cursor: 'pointer',
+    fontFamily: 'var(--font-body)',
+    fontWeight: 600,
+    whiteSpace: 'nowrap',
   },
   previewBanner: {
     display: 'flex',

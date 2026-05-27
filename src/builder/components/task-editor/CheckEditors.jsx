@@ -3,36 +3,24 @@ import { MarkdownFieldEditor } from '../ExplainerEditor'
 import { Field } from './TaskEditorFields'
 import { s } from './styles'
 
-function CopyButtons({ output, code }) {
-  const [copiedOutput, setCopiedOutput] = React.useState(false)
-  const [copiedCode, setCopiedCode] = React.useState(false)
-
-  function copyText(text, setCopied) {
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
-    })
-  }
-
+function CopyButtons({ output, code, onInsert }) {
   const btnBase = {
     fontFamily: 'var(--font-body)', fontSize: '0.78rem', padding: '3px 10px',
     borderRadius: 6, border: '1px solid var(--colour-primary)', background: 'transparent',
     color: 'var(--colour-primary)', cursor: 'pointer',
   }
-  const btnDone = { background: '#22c55e', border: '1px solid #22c55e', color: '#fff' }
-
   return (
     <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
       {output != null && output !== '' && (
-        <button type="button" style={{ ...btnBase, ...(copiedOutput ? btnDone : {}) }}
-          onClick={() => copyText(output, setCopiedOutput)} title="Copy the current output to clipboard">
-          {copiedOutput ? '✓ Copied' : '📋 Copy output'}
+        <button type="button" style={btnBase}
+          onClick={() => onInsert(output)} title="Use the current output as the check value">
+          Use output
         </button>
       )}
       {code != null && code !== '' && (
-        <button type="button" style={{ ...btnBase, ...(copiedCode ? btnDone : {}) }}
-          onClick={() => copyText(code, setCopiedCode)} title="Copy the current code to clipboard">
-          {copiedCode ? '✓ Copied' : '📋 Copy code'}
+        <button type="button" style={btnBase}
+          onClick={() => onInsert(code)} title="Use the current code as the check value">
+          Use code
         </button>
       )}
     </div>
@@ -369,7 +357,11 @@ function CheckValueEditor({ check, subject, operator, onChange, output = '', cod
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
       {(showOutputCopy || showCodeCopy) && (
-        <CopyButtons output={showOutputCopy ? output : ''} code={showCodeCopy ? code : ''} />
+        <CopyButtons
+          output={showOutputCopy ? output : ''}
+          code={showCodeCopy ? code : ''}
+          onInsert={value => onChange({ ...check, value })}
+        />
       )}
       <textarea
         style={s.checkValue}

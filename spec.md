@@ -751,7 +751,7 @@ Quiz builders:
 - Fill blank: text with `___` placeholders + blank answer inputs + mode toggle
 - Short answer: check type/value fields
 
-Scratch: starter/complete tabs with separate workspace state, sprite manager, backdrop manager, toolbox XML editor.
+Scratch: starter/complete tabs with separate workspace state, a unified starter sprite panel (add, appearance, costumes, and initial stage metadata), backdrop manager, toolbox XML editor, and copying tested complete/stage sprite presentation state into starter defaults.
 
 ## 44. Execution & Check Verification
 

@@ -188,7 +188,7 @@ Both apps import from `src/shared/`. Never duplicate this logic.
           "lastRunStatus": "success | error | null",
           "checkPassed": true,
           "lastRunAt": 1234567890,
-          "remoteResetAction": "starter | complete",
+          "remoteResetAction": "starter | complete | stage_0 | stage_1 | ...",
           "remoteResetPushedAt": 1234567890
         }
       }
@@ -299,8 +299,9 @@ No room IDs. One session per lesson. `?teacher=true` is the only auth mechanism.
 - Teacher view shows lesson elapsed time and a countdown for timed active tasks; expired task timers flash
 
 ### Remote reset
-- Teacher writes `remoteResetAction` ("starter" or "complete") + `remoteResetPushedAt` to student node
+- Teacher writes `remoteResetAction` ("starter", "complete", or "stage_N") + `remoteResetPushedAt` to student node
 - Student detects timestamp change and applies reset silently (no prompt)
+- `stage_N` actions resolve against `task.codeStages[N]` (Python: `.code`, HTML: `.files`/`.entryFile`, Scratch: `.blocks`)
 
 ### Sandbox mode
 - Student code saved to localStorage BEFORE editor clears on sandbox entry

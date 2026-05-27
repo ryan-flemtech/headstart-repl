@@ -380,4 +380,54 @@ function ScratchCheckEditor({ check, onChange, sprites = [{ id: 'sprite1', name:
   )
 }
 
+export function VariableManager({ variables, onChange }) {
+  const vars = variables ?? []
+
+  function addVariable() {
+    onChange([...vars, { name: `var${vars.length + 1}`, showOnStage: false }])
+  }
+
+  function removeVariable(index) {
+    onChange(vars.filter((_, i) => i !== index))
+  }
+
+  function updateVariable(index, updates) {
+    onChange(vars.map((v, i) => i === index ? { ...v, ...updates } : v))
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {vars.map((v, i) => (
+        <div key={i} style={s.variableRow}>
+          <input
+            style={{ ...s.input, flex: 1, minWidth: 0 }}
+            value={v.name}
+            onChange={e => updateVariable(i, { name: e.target.value })}
+            placeholder="Variable name"
+          />
+          <label style={s.variableStageLabel} title="Show on stage">
+            <input
+              type="checkbox"
+              checked={!!v.showOnStage}
+              onChange={e => updateVariable(i, { showOnStage: e.target.checked })}
+            />
+            <span>Stage</span>
+          </label>
+          <button
+            type="button"
+            style={{ ...s.removeCheckBtn, marginTop: 0 }}
+            onClick={() => removeVariable(i)}
+            title="Remove variable"
+          >
+            ×
+          </button>
+        </div>
+      ))}
+      <button type="button" className="btn-ghost" style={s.addCheckBtn} onClick={addVariable}>
+        + Add variable
+      </button>
+    </div>
+  )
+}
+
 export { ScratchCheckListEditor, ScratchCheckEditor, buildScratchToolboxXml, parseScratchToolboxXml }

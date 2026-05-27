@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import {
   loadBlocklyModules,
   DEFAULT_TOOLBOX,
@@ -15,6 +16,7 @@ import {
   setSpriteContext,
   setBackdropContext,
   setCostumeContext,
+  setVariableContext,
 } from '../../shared/scratch'
 import { resolveAssetFileUrl } from '../../shared/assetPaths'
 
@@ -321,16 +323,24 @@ export default function ScratchWorkspace({
   initialState  = null,      // legacy single-sprite alias
   initialSpriteStates = null,
   onStateChange,
+  onSpriteStatesChange,
   onCheckResult,
   externalStates = null,
   externalState  = null,     // legacy alias
   syncNowKey = null,
   hideStage = false,
+  selectedSpriteId: controlledSpriteId = null,
+  onSpriteSelect = null,
+  spritePanelTarget = null,
+  onAddSprite = null,
+  spritePanelEditor = null,
 }) {
   const sprites = task?.sprites?.length > 0 ? task.sprites : DEFAULT_SPRITES
   const backdrops = task?.backdrops?.length > 0 ? task.backdrops : []
+  const variables = task?.variables ?? []
   setSpriteContext(sprites)
   setBackdropContext(backdrops)
+  setVariableContext(variables)
 
   const normInitStates  = normaliseInitialStates(initialStates ?? initialState, sprites)
   const normExtStates   = externalStates ?? (externalState ? normaliseInitialStates(externalState, sprites) : null)
@@ -347,6 +357,7 @@ export default function ScratchWorkspace({
   const statusRef           = useRef('loading')
   const runningRef          = useRef(false)
   const onStateChangeRef    = useRef(onStateChange)
+  const onSpriteStatesChangeRef = useRef(onSpriteStatesChange)
   const onCheckResultRef    = useRef(onCheckResult)
   const askResolveRef       = useRef(null)
   const inputStateRef       = useRef({ keysPressed: new Set(), mouseDown: false, mouseX: 0, mouseY: 0 })
@@ -356,8 +367,14 @@ export default function ScratchWorkspace({
   const draggingSpriteIdRef = useRef(null)
   const backdropNameRef     = useRef(backdrops[0]?.name ?? null)
   const imageCacheRef       = useRef({})
+  const variableRuntimeRef  = useRef({})
 
-  const [selectedSpriteId, setSelectedSpriteId] = useState(sprites[0]?.id ?? 'sprite1')
+  const [internalSelectedSpriteId, setInternalSelectedSpriteId] = useState(sprites[0]?.id ?? 'sprite1')
+  const selectedSpriteId = controlledSpriteId ?? internalSelectedSpriteId
+  function setSelectedSpriteId(id) {
+    if (controlledSpriteId !== null) onSpriteSelect?.(id)
+    else setInternalSelectedSpriteId(id)
+  }
   setCostumeContext((sprites.find(sp => sp.id === selectedSpriteId) ?? sprites[0])?.costumes ?? [])
 
   const [status, setStatus]         = useState('loading')
@@ -365,6 +382,7 @@ export default function ScratchWorkspace({
   const [checkPassed, setCheckPassed] = useState(false)
   const [checkAttempted, setCheckAttempted] = useState(false)
   const [spriteStates, setSpriteStates] = useState(() => initSpriteStates(sprites))
+  const [variableValues, setVariableValues] = useState({})
   const [askPrompt, setAskPrompt]   = useState(null)
   const [askValue, setAskValue]     = useState('')
   const [broadcastToasts, setBroadcastToasts] = useState([])
@@ -379,6 +397,7 @@ export default function ScratchWorkspace({
   statusRef.current = status
   runningRef.current = running
   onStateChangeRef.current = onStateChange
+  onSpriteStatesChangeRef.current = onSpriteStatesChange
   onCheckResultRef.current = onCheckResult
 
   // ── Draw stage ──────────────────────────────────────────────────────────────
@@ -497,16 +516,20 @@ export default function ScratchWorkspace({
       state: spriteStatesRef.current[sp.id],
       costumes: sp.costumes ?? [],
       onUpdate: s => {
-        spriteStatesRef.current = { ...spriteStatesRef.current, [sp.id]: s }
-        setSpriteStates(prev => ({ ...prev, [sp.id]: s }))
+        commitSpriteStates({ ...spriteStatesRef.current, [sp.id]: s })
       },
     })).filter(sp => sp.workspace)
   }, [sprites])
 
+  function commitSpriteStates(nextStates) {
+    spriteStatesRef.current = nextStates
+    setSpriteStates(nextStates)
+    onSpriteStatesChangeRef.current?.(nextStates)
+  }
+
   function updateSpriteStateOverride(id, updates) {
     const newState = { ...spriteStatesRef.current[id], ...updates }
-    spriteStatesRef.current = { ...spriteStatesRef.current, [id]: newState }
-    setSpriteStates(prev => ({ ...prev, [id]: newState }))
+    commitSpriteStates({ ...spriteStatesRef.current, [id]: newState })
     if ('x' in updates || 'y' in updates) refreshSpriteToolbox(id)
   }
 
@@ -711,6 +734,11 @@ export default function ScratchWorkspace({
       setAskValue('')
       setAskPrompt(q)
     })
+    signal.variables = { ...variableRuntimeRef.current }
+    signal.onVariablesChange = vars => {
+      variableRuntimeRef.current = { ...vars }
+      setVariableValues({ ...vars })
+    }
     signal.onBroadcast = msg => {
       const id = Date.now() + Math.random()
       setBroadcastToasts(prev => [...prev, { id, message: msg }])
@@ -808,11 +836,12 @@ export default function ScratchWorkspace({
   function handleResetStage() {
     handleStop()
     const reset = initSpriteStates(sprites)
-    spriteStatesRef.current = reset
-    setSpriteStates(reset)
+    commitSpriteStates(reset)
     const defaultBackdrop = backdrops[0]?.name ?? null
     backdropNameRef.current = defaultBackdrop
     setBackdropName(defaultBackdrop)
+    variableRuntimeRef.current = {}
+    setVariableValues({})
     lastCheckRef.current = null
     setCheckPassed(false)
     setCheckAttempted(false)
@@ -862,8 +891,7 @@ export default function ScratchWorkspace({
         const newX = Math.max(-240, Math.min(240, dragStartRef.current.spriteX + dx))
         const newY = Math.max(-180, Math.min(180, dragStartRef.current.spriteY - dy))
         const updated = { ...spriteStatesRef.current[id], x: newX, y: newY }
-        spriteStatesRef.current = { ...spriteStatesRef.current, [id]: updated }
-        setSpriteStates(prev => ({ ...prev, [id]: updated }))
+        commitSpriteStates({ ...spriteStatesRef.current, [id]: updated })
       }
       return
     }
@@ -1028,8 +1056,21 @@ export default function ScratchWorkspace({
             <span style={s.spriteTileName}>{sp.name}</span>
           </button>
         ))}
+        {!readOnly && onAddSprite && (
+          <button
+            type="button"
+            style={s.spriteAddTile}
+            onClick={onAddSprite}
+            aria-label="Add sprite"
+            title="Add sprite"
+          >
+            <span style={s.spriteAddIcon}>+</span>
+            <span style={s.spriteTileName}>Add</span>
+          </button>
+        )}
       </div>
       {renderSpriteProps(false)}
+      {spritePanelEditor && <div style={s.spritePanelEditor}>{spritePanelEditor}</div>}
     </div>
   )
 
@@ -1068,8 +1109,9 @@ export default function ScratchWorkspace({
         </div>
       )}
 
-      {/* Sprite panel above editor when stage is hidden */}
-      {hideStage && spritePanelCompact}
+      {/* Sprite panel above editor when stage is hidden and no external selector */}
+      {hideStage && !onSpriteSelect && spritePanelCompact}
+      {spritePanelTarget && createPortal(spritePanelFull, spritePanelTarget)}
 
       {/* Block editor — all workspace divs stacked, only selected one visible */}
       <div style={s.editorPane}>
@@ -1128,6 +1170,16 @@ export default function ScratchWorkspace({
           </div>
 
           <div style={{ ...s.stageFrame, width: STAGE_W * stageScale, height: STAGE_H * stageScale }}>
+            {variables.some(v => v.showOnStage) && (
+              <div style={s.variableMonitors}>
+                {variables.filter(v => v.showOnStage).map(v => (
+                  <div key={v.name} style={s.variableMonitor}>
+                    <span style={s.variableMonitorName}>{v.name}</span>
+                    <span style={s.variableMonitorValue}>{variableValues[v.name] ?? 0}</span>
+                  </div>
+                ))}
+              </div>
+            )}
             {broadcastToasts.length > 0 && (
               <div style={s.broadcastToastStack}>
                 {broadcastToasts.map(t => (
@@ -1203,7 +1255,14 @@ const s = {
   spriteTileThumb: { width: 52, height: 52, borderRadius: 6, overflow: 'hidden', background: '#f8f8f8', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' },
   spriteTileHiddenBadge: { position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, background: 'rgba(0,0,0,0.35)', borderRadius: 6 },
   spriteTileName: { fontSize: '0.72rem', fontWeight: 600, color: 'var(--colour-text)', maxWidth: 64, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  spriteAddTile: {
+    width: 70, minHeight: 82, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4,
+    padding: '6px 8px', border: '2px dashed var(--colour-primary)', borderRadius: 8,
+    background: '#fff', cursor: 'pointer', fontFamily: 'var(--font-body)', color: 'var(--colour-primary)',
+  },
+  spriteAddIcon: { fontSize: '1.5rem', lineHeight: 1, fontWeight: 500 },
   spritePropBar: { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', padding: '4px 2px', borderTop: '1px solid #e5e7eb' },
+  spritePanelEditor: { paddingTop: 4, borderTop: '1px solid #e5e7eb' },
   spritePropField: { display: 'flex', flexDirection: 'column', gap: 2 },
   spritePropLabel: { fontSize: '0.65rem', fontWeight: 700, color: '#6b7280', fontFamily: 'var(--font-body)', textTransform: 'uppercase', letterSpacing: '0.03em' },
   spritePropInput: { width: 58, padding: '3px 5px', border: '1px solid #d1d5db', borderRadius: 5, fontFamily: 'var(--font-body)', fontSize: '0.8rem', color: 'var(--colour-text)', textAlign: 'center', background: '#fff' },
@@ -1227,6 +1286,10 @@ const s = {
   spriteTileCompactThumb: { width: 24, height: 24, borderRadius: 4, overflow: 'hidden', background: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   spriteTileCompactName: { fontSize: '0.78rem', fontWeight: 600, color: 'var(--colour-text)', maxWidth: 72, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   spritePropBarCompact: { display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', padding: '4px 8px 6px', borderTop: '1px solid #e5e7eb' },
+  variableMonitors: { position: 'absolute', top: 6, left: 6, display: 'flex', flexDirection: 'column', gap: 3, zIndex: 5, pointerEvents: 'none' },
+  variableMonitor: { display: 'flex', alignItems: 'center', gap: 0, background: 'rgba(255,140,26,0.92)', borderRadius: 4, overflow: 'hidden', boxShadow: '0 1px 4px rgba(0,0,0,0.18)', fontFamily: 'var(--font-body)', fontSize: '0.7rem', fontWeight: 700 },
+  variableMonitorName: { padding: '2px 6px', color: '#fff', background: 'rgba(0,0,0,0.18)' },
+  variableMonitorValue: { padding: '2px 6px', color: '#fff', minWidth: 24, textAlign: 'right' },
   broadcastToastStack: { position: 'absolute', top: 8, left: '50%', transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center', zIndex: 6, pointerEvents: 'none' },
   broadcastToast: { background: 'rgba(255, 171, 25, 0.96)', color: '#fff', padding: '4px 14px', borderRadius: 20, fontFamily: 'var(--font-body)', fontSize: '0.78rem', fontWeight: 700, boxShadow: '0 2px 8px rgba(0,0,0,0.22)', whiteSpace: 'nowrap', animation: 'scratch-toast-in 0.18s ease' },
   broadcastToastIcon: { fontSize: '0.75rem' },

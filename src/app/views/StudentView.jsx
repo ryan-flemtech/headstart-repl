@@ -432,20 +432,46 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
     if (!task || !action) return
 
     if (lesson.type === 'python') {
-      const target = action === 'starter' ? (task.starterCode ?? '') : (task.completeCode ?? '')
+      let target
+      if (action === 'starter') target = task.starterCode ?? ''
+      else if (action === 'complete') target = task.completeCode ?? ''
+      else {
+        const stageMatch = action.match(/^stage_(\d+)$/)
+        const stage = stageMatch ? (task.codeStages ?? [])[parseInt(stageMatch[1], 10)] : null
+        target = stage?.code ?? task.starterCode ?? ''
+      }
       setCode(target)
       setOutput('')
       setRunStatus(null)
       resetCheckFeedback()
     } else if (lesson.type === 'html') {
-      const targetFiles = action === 'starter' ? (task.starterFiles ?? []) : (task.completeFiles ?? [])
+      let targetFiles, targetEntry
+      if (action === 'starter') {
+        targetFiles = task.starterFiles ?? []
+        targetEntry = task.entryFile
+      } else if (action === 'complete') {
+        targetFiles = task.completeFiles ?? []
+        targetEntry = task.completeEntryFile ?? task.entryFile
+      } else {
+        const stageMatch = action.match(/^stage_(\d+)$/)
+        const stage = stageMatch ? (task.codeStages ?? [])[parseInt(stageMatch[1], 10)] : null
+        targetFiles = stage?.files ?? task.starterFiles ?? []
+        targetEntry = stage?.entryFile ?? task.entryFile
+      }
       setFiles(targetFiles.map(f => ({ ...f })))
-      setActiveFile(task.entryFile ?? targetFiles[0]?.name ?? '')
+      setActiveFile(targetEntry ?? targetFiles[0]?.name ?? '')
       setIframeSrc(null)
       setRunStatus(null)
       resetCheckFeedback()
     } else if (lesson.type === 'scratch') {
-      const targetBlocks = action === 'starter' ? (task.starterBlocks ?? null) : (task.completeBlocks ?? null)
+      let targetBlocks
+      if (action === 'starter') targetBlocks = task.starterBlocks ?? null
+      else if (action === 'complete') targetBlocks = task.completeBlocks ?? null
+      else {
+        const stageMatch = action.match(/^stage_(\d+)$/)
+        const stage = stageMatch ? (task.codeStages ?? [])[parseInt(stageMatch[1], 10)] : null
+        targetBlocks = stage?.blocks ?? task.starterBlocks ?? null
+      }
       setScratchExternalState(targetBlocks)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps

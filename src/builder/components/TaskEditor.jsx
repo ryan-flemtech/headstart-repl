@@ -15,11 +15,12 @@ import QuizTask from '../../app/components/QuizTask'
 import InformationTask from '../../app/components/InformationTask'
 import { DEFAULT_SPRITES } from '../../shared/scratch'
 import { resolveAssetsPath } from '../../shared/assetPaths'
+import { copyScratchSpriteStateToStarters } from '../lessonUtils'
 import { s } from './task-editor/styles'
 import { Field, TaskFormatIcon, QuizTypeIcon, CodeWorkspaceTabs, Modal, CarryThroughPicker, SpriteManager, BackdropManager } from './task-editor/TaskEditorFields'
 import { QuizTypePicker, MatchPairsBuilder, FillBlankBuilder, ShortAnswerBuilder, QuizOptionsBuilder } from './task-editor/QuizEditors'
 import { CopyButtons, IncorrectCheckResultsDisplay, formatCheckFailure, formatCheckFailureDetail, CheckListEditor } from './task-editor/CheckEditors'
-import { ScratchToolboxPicker, ScratchCheckListEditor } from './task-editor/ScratchEditors'
+import { ScratchToolboxPicker, ScratchCheckListEditor, VariableManager } from './task-editor/ScratchEditors'
 
 // Re-export for backward compatibility
 export { ScratchToolboxPicker, SpriteManager, BackdropManager }
@@ -58,14 +59,36 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
   const [starterBlocksOpen, setStarterBlocksOpen] = useState(false)
   const [starterBlocksSyncKey, setStarterBlocksSyncKey] = useState(0)
   const [scratchModalTab, setScratchModalTab] = useState('starter')
+  const [modalSelectedSpriteId, setModalSelectedSpriteId] = useState(null)
+  const [modalSpritePanelTarget, setModalSpritePanelTarget] = useState(null)
+  const [sidebarSections, setSidebarSections] = useState({ toolbox: true, sprites: true, backdrops: false, variables: false })
   const [modalStarterBlocks, setModalStarterBlocks] = useState(null)
   const modalStarterBlocksRef = React.useRef(null)
   const modalCompleteBlocksRef = React.useRef(null)
+  const modalCompleteSpriteStatesRef = React.useRef(null)
+  const modalStageSpriteStatesRef = React.useRef({})
   const isCompleteTab = codeTab === 'complete'
-  const activePythonCode = isCompleteTab ? (task.completeCode ?? '') : (task.starterCode ?? '')
-  const activeFiles = isCompleteTab ? (task.completeFiles ?? []) : (task.starterFiles ?? [])
+  const stageTabMatch = codeTab.match(/^stage_(\d+)$/)
+  const activeStageIndex = stageTabMatch ? parseInt(stageTabMatch[1], 10) : null
+  const isStageTab = activeStageIndex !== null
+  const codeStages = task.codeStages ?? []
+  const activeStage = isStageTab ? (codeStages[activeStageIndex] ?? null) : null
+  const activePythonCode = isCompleteTab
+    ? (task.completeCode ?? '')
+    : isStageTab
+    ? (activeStage?.code ?? '')
+    : (task.starterCode ?? '')
+  const activeFiles = isCompleteTab
+    ? (task.completeFiles ?? [])
+    : isStageTab
+    ? (activeStage?.files ?? [])
+    : (task.starterFiles ?? [])
   const activeSelectedFile = isCompleteTab ? selectedCompleteFile : selectedFile
-  const activeEntryFile = isCompleteTab ? (task.completeEntryFile ?? task.entryFile ?? 'index.html') : (task.entryFile ?? 'index.html')
+  const activeEntryFile = isCompleteTab
+    ? (task.completeEntryFile ?? task.entryFile ?? 'index.html')
+    : isStageTab
+    ? (activeStage?.entryFile ?? task.entryFile ?? 'index.html')
+    : (task.entryFile ?? 'index.html')
   const activeCodeForChecks = isPython
     ? activePythonCode
     : activeFiles.map(file => `--- ${file.name} ---\n${file.content ?? ''}`).join('\n\n')
@@ -79,6 +102,32 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
     if (!blocks) return null
     if (typeof structuredClone === 'function') return structuredClone(blocks)
     return JSON.parse(JSON.stringify(blocks))
+  }
+
+  function getScratchSprites() {
+    return task.sprites?.length > 0 ? task.sprites : DEFAULT_SPRITES
+  }
+
+  function handleStarterSpritesChange(newSprites) {
+    const previousSprites = getScratchSprites()
+    set('sprites', newSprites)
+    const previousIds = new Set(previousSprites.map(sp => sp.id))
+    const added = newSprites.find(sp => !previousIds.has(sp.id))
+    if (added) {
+      setModalSelectedSpriteId(added.id)
+    } else if (!newSprites.find(sp => sp.id === modalSelectedSpriteId)) {
+      setModalSelectedSpriteId(newSprites[0]?.id ?? null)
+    }
+  }
+
+  function handleAddStarterSprite() {
+    const sprites = getScratchSprites()
+    let next = sprites.length + 1
+    while (sprites.some(sp => sp.id === `sprite${next}`)) next += 1
+    handleStarterSpritesChange([
+      ...sprites,
+      { id: `sprite${next}`, name: `Sprite ${next}`, type: 'cat', x: 0, y: 0, size: 100, direction: 90 },
+    ])
   }
 
   function handleCodeTabChange(tab) {
@@ -108,7 +157,42 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
       }
     }
 
+    const stageMatch = tab.match(/^stage_(\d+)$/)
+    if (stageMatch) {
+      const idx = parseInt(stageMatch[1], 10)
+      const stage = (task.codeStages ?? [])[idx]
+      if (stage && !isPython && !isScratch) {
+        setSelectedFile(stage.files?.[0]?.name ?? '')
+      }
+    }
+
     setCodeTab(tab)
+  }
+
+  function handleAddStage() {
+    const existing = task.codeStages ?? []
+    const newStage = isPython
+      ? { label: `Stage ${existing.length + 1}`, code: task.starterCode ?? '' }
+      : { label: `Stage ${existing.length + 1}`, files: (task.starterFiles ?? []).map(f => ({ ...f })), entryFile: task.entryFile ?? 'index.html' }
+    const updated = [...existing, newStage]
+    onUpdate({ ...task, codeStages: updated })
+    setCodeTab(`stage_${updated.length - 1}`)
+    if (!isPython && !isScratch) {
+      setSelectedFile(newStage.files?.[0]?.name ?? '')
+    }
+  }
+
+  function handleRemoveStage(idx) {
+    const existing = task.codeStages ?? []
+    const updated = existing.filter((_, i) => i !== idx)
+    onUpdate({ ...task, codeStages: updated.length > 0 ? updated : undefined })
+    setCodeTab('starter')
+  }
+
+  function updateStage(idx, updates) {
+    const existing = task.codeStages ?? []
+    const updated = existing.map((s, i) => i === idx ? { ...s, ...updates } : s)
+    onUpdate({ ...task, codeStages: updated })
   }
 
   function handleStop() {
@@ -219,16 +303,24 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
     const blocks = cloneBlocks(task.starterBlocks)
     modalStarterBlocksRef.current = blocks
     modalCompleteBlocksRef.current = cloneBlocks(task.completeBlocks)
+    modalCompleteSpriteStatesRef.current = null
+    modalStageSpriteStatesRef.current = {}
     setModalStarterBlocks(blocks)
     setTestScratchBlocks(cloneBlocks(blocks))
     setScratchModalTab('starter')
     setStarterBlocksOpen(true)
     setCheckResult(null)
+    const activeSprites = task.sprites?.length > 0 ? task.sprites : DEFAULT_SPRITES
+    setModalSelectedSpriteId(activeSprites[0]?.id ?? null)
   }
 
   function handleCloseStarterBlocks() {
     setStarterBlocksSyncKey(key => key + 1)
     requestAnimationFrame(() => setStarterBlocksOpen(false))
+  }
+
+  function toggleSidebarSection(name) {
+    setSidebarSections(prev => ({ ...prev, [name]: !prev[name] }))
   }
 
   function handleScratchModalTabChange(tab) {
@@ -252,6 +344,34 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
       return
     }
 
+    setScratchModalTab(tab)
+  }
+
+  function handleAddScratchStage() {
+    const existing = task.codeStages ?? []
+    const srcBlocks = existing.length > 0
+      ? cloneBlocks(existing[existing.length - 1].blocks)
+      : cloneBlocks(modalStarterBlocksRef.current ?? task.starterBlocks)
+    const newStage = { label: `Stage ${existing.length + 1}`, blocks: srcBlocks }
+    const updated = [...existing, newStage]
+    onUpdate({ ...task, codeStages: updated })
+    setScratchModalTab(`stage_${updated.length - 1}`)
+  }
+
+  function handleCopySpriteInfoToStarter() {
+    const stageMatch = scratchModalTab.match(/^stage_(\d+)$/)
+    const stageIndex = stageMatch ? parseInt(stageMatch[1], 10) : null
+    const spriteStates = scratchModalTab === 'complete'
+      ? modalCompleteSpriteStatesRef.current
+      : modalStageSpriteStatesRef.current[stageIndex]
+    const sprites = task.sprites?.length > 0 ? task.sprites : DEFAULT_SPRITES
+    set('sprites', copyScratchSpriteStateToStarters(sprites, spriteStates))
+  }
+
+  function handleRemoveScratchStage(idx) {
+    const existing = task.codeStages ?? []
+    const updated = existing.filter((_, i) => i !== idx)
+    onUpdate({ ...task, codeStages: updated.length > 0 ? updated : undefined })
     setScratchModalTab('starter')
   }
 
@@ -716,13 +836,29 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
       ) : isPython ? (
         <>
           <div style={s.codeWorkspaceStack}>
-            <CodeWorkspaceTabs activeTab={codeTab} onChange={handleCodeTabChange} />
-
+            <CodeWorkspaceTabs
+              activeTab={codeTab}
+              onChange={handleCodeTabChange}
+              stages={codeStages}
+              onAddStage={handleAddStage}
+              onRemoveStage={handleRemoveStage}
+            />
+            {isStageTab && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: '#f5f3ff', border: '1px solid #e5e7eb', borderTop: 0, borderBottom: 0 }}>
+                <span style={{ fontFamily: 'var(--font-body)', fontSize: '0.8rem', color: '#6b7280', fontWeight: 600 }}>Stage label:</span>
+                <input
+                  style={{ ...s.input, width: 200, padding: '4px 8px', fontSize: '0.82rem' }}
+                  value={activeStage?.label ?? ''}
+                  onChange={e => updateStage(activeStageIndex, { label: e.target.value })}
+                  placeholder={`Stage ${activeStageIndex + 1}`}
+                />
+              </div>
+            )}
             <div style={s.pythonEditor}>
               <CodeEditor
                 value={activePythonCode}
                 language="python"
-                onChange={v => isCompleteTab ? set('completeCode', v) : set('starterCode', v)}
+                onChange={v => isCompleteTab ? set('completeCode', v) : isStageTab ? updateStage(activeStageIndex, { code: v }) : set('starterCode', v)}
                 style={s.attachedCodeEditor}
               />
             </div>
@@ -827,43 +963,85 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                     onChange={handleScratchModalTabChange}
                     starterLabel="Starter blocks"
                     testLabel="Complete blocks"
+                    stages={codeStages}
+                    onAddStage={handleAddScratchStage}
+                    onRemoveStage={handleRemoveScratchStage}
                   />
                   {scratchModalTab === 'complete' && checkResult !== null && (
                     <span style={checkResult === 'pass' ? s.scratchCheckPass : s.scratchCheckFail}>
                       {checkResult === 'pass' ? 'Check passes' : 'Check not passing'}
                     </span>
                   )}
+                  {scratchModalTab !== 'starter' && (
+                    <button type="button" className="btn-ghost" style={s.secondaryBtn} onClick={handleCopySpriteInfoToStarter}>
+                      Copy Sprite Info to Starter
+                    </button>
+                  )}
                 </div>
 
                 <div style={s.scratchModalBody}>
                   {scratchModalTab === 'starter' && (
                     <div style={s.scratchConfigSidebar}>
-                      <div style={s.sidebarSection}>
-                        <span style={s.sidebarSectionTitle}>Toolbox blocks</span>
-                        <ScratchToolboxPicker
-                          toolbox={task.toolbox ?? ''}
-                          onChange={toolbox => set('toolbox', toolbox)}
-                        />
+                      {/* Toolbox blocks */}
+                      <div style={s.collapsibleField}>
+                        <button type="button" style={s.collapsibleHeader} onClick={() => toggleSidebarSection('toolbox')}>
+                          <span style={s.collapsibleLabel}>Toolbox blocks</span>
+                          <span style={{ ...s.collapsibleChevron, transform: sidebarSections.toolbox ? 'rotate(180deg)' : 'none' }}>▾</span>
+                        </button>
+                        {sidebarSections.toolbox && (
+                          <ScratchToolboxPicker
+                            toolbox={task.toolbox ?? ''}
+                            onChange={toolbox => set('toolbox', toolbox)}
+                          />
+                        )}
                       </div>
-                      <div style={s.sidebarSection}>
-                        <span style={s.sidebarSectionTitle}>Sprites</span>
-                        <SpriteManager
-                          sprites={task.sprites?.length > 0 ? task.sprites : DEFAULT_SPRITES}
-                          onChange={sprites => set('sprites', sprites)}
-                          assetsPath={lesson.assetsPath ? resolveAssetsPath(lesson.assetsPath) : ''}
-                          lessonId={lesson.id}
-                          lessonType={lesson.type}
-                        />
+
+                      {/* Sprites */}
+                      <div style={s.collapsibleField}>
+                        <button type="button" style={s.collapsibleHeader} onClick={() => toggleSidebarSection('sprites')}>
+                          <span style={s.collapsibleLabel}>Sprites</span>
+                          <span style={{ ...s.collapsibleChevron, transform: sidebarSections.sprites ? 'rotate(180deg)' : 'none' }}>▾</span>
+                        </button>
+                        {sidebarSections.sprites && (() => {
+                          return (
+                            <div ref={setModalSpritePanelTarget} style={s.spritePanelHost} />
+                          )
+                        })()}
                       </div>
-                      <div style={s.sidebarSection}>
-                        <span style={s.sidebarSectionTitle}>Backdrops</span>
-                        <BackdropManager
-                          backdrops={task.backdrops?.length > 0 ? task.backdrops : [{ id: 'backdrop1', name: 'Backdrop 1', colour: '#ffffff' }]}
-                          onChange={backdrops => set('backdrops', backdrops)}
-                          assetsPath={lesson.assetsPath ? resolveAssetsPath(lesson.assetsPath) : ''}
-                          lessonId={lesson.id}
-                          lessonType={lesson.type}
-                        />
+
+                      {/* Backdrops */}
+                      <div style={s.collapsibleField}>
+                        <button type="button" style={s.collapsibleHeader} onClick={() => toggleSidebarSection('backdrops')}>
+                          <span style={s.collapsibleLabel}>Backdrops</span>
+                          <span style={{ ...s.collapsibleChevron, transform: sidebarSections.backdrops ? 'rotate(180deg)' : 'none' }}>▾</span>
+                        </button>
+                        {sidebarSections.backdrops && (
+                          <div style={{ padding: '10px 12px', borderTop: '1px solid #e5e7eb' }}>
+                            <BackdropManager
+                              backdrops={task.backdrops?.length > 0 ? task.backdrops : [{ id: 'backdrop1', name: 'Backdrop 1', colour: '#ffffff' }]}
+                              onChange={backdrops => set('backdrops', backdrops)}
+                              assetsPath={lesson.assetsPath ? resolveAssetsPath(lesson.assetsPath) : ''}
+                              lessonId={lesson.id}
+                              lessonType={lesson.type}
+                            />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Variables */}
+                      <div style={s.collapsibleField}>
+                        <button type="button" style={s.collapsibleHeader} onClick={() => toggleSidebarSection('variables')}>
+                          <span style={s.collapsibleLabel}>Variables</span>
+                          <span style={{ ...s.collapsibleChevron, transform: sidebarSections.variables ? 'rotate(180deg)' : 'none' }}>▾</span>
+                        </button>
+                        {sidebarSections.variables && (
+                          <div style={{ padding: '10px 12px', borderTop: '1px solid #e5e7eb' }}>
+                            <VariableManager
+                              variables={task.variables ?? []}
+                              onChange={variables => set('variables', variables.length > 0 ? variables : undefined)}
+                            />
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -881,9 +1059,28 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                           setModalStarterBlocks(states)
                           set('starterBlocks', states)
                         }}
+                        onSpriteStatesChange={states => {
+                          set('sprites', copyScratchSpriteStateToStarters(getScratchSprites(), states))
+                        }}
                         syncNowKey={starterBlocksSyncKey}
+                        selectedSpriteId={modalSelectedSpriteId}
+                        onSpriteSelect={setModalSelectedSpriteId}
+                        spritePanelTarget={modalSpritePanelTarget}
+                        onAddSprite={handleAddStarterSprite}
+                        spritePanelEditor={(
+                          <SpriteManager
+                            sprites={getScratchSprites()}
+                            focusedSpriteId={modalSelectedSpriteId}
+                            hidePosition
+                            hideAdd
+                            onChange={handleStarterSpritesChange}
+                            assetsPath={lesson.assetsPath ? resolveAssetsPath(lesson.assetsPath) : ''}
+                            lessonId={lesson.id}
+                            lessonType={lesson.type}
+                          />
+                        )}
                       />
-                    ) : (
+                    ) : scratchModalTab === 'complete' ? (
                       <ScratchWorkspace
                         key={`builder-scratch-complete-${task.id}-${(task.sprites ?? []).map(sp => sp.id).join(',')}`}
                         task={task}
@@ -893,6 +1090,9 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                           modalCompleteBlocksRef.current = states
                           setTestScratchBlocks(states)
                           set('completeBlocks', states)
+                        }}
+                        onSpriteStatesChange={states => {
+                          modalCompleteSpriteStatesRef.current = states
                         }}
                         onCheckResult={passed => {
                           setCheckResult(passed ? 'pass' : 'fail')
@@ -906,7 +1106,38 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                         }}
                         syncNowKey={starterBlocksSyncKey}
                       />
-                    )}
+                    ) : (() => {
+                      const stageMatch = scratchModalTab.match(/^stage_(\d+)$/)
+                      if (!stageMatch) return null
+                      const stageIdx = parseInt(stageMatch[1], 10)
+                      const stage = codeStages[stageIdx]
+                      if (!stage) return null
+                      return (
+                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderBottom: '1px solid #e5e7eb', flexShrink: 0 }}>
+                            <span style={{ fontFamily: 'var(--font-body)', fontSize: '0.8rem', color: '#6b7280', fontWeight: 600 }}>Stage label:</span>
+                            <input
+                              style={{ ...s.input, width: 200, padding: '4px 8px', fontSize: '0.82rem' }}
+                              value={stage.label ?? ''}
+                              onChange={e => updateStage(stageIdx, { label: e.target.value })}
+                              placeholder={`Stage ${stageIdx + 1}`}
+                            />
+                          </div>
+                          <ScratchWorkspace
+                            key={`builder-scratch-stage-${task.id}-${stageIdx}-${(task.sprites ?? []).map(sp => sp.id).join(',')}`}
+                            task={task}
+                            hideStage
+                            assetsPath={lesson.assetsPath ? resolveAssetsPath(lesson.assetsPath) : ''}
+                            initialStates={stage.blocks ?? null}
+                            onStateChange={states => updateStage(stageIdx, { blocks: states })}
+                            onSpriteStatesChange={states => {
+                              modalStageSpriteStatesRef.current[stageIdx] = states
+                            }}
+                            syncNowKey={starterBlocksSyncKey}
+                          />
+                        </div>
+                      )
+                    })()}
                   </div>
                 </div>
               </div>
@@ -919,6 +1150,9 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
             <CodeWorkspaceTabs
               activeTab={codeTab}
               onChange={handleCodeTabChange}
+              stages={codeStages}
+              onAddStage={handleAddStage}
+              onRemoveStage={handleRemoveStage}
               rightAction={
                 <button
                   type="button"
@@ -931,6 +1165,17 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                 </button>
               }
             />
+            {isStageTab && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: '#f5f3ff', border: '1px solid #e5e7eb', borderTop: 0, borderBottom: 0 }}>
+                <span style={{ fontFamily: 'var(--font-body)', fontSize: '0.8rem', color: '#6b7280', fontWeight: 600 }}>Stage label:</span>
+                <input
+                  style={{ ...s.input, width: 200, padding: '4px 8px', fontSize: '0.82rem' }}
+                  value={activeStage?.label ?? ''}
+                  onChange={e => updateStage(activeStageIndex, { label: e.target.value })}
+                  placeholder={`Stage ${activeStageIndex + 1}`}
+                />
+              </div>
+            )}
 
             <div style={s.htmlSplit}>
             <SplitPane
@@ -947,6 +1192,9 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                       if (isCompleteTab) {
                         set('completeFiles', [...(task.completeFiles ?? []), f])
                         setSelectedCompleteFile(f.name)
+                      } else if (isStageTab) {
+                        updateStage(activeStageIndex, { files: [...(activeStage?.files ?? []), f] })
+                        setSelectedFile(f.name)
                       } else {
                         set('starterFiles', [...(task.starterFiles ?? []), f])
                         setSelectedFile(f.name)
@@ -956,17 +1204,23 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                       if (isCompleteTab) {
                         onUpdate({ ...task, completeFiles: newFiles, completeEntryFile: newEntry })
                         setSelectedCompleteFile(newFiles[0]?.name ?? '')
+                      } else if (isStageTab) {
+                        updateStage(activeStageIndex, { files: newFiles, entryFile: newEntry })
+                        setSelectedFile(newFiles[0]?.name ?? '')
                       } else {
                         onUpdate({ ...task, starterFiles: newFiles, entryFile: newEntry })
                         setSelectedFile(newFiles[0]?.name ?? '')
                       }
                     }}
                     onDeleteFile={name => {
-                      const current = isCompleteTab ? (task.completeFiles ?? []) : (task.starterFiles ?? [])
+                      const current = isCompleteTab ? (task.completeFiles ?? []) : isStageTab ? (activeStage?.files ?? []) : (task.starterFiles ?? [])
                       const next = current.filter(f => f.name !== name)
                       if (isCompleteTab) {
                         set('completeFiles', next)
                         setSelectedCompleteFile(next[0]?.name ?? '')
+                      } else if (isStageTab) {
+                        updateStage(activeStageIndex, { files: next })
+                        setSelectedFile(next[0]?.name ?? '')
                       } else {
                         set('starterFiles', next)
                         setSelectedFile(next[0]?.name ?? '')
@@ -974,9 +1228,14 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                     }}
                     onChangeType={(name, type) => {
                       if (isCompleteTab) set('completeFiles', (task.completeFiles ?? []).map(f => f.name === name ? { ...f, type } : f))
+                      else if (isStageTab) updateStage(activeStageIndex, { files: (activeStage?.files ?? []).map(f => f.name === name ? { ...f, type } : f) })
                       else set('starterFiles', (task.starterFiles ?? []).map(f => f.name === name ? { ...f, type } : f))
                     }}
-                    onChangeEntryFile={name => isCompleteTab ? set('completeEntryFile', name) : set('entryFile', name)}
+                    onChangeEntryFile={name => {
+                      if (isCompleteTab) set('completeEntryFile', name)
+                      else if (isStageTab) updateStage(activeStageIndex, { entryFile: name })
+                      else set('entryFile', name)
+                    }}
                     attachedTop
                   />
                 </div>
@@ -1030,6 +1289,7 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                           language={activeFiles.find(f => f.name === activeSelectedFile)?.type ?? 'html'}
                           onChange={v => {
                             if (isCompleteTab) set('completeFiles', (task.completeFiles ?? []).map(f => f.name === activeSelectedFile ? { ...f, content: v } : f))
+                            else if (isStageTab) updateStage(activeStageIndex, { files: (activeStage?.files ?? []).map(f => f.name === activeSelectedFile ? { ...f, content: v } : f) })
                             else set('starterFiles', (task.starterFiles ?? []).map(f => f.name === activeSelectedFile ? { ...f, content: v } : f))
                           }}
                           style={s.htmlCodeEditor}
