@@ -58,7 +58,12 @@ Testing strategy, tool choices, and conventions. Read this before writing or mod
 | `src/app/hooks/useIdentity.js` | Creates identity on first use; restores from localStorage; `createIdentity`, `updateTimestamp`, `updateDisplayName` methods; handles corrupted JSON gracefully |
 | `src/app/hooks/useSession.js` | `encodeFileKey`/`decodeFileKey` helpers (pure — unit test these directly); Firebase methods mocked — test that correct Firebase calls are made for each teacher/student action |
 | `src/app/views/LandingPage.jsx` | Renders; navigates to `/lesson/:id` on submit |
-| `src/app/components/NameEntry.jsx` | Renders; submit with name; duplicate suffix label |
+| `src/app/components/WaitingRoom.jsx` | Title and description rendering; animated dot progression |
+| `src/app/components/JoinChoiceScreen.jsx` | Session-state message variants; Wait/Solo callbacks |
+| `src/app/components/JoinSessionPrompt.jsx` | Title rendering; Join/Decline callbacks |
+| `src/app/components/NameEntry.jsx` | Submit with unique name; duplicate-suffix confirmation step; solo link; waiting-room mode |
+| `src/app/components/ExplainerPanel.jsx` | Collapsible toggle; aria-expanded; non-collapsible mode; content passes to MarkdownRenderer |
+| `src/app/components/TopBar.jsx` | Solo/Live/Sandbox badge logic; displayName visibility; right slot; desktop mode |
 | `src/app/components/TaskProgressDots.jsx` | Renders past/current/locked dots; click on past dot fires callback; locked dot is not clickable |
 | `src/app/components/CheckFeedbackBanner.jsx` | Renders pass state; renders fail + hint; renders "see complete code" when unlocked |
 | `src/app/components/QuizTask.jsx` | Multiple-choice renders all options; selecting an answer fires callback; match/fill-blank drag interactions |
@@ -157,4 +162,4 @@ Set in `vitest.config.js`. Current thresholds reflect the initial test scope (pu
 
 ---
 
-*Last updated: May 2026 — refreshed after builder/shared utility characterization coverage was added.*
+*Last updated: May 2026 — added characterization coverage for WaitingRoom, JoinChoiceScreen, JoinSessionPrompt, NameEntry, ExplainerPanel, and TopBar.*
