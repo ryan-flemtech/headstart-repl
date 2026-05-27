@@ -16,7 +16,6 @@ import InformationTask from '../../app/components/InformationTask'
 import { DEFAULT_SPRITES } from '../../shared/scratch'
 import { resolveAssetsPath } from '../../shared/assetPaths'
 import { copyScratchSpriteStateToStarters } from '../lessonUtils'
-import { s } from './task-editor/styles'
 import { Field, TaskFormatIcon, QuizTypeIcon, CodeWorkspaceTabs, Modal, CarryThroughPicker, SpriteManager, BackdropManager } from './task-editor/TaskEditorFields'
 import { QuizTypePicker, MatchPairsBuilder, FillBlankBuilder, ShortAnswerBuilder, QuizOptionsBuilder } from './task-editor/QuizEditors'
 import { CopyButtons, IncorrectCheckResultsDisplay, formatCheckFailure, formatCheckFailureDetail, CheckListEditor } from './task-editor/CheckEditors'
@@ -511,12 +510,13 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
   }
 
   return (
-    <div style={s.wrap}>
+    <div className="te-wrap">
       {parentGroup ? (
         <Field label="Task title">
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <input
-              style={{ ...s.input, flex: 1 }}
+              className="te-input"
+              style={{ flex: 1 }}
               value={task.title}
               onChange={e => set('title', e.target.value)}
               placeholder={`${parentGroup.title} - N`}
@@ -524,21 +524,21 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
             {task._customTitle ? (
               <button
                 type="button"
-                style={s.resetTitleBtn}
+                className="te-reset-title-btn"
                 title="Reset to auto-generated name"
                 onClick={() => onUpdate({ ...task, title: '', _customTitle: undefined })}
               >
                 reset
               </button>
             ) : (
-              <span style={s.autoTitleBadge}>auto</span>
+              <span className="te-auto-title-badge">auto</span>
             )}
           </div>
         </Field>
       ) : (
         <Field label="Task title">
           <input
-            style={s.input}
+            className="te-input"
             value={task.title}
             onChange={e => set('title', e.target.value)}
             placeholder="e.g. Hello World"
@@ -548,7 +548,7 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
 
       <Field label="Estimated time (minutes)">
         <input
-          style={s.input}
+          className="te-input"
           type="number"
           min="1"
           step="1"
@@ -562,7 +562,7 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
       </Field>
 
       <Field label="Task format">
-        <div style={s.taskFormatGrid}>
+        <div className="te-task-format-grid">
           {[
             { value: 'code', label: lesson.type === 'scratch' ? 'Scratch' : 'Code', iconType: lesson.type === 'scratch' ? 'scratch' : 'code' },
             { value: 'information', label: 'Information', iconType: 'information' },
@@ -573,11 +573,11 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
               <button
                 key={value}
                 type="button"
-                style={{ ...s.taskFormatBtn, ...(active ? s.taskFormatBtnActive : {}) }}
+                className={active ? 'te-task-format-btn te-task-format-btn--active' : 'te-task-format-btn'}
                 onClick={() => handleTaskTypeChange(value)}
               >
                 <TaskFormatIcon type={iconType} />
-                <span style={s.taskFormatLabel}>{label}</span>
+                <span className="te-task-format-label">{label}</span>
               </button>
             )
           })}
@@ -586,7 +586,7 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
 
       {isInformation && (
         <Field label="Information type">
-          <div style={s.infoTypeGrid}>
+          <div className="te-info-type-grid">
             {[
               { value: 'standard', label: 'Standard', hint: 'Markdown explainer' },
               { value: 'recap', label: 'Two Pane View', hint: 'Two editable markdown panes' },
@@ -597,11 +597,11 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                 <button
                   key={option.value}
                   type="button"
-                  style={{ ...s.infoTypeBtn, ...(active ? s.infoTypeBtnActive : {}) }}
+                  className={active ? 'te-info-type-btn te-info-type-btn--active' : 'te-info-type-btn'}
                   onClick={() => set('informationType', option.value)}
                 >
-                  <span style={s.infoTypeLabel}>{option.label}</span>
-                  <span style={s.infoTypeHint}>{option.hint}</span>
+                  <span className="te-info-type-label">{option.label}</span>
+                  <span className="te-info-type-hint">{option.hint}</span>
                 </button>
               )
             })}
@@ -632,7 +632,7 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
             <span style={{ fontFamily: 'var(--font-body)', fontWeight: 600, fontSize: '0.88rem', color: 'var(--colour-text)' }}>
               {isInformation && (task.informationType ?? 'standard') === 'recap' ? 'Right pane (Markdown)' : 'Explainer (Markdown)'}
             </span>
-            <label style={s.checkToggle}>
+            <label className="te-check-toggle">
               <input
                 type="checkbox"
                 checked={task.explainer !== null && task.explainer !== undefined}
@@ -656,11 +656,11 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
       )}
 
       {isInformation && (
-        <div style={s.previewPanel}>
-          <div style={s.previewHeader}>
-            <span style={s.previewTitle}>Student preview</span>
+        <div className="te-preview-panel">
+          <div className="te-preview-header">
+            <span className="te-preview-title">Student preview</span>
           </div>
-          <div style={s.infoPreview}>
+          <div className="te-info-preview">
             <InformationTask task={task} lesson={lesson} />
           </div>
         </div>
@@ -673,28 +673,28 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
         const summary = summaryParts.join(' · ')
 
         return (
-          <div style={s.optionsSection}>
+          <div className="te-options-section">
             <button
               type="button"
-              style={s.optionsSectionToggle}
+              className="te-options-section__toggle"
               onClick={() => setOptionsOpen(o => !o)}
               aria-expanded={optionsOpen}
             >
-              <span style={s.optionsSectionTitle}>Task options</span>
+              <span className="te-options-section__title">Task options</span>
               {!optionsOpen && summary && (
-                <span style={s.optionsSummaryText}>{summary}</span>
+                <span className="te-options-section__summary">{summary}</span>
               )}
-              <span style={{ ...s.optionsChevron, transform: optionsOpen ? 'rotate(180deg)' : 'none' }}>▾</span>
+              <span className="te-options-section__chevron" style={{ transform: optionsOpen ? 'rotate(180deg)' : 'none' }}>▾</span>
             </button>
 
             {optionsOpen && (
-              <div style={s.optionsBody}>
+              <div className="te-options-section__body">
                 <CarryThroughPicker task={task} lesson={lesson} onUpdate={onUpdate} isScratch={isScratch} isPython={isPython} />
 
                 {!isScratch && (
                   <Field label="Student interaction">
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      <div style={s.optionChoiceGrid}>
+                      <div className="te-option-choice-grid">
                         {[
                           { value: 'run', label: 'Run', text: 'Students run code and see output.' },
                           { value: 'submit', label: 'Submit', text: 'Students submit code without running it.' },
@@ -703,23 +703,23 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                           return (
                             <label
                               key={choice.value}
-                              style={{ ...s.optionChoiceCard, ...(active ? s.optionChoiceCardActive : {}) }}
+                              className={active ? 'te-option-choice-card te-option-choice-card--active' : 'te-option-choice-card'}
                             >
                               <input
                                 type="radio"
                                 name={`interaction-${task.id}`}
                                 checked={active}
                                 onChange={() => handleInteractionModeChange(choice.value)}
-                                style={s.optionChoiceInput}
+                                className="te-option-choice-input"
                               />
-                              <span style={s.optionChoiceTitle}>{choice.label}</span>
-                              <span style={{ ...s.optionChoiceText, ...(active ? s.optionChoiceTextActive : {}) }}>{choice.text}</span>
+                              <span className="te-option-choice-title">{choice.label}</span>
+                              <span className={active ? 'te-option-choice-text te-option-choice-text--active' : 'te-option-choice-text'}>{choice.text}</span>
                             </label>
                           )
                         })}
                       </div>
                       {task.interactionMode === 'submit' && (
-                        <p style={s.optionNote}>
+                        <p className="te-option-note">
                           Submit mode hides the Run button. Only code-based checks can be evaluated on submit.
                         </p>
                       )}
@@ -728,7 +728,7 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                 )}
 
                 <Field label="Completion check">
-                  <label style={{ ...s.optionToggleCard, ...(task.check ? s.optionToggleCardActive : {}) }}>
+                  <label className={task.check ? 'te-option-toggle-card te-option-toggle-card--active' : 'te-option-toggle-card'}>
                     <input
                       type="checkbox"
                       checked={!!task.check}
@@ -741,10 +741,10 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                             ? [{ type: 'code_no_error' }]
                             : [{ type: 'output_contains', value: '' }])
                         : null)}
-                      style={s.optionChoiceInput}
+                      className="te-option-choice-input"
                     />
-                    <span style={s.optionChoiceTitle}>Enable check</span>
-                    <span style={{ ...s.optionChoiceText, ...(task.check ? s.optionChoiceTextActive : {}) }}>
+                    <span className="te-option-choice-title">Enable check</span>
+                    <span className={task.check ? 'te-option-choice-text te-option-choice-text--active' : 'te-option-choice-text'}>
                       Add completion criteria students can pass.
                     </span>
                   </label>
@@ -771,7 +771,7 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
 
                 {task.check && !isScratch && (
                   <Field label="Incorrect checks">
-                    <p style={s.optionNote}>
+                    <p className="te-option-note">
                       When the completion check fails, these detect specific mistakes and show a targeted hint in the feedback banner. Each check passes when it detects a particular wrong pattern.
                     </p>
                     <CheckListEditor
@@ -793,7 +793,7 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
         )
       })()}
 
-      {!isInformation && <div style={s.divider} />}
+      {!isInformation && <div className="te-divider" />}
 
       {isInformation ? null : isQuiz ? (
         <>
@@ -807,9 +807,9 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
           ) : task.quizType === 'short_answer' ? (
             <ShortAnswerBuilder task={task} onUpdate={onUpdate} lessonType={lesson.type} />
           ) : null}
-          <div style={s.previewPanel}>
-            <div style={s.previewHeader}>
-              <span style={s.previewTitle}>Student preview</span>
+          <div className="te-preview-panel">
+            <div className="te-preview-header">
+              <span className="te-preview-title">Student preview</span>
             </div>
             <QuizTask
               task={task}
@@ -835,7 +835,7 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
         </>
       ) : isPython ? (
         <>
-          <div style={s.codeWorkspaceStack}>
+          <div className="te-code-workspace-stack">
             <CodeWorkspaceTabs
               activeTab={codeTab}
               onChange={handleCodeTabChange}
@@ -847,26 +847,27 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: '#f5f3ff', border: '1px solid #e5e7eb', borderTop: 0, borderBottom: 0 }}>
                 <span style={{ fontFamily: 'var(--font-body)', fontSize: '0.8rem', color: '#6b7280', fontWeight: 600 }}>Stage label:</span>
                 <input
-                  style={{ ...s.input, width: 200, padding: '4px 8px', fontSize: '0.82rem' }}
+                  className="te-input"
+                  style={{ width: 200, padding: '4px 8px', fontSize: '0.82rem' }}
                   value={activeStage?.label ?? ''}
                   onChange={e => updateStage(activeStageIndex, { label: e.target.value })}
                   placeholder={`Stage ${activeStageIndex + 1}`}
                 />
               </div>
             )}
-            <div style={s.pythonEditor}>
+            <div className="te-python-editor">
               <CodeEditor
                 value={activePythonCode}
                 language="python"
                 onChange={v => isCompleteTab ? set('completeCode', v) : isStageTab ? updateStage(activeStageIndex, { code: v }) : set('starterCode', v)}
-                style={s.attachedCodeEditor}
+                style={{ borderRadius: '0 0 8px 8px' }}
               />
             </div>
           </div>
 
           {task.interactionMode === 'submit' ? (
             <>
-              <div style={s.runRow}>
+              <div className="te-run-row">
                 <button
                   className="btn-primary"
                   onClick={handleTestChecks}
@@ -906,7 +907,7 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
             </>
           ) : (
             <>
-              <div style={s.runRow}>
+              <div className="te-run-row">
                 <button
                   className="btn-primary"
                   onClick={running ? handleStop : handleRun}
@@ -940,24 +941,24 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
         </>
       ) : isScratch ? (
         <>
-          <div style={s.starterBlocksSummary}>
+          <div className="te-starter-blocks-summary">
             <div>
-              <span style={s.previewTitle}>Starter Blocks</span>
-              <p style={s.summaryText}>
+              <span className="te-preview-title">Starter Blocks</span>
+              <p className="te-summary-text">
                 {task.starterBlocks && Object.values(task.starterBlocks).some(Boolean)
                   ? 'Starter blocks configured for this task.'
                   : 'No starter blocks set. Students will start with an empty workspace.'}
               </p>
             </div>
-            <button className="btn-ghost" style={s.secondaryBtn} onClick={handleOpenStarterBlocks}>
+            <button className="btn-ghost te-secondary-btn" onClick={handleOpenStarterBlocks}>
               Edit
             </button>
           </div>
 
           {starterBlocksOpen && (
             <Modal title="Starter blocks" onClose={handleCloseStarterBlocks}>
-              <div style={s.scratchModalContent}>
-                <div style={s.scratchModalHeader}>
+              <div className="te-scratch-modal-content">
+                <div className="te-scratch-modal-header">
                   <CodeWorkspaceTabs
                     activeTab={scratchModalTab}
                     onChange={handleScratchModalTabChange}
@@ -968,25 +969,25 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                     onRemoveStage={handleRemoveScratchStage}
                   />
                   {scratchModalTab === 'complete' && checkResult !== null && (
-                    <span style={checkResult === 'pass' ? s.scratchCheckPass : s.scratchCheckFail}>
+                    <span className={checkResult === 'pass' ? 'te-scratch-check-pass' : 'te-scratch-check-fail'}>
                       {checkResult === 'pass' ? 'Check passes' : 'Check not passing'}
                     </span>
                   )}
                   {scratchModalTab !== 'starter' && (
-                    <button type="button" className="btn-ghost" style={s.secondaryBtn} onClick={handleCopySpriteInfoToStarter}>
+                    <button type="button" className="btn-ghost te-secondary-btn" onClick={handleCopySpriteInfoToStarter}>
                       Copy Sprite Info to Starter
                     </button>
                   )}
                 </div>
 
-                <div style={s.scratchModalBody}>
+                <div className="te-scratch-modal-body">
                   {scratchModalTab === 'starter' && (
-                    <div style={s.scratchConfigSidebar}>
+                    <div className="te-scratch-config-sidebar">
                       {/* Toolbox blocks */}
-                      <div style={s.collapsibleField}>
-                        <button type="button" style={s.collapsibleHeader} onClick={() => toggleSidebarSection('toolbox')}>
-                          <span style={s.collapsibleLabel}>Toolbox blocks</span>
-                          <span style={{ ...s.collapsibleChevron, transform: sidebarSections.toolbox ? 'rotate(180deg)' : 'none' }}>▾</span>
+                      <div className="te-collapsible">
+                        <button type="button" className="te-collapsible__header" onClick={() => toggleSidebarSection('toolbox')}>
+                          <span className="te-collapsible__label">Toolbox blocks</span>
+                          <span className="te-collapsible__chevron" style={{ transform: sidebarSections.toolbox ? 'rotate(180deg)' : 'none' }}>▾</span>
                         </button>
                         {sidebarSections.toolbox && (
                           <ScratchToolboxPicker
@@ -997,23 +998,23 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                       </div>
 
                       {/* Sprites */}
-                      <div style={s.collapsibleField}>
-                        <button type="button" style={s.collapsibleHeader} onClick={() => toggleSidebarSection('sprites')}>
-                          <span style={s.collapsibleLabel}>Sprites</span>
-                          <span style={{ ...s.collapsibleChevron, transform: sidebarSections.sprites ? 'rotate(180deg)' : 'none' }}>▾</span>
+                      <div className="te-collapsible">
+                        <button type="button" className="te-collapsible__header" onClick={() => toggleSidebarSection('sprites')}>
+                          <span className="te-collapsible__label">Sprites</span>
+                          <span className="te-collapsible__chevron" style={{ transform: sidebarSections.sprites ? 'rotate(180deg)' : 'none' }}>▾</span>
                         </button>
                         {sidebarSections.sprites && (() => {
                           return (
-                            <div ref={setModalSpritePanelTarget} style={s.spritePanelHost} />
+                            <div ref={setModalSpritePanelTarget} className="te-sprite-panel-host" />
                           )
                         })()}
                       </div>
 
                       {/* Backdrops */}
-                      <div style={s.collapsibleField}>
-                        <button type="button" style={s.collapsibleHeader} onClick={() => toggleSidebarSection('backdrops')}>
-                          <span style={s.collapsibleLabel}>Backdrops</span>
-                          <span style={{ ...s.collapsibleChevron, transform: sidebarSections.backdrops ? 'rotate(180deg)' : 'none' }}>▾</span>
+                      <div className="te-collapsible">
+                        <button type="button" className="te-collapsible__header" onClick={() => toggleSidebarSection('backdrops')}>
+                          <span className="te-collapsible__label">Backdrops</span>
+                          <span className="te-collapsible__chevron" style={{ transform: sidebarSections.backdrops ? 'rotate(180deg)' : 'none' }}>▾</span>
                         </button>
                         {sidebarSections.backdrops && (
                           <div style={{ padding: '10px 12px', borderTop: '1px solid #e5e7eb' }}>
@@ -1029,10 +1030,10 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                       </div>
 
                       {/* Variables */}
-                      <div style={s.collapsibleField}>
-                        <button type="button" style={s.collapsibleHeader} onClick={() => toggleSidebarSection('variables')}>
-                          <span style={s.collapsibleLabel}>Variables</span>
-                          <span style={{ ...s.collapsibleChevron, transform: sidebarSections.variables ? 'rotate(180deg)' : 'none' }}>▾</span>
+                      <div className="te-collapsible">
+                        <button type="button" className="te-collapsible__header" onClick={() => toggleSidebarSection('variables')}>
+                          <span className="te-collapsible__label">Variables</span>
+                          <span className="te-collapsible__chevron" style={{ transform: sidebarSections.variables ? 'rotate(180deg)' : 'none' }}>▾</span>
                         </button>
                         {sidebarSections.variables && (
                           <div style={{ padding: '10px 12px', borderTop: '1px solid #e5e7eb' }}>
@@ -1046,7 +1047,7 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                     </div>
                   )}
 
-                  <div style={s.scratchModalWorkspace}>
+                  <div className="te-scratch-modal-workspace">
                     {scratchModalTab === 'starter' ? (
                       <ScratchWorkspace
                         key={`builder-scratch-starter-${task.id}-${(task.sprites ?? []).map(sp => sp.id).join(',')}`}
@@ -1117,7 +1118,8 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderBottom: '1px solid #e5e7eb', flexShrink: 0 }}>
                             <span style={{ fontFamily: 'var(--font-body)', fontSize: '0.8rem', color: '#6b7280', fontWeight: 600 }}>Stage label:</span>
                             <input
-                              style={{ ...s.input, width: 200, padding: '4px 8px', fontSize: '0.82rem' }}
+                              className="te-input"
+                              style={{ width: 200, padding: '4px 8px', fontSize: '0.82rem' }}
                               value={stage.label ?? ''}
                               onChange={e => updateStage(stageIdx, { label: e.target.value })}
                               placeholder={`Stage ${stageIdx + 1}`}
@@ -1146,7 +1148,7 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
         </>
       ) : (
         <>
-          <div style={s.codeWorkspaceStack}>
+          <div className="te-code-workspace-stack">
             <CodeWorkspaceTabs
               activeTab={codeTab}
               onChange={handleCodeTabChange}
@@ -1169,7 +1171,8 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: '#f5f3ff', border: '1px solid #e5e7eb', borderTop: 0, borderBottom: 0 }}>
                 <span style={{ fontFamily: 'var(--font-body)', fontSize: '0.8rem', color: '#6b7280', fontWeight: 600 }}>Stage label:</span>
                 <input
-                  style={{ ...s.input, width: 200, padding: '4px 8px', fontSize: '0.82rem' }}
+                  className="te-input"
+                  style={{ width: 200, padding: '4px 8px', fontSize: '0.82rem' }}
                   value={activeStage?.label ?? ''}
                   onChange={e => updateStage(activeStageIndex, { label: e.target.value })}
                   placeholder={`Stage ${activeStageIndex + 1}`}
@@ -1177,12 +1180,12 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
               </div>
             )}
 
-            <div style={s.htmlSplit}>
+            <div className="te-html-split">
             <SplitPane
               defaultSplit={34}
               style={{ flex: 1, minHeight: 0 }}
               left={
-                <div style={s.htmlLeft}>
+                <div className="te-html-left">
                   <FileManager
                     files={activeFiles}
                     entryFile={activeEntryFile}
@@ -1242,7 +1245,7 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
               }
               right={
                 htmlPreviewOpen ? (
-                  <div style={s.builderPreviewPane}>
+                  <div className="te-builder-preview-pane">
                     <IframePreview
                       src={iframeSrc}
                       iframeRef={iframeRef}
@@ -1280,8 +1283,8 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                     })()}
                   </div>
                 ) : (
-                  <div style={s.htmlEditorWithRail}>
-                    <div style={s.htmlEditorPane}>
+                  <div className="te-html-editor-with-rail">
+                    <div className="te-html-editor-pane">
                       {activeSelectedFile ? (
                         <CodeEditor
                           key={`${codeTab}-${activeSelectedFile}`}
@@ -1292,21 +1295,21 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                             else if (isStageTab) updateStage(activeStageIndex, { files: (activeStage?.files ?? []).map(f => f.name === activeSelectedFile ? { ...f, content: v } : f) })
                             else set('starterFiles', (task.starterFiles ?? []).map(f => f.name === activeSelectedFile ? { ...f, content: v } : f))
                           }}
-                          style={s.htmlCodeEditor}
+                          style={{ width: '100%', minWidth: 0, flex: '1 1 auto', borderRadius: '0 0 8px 8px' }}
                         />
                       ) : (
-                        <div style={s.noFile}>Select or add a file to edit.</div>
+                        <div className="te-no-file">Select or add a file to edit.</div>
                       )}
                     </div>
                     <button
                       type="button"
-                      style={s.previewRail}
+                      className="te-preview-rail"
                       onClick={() => setHtmlPreviewOpen(true)}
                       title="Show Preview"
                       aria-label="Show Preview"
                     >
-                      <span style={s.previewRailIcon}>{'<'}</span>
-                      <span style={s.previewRailLabel}>Preview</span>
+                      <span className="te-preview-rail__icon">{'<'}</span>
+                      <span className="te-preview-rail__label">Preview</span>
                     </button>
                   </div>
                 )

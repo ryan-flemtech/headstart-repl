@@ -1,7 +1,6 @@
 import React from 'react'
 import { MarkdownFieldEditor } from '../ExplainerEditor'
 import { Field } from './TaskEditorFields'
-import { s } from './styles'
 
 function CopyButtons({ output, code, onInsert }) {
   const btnBase = {
@@ -210,37 +209,38 @@ function makeCheckSkeleton(type, prev = {}) {
 
 function CheckValueEditor({ check, subject, operator, onChange, output = '', code = '' }) {
   if (check.type === 'code_no_error') {
-    return <div style={s.checkHelp}>Passes when Python runs without an error.</div>
+    return <div className="te-check-help">Passes when Python runs without an error.</div>
   }
   if (check.type === 'output_not_empty') {
-    return <div style={s.checkHelp}>Passes when the run produces any visible output.</div>
+    return <div className="te-check-help">Passes when the run produces any visible output.</div>
   }
   if (check.type === 'output_empty') {
-    return <div style={s.checkHelp}>Passes when the run produces no visible output.</div>
+    return <div className="te-check-help">Passes when the run produces no visible output.</div>
   }
 
   if (subject === 'element') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         <input
-          style={{ ...s.input, fontFamily: "'JetBrains Mono', monospace", fontSize: '0.88rem' }}
+          className="te-input"
+          style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '0.88rem' }}
           value={check.selector ?? ''}
           onChange={e => onChange({ ...check, selector: e.target.value })}
           placeholder="CSS selector, e.g. h1  .myClass  #myId  input[type=text]"
         />
         {operator === 'exists' && (
-          <div style={s.checkHelp}>Passes when at least one matching element exists in the page.</div>
+          <div className="te-check-help">Passes when at least one matching element exists in the page.</div>
         )}
         {operator === 'attribute_equals' && (
           <>
             <input
-              style={s.input}
+              className="te-input"
               value={check.attribute ?? ''}
               onChange={e => onChange({ ...check, attribute: e.target.value })}
               placeholder="Attribute name, e.g. href, src, alt, class"
             />
             <input
-              style={s.input}
+              className="te-input"
               value={check.value ?? ''}
               onChange={e => onChange({ ...check, value: e.target.value })}
               placeholder="Optional expected attribute value..."
@@ -250,13 +250,13 @@ function CheckValueEditor({ check, subject, operator, onChange, output = '', cod
         {operator === 'style_equals' && (
           <>
             <input
-              style={s.input}
+              className="te-input"
               value={check.property ?? ''}
               onChange={e => onChange({ ...check, property: e.target.value })}
               placeholder="CSS property, e.g. color, background-color, font-size"
             />
             <input
-              style={s.input}
+              className="te-input"
               value={check.value ?? ''}
               onChange={e => onChange({ ...check, value: e.target.value })}
               placeholder="Optional expected computed value, e.g. rgb(255, 0, 0) or 16px"
@@ -265,7 +265,8 @@ function CheckValueEditor({ check, subject, operator, onChange, output = '', cod
         )}
         {operator === 'count' && (
           <input
-            style={{ ...s.input, width: 160 }}
+            className="te-input"
+            style={{ width: 160 }}
             type="number"
             min="0"
             value={check.value ?? '1'}
@@ -275,7 +276,7 @@ function CheckValueEditor({ check, subject, operator, onChange, output = '', cod
         )}
         {operator !== 'exists' && operator !== 'count' && operator !== 'attribute_equals' && operator !== 'style_equals' && (
           <input
-            style={s.input}
+            className="te-input"
             value={check.value ?? ''}
             onChange={e => onChange({ ...check, value: e.target.value })}
             placeholder={
@@ -295,17 +296,18 @@ function CheckValueEditor({ check, subject, operator, onChange, output = '', cod
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         <input
-          style={{ ...s.input, fontFamily: "'JetBrains Mono', monospace", fontSize: '0.88rem' }}
+          className="te-input"
+          style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '0.88rem' }}
           value={check.name ?? ''}
           onChange={e => onChange({ ...check, name: e.target.value })}
           placeholder="Variable name, e.g. score"
         />
         {operator === 'exists' && (
-          <div style={s.checkHelp}>Passes when the variable exists after the Python code runs.</div>
+          <div className="te-check-help">Passes when the variable exists after the Python code runs.</div>
         )}
         {operator === 'dict_key_value' && (
           <input
-            style={s.input}
+            className="te-input"
             value={check.key ?? ''}
             onChange={e => onChange({ ...check, key: e.target.value })}
             placeholder="Dictionary key, e.g. name"
@@ -313,7 +315,8 @@ function CheckValueEditor({ check, subject, operator, onChange, output = '', cod
         )}
         {operator === 'array_nth_item' && (
           <input
-            style={{ ...s.input, width: 180 }}
+            className="te-input"
+            style={{ width: 180 }}
             type="number"
             min="0"
             value={check.index ?? '0'}
@@ -323,7 +326,7 @@ function CheckValueEditor({ check, subject, operator, onChange, output = '', cod
         )}
         {operator !== 'exists' && (
           <textarea
-            style={s.checkValue}
+            className="te-check-value"
             value={check.value ?? ''}
             onChange={e => onChange({ ...check, value: e.target.value })}
             placeholder={
@@ -341,7 +344,8 @@ function CheckValueEditor({ check, subject, operator, onChange, output = '', cod
   if (check.type === 'output_line_count') {
     return (
       <input
-        style={{ ...s.input, width: 160 }}
+        className="te-input"
+        style={{ width: 160 }}
         type="number"
         min="0"
         value={check.value ?? ''}
@@ -364,7 +368,7 @@ function CheckValueEditor({ check, subject, operator, onChange, output = '', cod
         />
       )}
       <textarea
-        style={s.checkValue}
+        className="te-check-value"
         value={check.value ?? ''}
         onChange={e => onChange({ ...check, value: e.target.value })}
         placeholder={
@@ -413,11 +417,12 @@ function CheckListEditor({ checks, onChange, interactionMode = 'run', allowCodeN
         const { subject, operator } = subjectOpFromType(check.type)
         const operatorOptions = getOperatorOptions(subject, { allowCodeNoError })
         return (
-          <div key={index} style={s.checkRow}>
-            {checks.length > 1 && <span style={s.checkIndexLabel}>#{index + 1}</span>}
-            <div style={s.checkEditor}>
+          <div key={index} className="te-check-row">
+            {checks.length > 1 && <span className="te-check-index">#{index + 1}</span>}
+            <div className="te-check-editor">
               <select
-                style={{ ...s.select, flex: '0 0 auto' }}
+                className="te-select"
+                style={{ flex: '0 0 auto' }}
                 value={subject}
                 onChange={e => handleSubjectChange(index, e.target.value)}
               >
@@ -427,7 +432,8 @@ function CheckListEditor({ checks, onChange, interactionMode = 'run', allowCodeN
                 {allowDomChecks && <option value="element">Element</option>}
               </select>
               <select
-                style={{ ...s.select, flex: '0 0 auto' }}
+                className="te-select"
+                style={{ flex: '0 0 auto' }}
                 value={operator}
                 onChange={e => handleOperatorChange(index, e.target.value)}
               >
@@ -456,12 +462,12 @@ function CheckListEditor({ checks, onChange, interactionMode = 'run', allowCodeN
               </div>
             </div>
             {checks.length > 1 && (
-              <button type="button" style={s.removeCheckBtn} onClick={() => removeCheck(index)} title="Remove check">×</button>
+              <button type="button" className="te-check-remove-btn" onClick={() => removeCheck(index)} title="Remove check">×</button>
             )}
           </div>
         )
       })}
-      <button type="button" className="btn-ghost" style={s.addCheckBtn} onClick={addCheck}>
+      <button type="button" className="btn-ghost te-add-check-btn" onClick={addCheck}>
         + Add check
       </button>
     </div>

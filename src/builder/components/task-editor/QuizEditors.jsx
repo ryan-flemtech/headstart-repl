@@ -1,7 +1,6 @@
 import React from 'react'
 import { MarkdownFieldEditor } from '../ExplainerEditor'
 import { Field, QuizTypeIcon } from './TaskEditorFields'
-import { s } from './styles'
 
 function QuizTypePicker({ task, onQuizTypeChange }) {
   const quizType = task.quizType ?? 'multiple_choice'
@@ -13,19 +12,19 @@ function QuizTypePicker({ task, onQuizTypeChange }) {
   ]
   return (
     <Field label="Quiz type">
-      <div style={s.quizTypeGrid}>
+      <div className="te-quiz-type-grid">
         {types.map(t => {
           const active = quizType === t.value
           return (
             <button
               key={t.value}
               type="button"
-              style={{ ...s.quizTypeBtn, ...(active ? s.quizTypeBtnActive : {}) }}
+              className={active ? 'te-quiz-type-btn te-quiz-type-btn--active' : 'te-quiz-type-btn'}
               onClick={() => onQuizTypeChange(t.value)}
             >
               <QuizTypeIcon type={t.icon} />
-              <span style={s.quizTypeLabel}>{t.label}</span>
-              <span style={{ ...s.quizTypeMeta, ...(active ? s.quizTypeMetaActive : {}) }}>{t.meta}</span>
+              <span className="te-quiz-type-label">{t.label}</span>
+              <span className={active ? 'te-quiz-type-meta te-quiz-type-meta--active' : 'te-quiz-type-meta'}>{t.meta}</span>
             </button>
           )
         })}
@@ -49,13 +48,13 @@ function MatchPairsBuilder({ task, onUpdate, lessonType = null }) {
 
   return (
     <Field label="Pairs (students match left to right)">
-      <div style={s.quizAnswerStack}>
+      <div className="te-quiz-answer-stack">
         {pairs.map((pair, index) => (
-          <div key={pair.id || index} style={s.quizAnswerCard}>
-            <span style={s.quizAnswerBadge}>{index + 1}</span>
-            <div style={s.matchPairEditorRow}>
-              <div style={s.quizAnswerEditorBlock}>
-                <span style={s.quizAnswerLabel}>Prompt</span>
+          <div key={pair.id || index} className="te-quiz-answer-card">
+            <span className="te-quiz-answer-badge">{index + 1}</span>
+            <div className="te-match-pair-row">
+              <div className="te-quiz-answer-block">
+                <span className="te-quiz-answer-label">Prompt</span>
                 <MarkdownFieldEditor
                   height={132}
                   minHeight={118}
@@ -66,9 +65,9 @@ function MatchPairsBuilder({ task, onUpdate, lessonType = null }) {
                   lessonType={lessonType}
                 />
               </div>
-              <span style={s.matchArrow}>-</span>
-              <div style={s.quizAnswerEditorBlock}>
-                <span style={s.quizAnswerLabel}>Answer</span>
+              <span className="te-match-arrow">-</span>
+              <div className="te-quiz-answer-block">
+                <span className="te-quiz-answer-label">Answer</span>
                 <MarkdownFieldEditor
                   height={132}
                   minHeight={118}
@@ -82,14 +81,14 @@ function MatchPairsBuilder({ task, onUpdate, lessonType = null }) {
             </div>
             <button
               type="button"
-              style={s.removeBtn}
+              className="te-remove-btn"
               onClick={() => updatePairs(pairs.filter((_, i) => i !== index))}
               disabled={pairs.length <= 2}
               title="Remove pair"
             >✕</button>
           </div>
         ))}
-        <button type="button" className="btn-ghost" style={s.addCheckBtn} onClick={() => updatePairs([...pairs, { id: '', prompt: '', answer: '' }])}>
+        <button type="button" className="btn-ghost te-add-check-btn" onClick={() => updatePairs([...pairs, { id: '', prompt: '', answer: '' }])}>
           + Add pair
         </button>
       </div>
@@ -135,11 +134,11 @@ function FillBlankBuilder({ task, onUpdate, lessonType = null }) {
     <>
       <Field label="Mode">
         <div style={{ display: 'flex', gap: 24 }}>
-          <label style={s.carryRadioLabel}>
+          <label className="te-carry-radio-label">
             <input type="radio" checked={mode === 'drag'} onChange={() => onUpdate({ ...task, mode: 'drag' })} />
             Drag and drop
           </label>
-          <label style={s.carryRadioLabel}>
+          <label className="te-carry-radio-label">
             <input type="radio" checked={mode === 'type'} onChange={() => onUpdate({ ...task, mode: 'type' })} />
             Type answer
           </label>
@@ -161,12 +160,12 @@ function FillBlankBuilder({ task, onUpdate, lessonType = null }) {
       </Field>
       {blanks.length > 0 && (
         <Field label="Correct answers (in order)">
-          <div style={s.quizAnswerStack}>
+          <div className="te-quiz-answer-stack">
             {blanks.map((blank, index) => (
-              <div key={blank.id} style={s.quizAnswerCard}>
-                <span style={s.quizAnswerBadge}>{index + 1}</span>
-                <div style={s.quizAnswerEditorBlock}>
-                  <span style={s.quizAnswerLabel}>Blank {index + 1}</span>
+              <div key={blank.id} className="te-quiz-answer-card">
+                <span className="te-quiz-answer-badge">{index + 1}</span>
+                <div className="te-quiz-answer-block">
+                  <span className="te-quiz-answer-label">Blank {index + 1}</span>
                 <MarkdownFieldEditor
                   height={118}
                   minHeight={104}
@@ -184,14 +183,14 @@ function FillBlankBuilder({ task, onUpdate, lessonType = null }) {
       )}
       {mode === 'drag' && (
         <Field label="Extra options (distractors — drag mode only)">
-          <div style={s.quizAnswerStack}>
+          <div className="te-quiz-answer-stack">
             {distractors.map((d, index) => (
-              <div key={d.id} style={{ ...s.quizAnswerCard, alignItems: 'center' }}>
-                <span style={s.quizAnswerBadge}>✕</span>
+              <div key={d.id} className="te-quiz-answer-card" style={{ alignItems: 'center' }}>
+                <span className="te-quiz-answer-badge">✕</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <input
                     type="text"
-                    style={s.input}
+                    className="te-input"
                     value={d.text}
                     onChange={e => updateDistractor(index, e.target.value)}
                     placeholder={`Distractor option ${index + 1}`}
@@ -199,13 +198,13 @@ function FillBlankBuilder({ task, onUpdate, lessonType = null }) {
                 </div>
                 <button
                   type="button"
-                  style={s.removeBtn}
+                  className="te-remove-btn"
                   onClick={() => removeDistractor(index)}
                   title="Remove distractor"
                 >✕</button>
               </div>
             ))}
-            <button type="button" className="btn-ghost" style={s.addCheckBtn} onClick={addDistractor}>
+            <button type="button" className="btn-ghost te-add-check-btn" onClick={addDistractor}>
               + Add distractor
             </button>
           </div>
@@ -249,7 +248,7 @@ function ShortAnswerBuilder({ task, onUpdate, lessonType = null }) {
         {hasCheck && (
           <>
             <select
-              style={s.select}
+              className="te-select"
               value={check.type ?? 'answer_contains'}
               onChange={e => updateCheck({ type: e.target.value })}
             >
@@ -258,7 +257,7 @@ function ShortAnswerBuilder({ task, onUpdate, lessonType = null }) {
               <option value="answer_matches_regex">Answer matches regex</option>
             </select>
             <textarea
-              style={s.checkValue}
+              className="te-check-value"
               value={check.value ?? ''}
               onChange={e => updateCheck({ value: e.target.value })}
               placeholder={
@@ -319,22 +318,22 @@ function QuizOptionsBuilder({ task, onUpdate, lessonType = null }) {
 
   return (
     <Field label="Options">
-      <div style={s.quizOptions}>
+      <div className="te-quiz-options">
         {options.map((option, index) => (
-          <div key={option.id} style={s.quizOptionCard}>
-            <label style={s.quizCorrectLabel}>
-              <span style={s.quizOptionId}>{option.id}</span>
+          <div key={option.id} className="te-quiz-option-card">
+            <label className="te-quiz-correct-label">
+              <span className="te-quiz-option-id">{option.id}</span>
               <input
                 type="radio"
                 name={`quiz-correct-${task.id}`}
                 checked={correctAnswer === option.id}
                 onChange={() => setCorrectAnswer(option.id)}
               />
-              <span style={{ ...s.quizCorrectPill, ...(correctAnswer === option.id ? s.quizCorrectPillActive : {}) }}>
+              <span className={correctAnswer === option.id ? 'te-quiz-correct-pill te-quiz-correct-pill--active' : 'te-quiz-correct-pill'}>
                 Correct
               </span>
             </label>
-            <div style={s.quizOptionEditor}>
+            <div className="te-quiz-option-editor">
               <MarkdownFieldEditor
                 height={132}
                 minHeight={118}
@@ -356,7 +355,7 @@ function QuizOptionsBuilder({ task, onUpdate, lessonType = null }) {
             </div>
             <button
               type="button"
-              style={s.removeBtn}
+              className="te-remove-btn"
               onClick={() => updateOptions(options.filter((_, i) => i !== index))}
               disabled={options.length <= 2}
               title="Remove option"
@@ -367,8 +366,7 @@ function QuizOptionsBuilder({ task, onUpdate, lessonType = null }) {
         ))}
         <button
           type="button"
-          className="btn-ghost"
-          style={s.addCheckBtn}
+          className="btn-ghost te-add-check-btn"
           onClick={() => updateOptions([...options, { id: '', text: '' }])}
         >
           + Add option
