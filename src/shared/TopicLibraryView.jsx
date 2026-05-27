@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkBreaks from 'remark-breaks'
 import { searchTopics } from './topicLibrary'
@@ -14,26 +15,76 @@ const descriptionComponents = {
 
 export function TopicReference({ topic, label, onOpen }) {
   const [showPreview, setShowPreview] = useState(false)
+  const [previewPosition, setPreviewPosition] = useState(null)
+  const referenceRef = useRef(null)
+  const closeTimerRef = useRef(null)
+
+  const positionPreview = useCallback(() => {
+    const rect = referenceRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const gutter = 10
+    const previewWidth = 250
+    const maxLeft = Math.max(gutter, window.innerWidth - previewWidth - gutter)
+    setPreviewPosition({
+      left: Math.min(Math.max(rect.left, gutter), maxLeft),
+      top: rect.bottom + 7,
+    })
+  }, [])
+
+  const cancelClose = useCallback(() => {
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current)
+  }, [])
+
+  const openPreview = useCallback(() => {
+    cancelClose()
+    positionPreview()
+    setShowPreview(true)
+  }, [cancelClose, positionPreview])
+
+  const scheduleClose = useCallback(() => {
+    cancelClose()
+    closeTimerRef.current = setTimeout(() => setShowPreview(false), 80)
+  }, [cancelClose])
+
+  useEffect(() => {
+    if (!showPreview) return undefined
+    positionPreview()
+    window.addEventListener('resize', positionPreview)
+    window.addEventListener('scroll', positionPreview, true)
+    return () => {
+      window.removeEventListener('resize', positionPreview)
+      window.removeEventListener('scroll', positionPreview, true)
+    }
+  }, [positionPreview, showPreview])
+
+  useEffect(() => () => cancelClose(), [cancelClose])
 
   return (
     <span
+      ref={referenceRef}
       style={s.referenceWrap}
-      onMouseEnter={() => setShowPreview(true)}
-      onMouseLeave={() => setShowPreview(false)}
-      onFocus={() => setShowPreview(true)}
-      onBlur={() => setShowPreview(false)}
+      onMouseEnter={openPreview}
+      onMouseLeave={scheduleClose}
+      onFocus={openPreview}
+      onBlur={scheduleClose}
     >
       <button type="button" style={s.reference} onClick={() => onOpen(topic?.id)}>
         {label}
       </button>
-      {showPreview && topic && (
-        <span style={s.preview} role="tooltip">
+      {showPreview && previewPosition && topic && createPortal(
+        <span
+          style={{ ...s.preview, ...previewPosition }}
+          role="tooltip"
+          onMouseEnter={cancelClose}
+          onMouseLeave={scheduleClose}
+        >
           <button type="button" style={s.previewTitle} onMouseDown={event => event.preventDefault()} onClick={() => onOpen(topic.id)}>
             {topic.title}
           </button>
           <span style={s.previewCategory}>{topic.category}</span>
           <span style={s.previewText}>{topic.summary}</span>
-        </span>
+        </span>,
+        document.body,
       )}
     </span>
   )
@@ -137,8 +188,8 @@ const s = {
     font: 'inherit', fontWeight: 700, padding: '0 3px',
   },
   preview: {
-    position: 'absolute', left: 0, top: 'calc(100% + 7px)', zIndex: 120,
-    display: 'flex', flexDirection: 'column', gap: 5, width: 250,
+    position: 'fixed', zIndex: 1200,
+    display: 'flex', flexDirection: 'column', gap: 5, width: 250, boxSizing: 'border-box',
     background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8,
     boxShadow: '0 8px 26px rgba(35,18,76,0.18)', padding: 10,
   },
