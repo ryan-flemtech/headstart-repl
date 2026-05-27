@@ -14,6 +14,7 @@ import QuizTask from '../components/QuizTask'
 import LiveActivityToast from '../components/LiveActivityToast'
 import TeacherTimers from '../components/TeacherTimers'
 import TeacherSessionControls from '../components/TeacherSessionControls'
+import TeacherCodeTabs from '../components/TeacherCodeTabs'
 import { resolveAssetsPath } from '../../shared/assetPaths'
 import { cloneFiles, cloneScratchState } from '../../shared/workspaceData'
 import { buildStudentLivePayload } from '../teacherLivePayload'
@@ -433,7 +434,6 @@ export default function TeacherView({ lessonId }) {
             <div style={!isInSandbox ? s.codeWorkspaceStack : undefined}>
               {!isInSandbox && (
                 <TeacherCodeTabs
-                  s={s}
                   activeTab={teacherCodeTab}
                   stages={taskCodeStages}
                   onStarter={() => setTeacherCodeTab('starter')}
@@ -459,7 +459,6 @@ export default function TeacherView({ lessonId }) {
             <div style={!isInSandbox ? s.codeWorkspaceStack : s.scratchWrap}>
               {!isInSandbox && (
                 <TeacherCodeTabs
-                  s={s}
                   activeTab={teacherCodeTab}
                   stages={taskCodeStages}
                   onStarter={() => setTeacherCodeTab('starter')}
@@ -492,7 +491,6 @@ export default function TeacherView({ lessonId }) {
             <div style={!isInSandbox ? s.codeWorkspaceStack : s.htmlLeft}>
               {!isInSandbox && (
                 <TeacherCodeTabs
-                  s={s}
                   activeTab={teacherCodeTab}
                   stages={taskCodeStages}
                   onStarter={() => setTeacherCodeTab('starter')}
@@ -581,65 +579,6 @@ export default function TeacherView({ lessonId }) {
   )
 }
 
-function TeacherCodeTabs({ s, activeTab, stages = [], onStarter, onStage, onComplete, onSendToAll, hasStudents, starterLabel = 'Starter code', completeLabel = 'Complete code' }) {
-  return (
-    <div style={s.codeTabStrip} className="ui-tabs ui-tabs--editor" role="tablist" aria-label="Teacher code workspace">
-      <button
-        type="button"
-        className="ui-tab"
-        role="tab"
-        aria-selected={activeTab === 'starter'}
-        style={{ ...s.codeTabBtn, ...(activeTab === 'starter' ? s.codeTabBtnActive : {}) }}
-        onClick={onStarter}
-      >
-        {starterLabel}
-      </button>
-      {stages.map((stage, i) => (
-        <button
-          key={i}
-          type="button"
-          className="ui-tab"
-          role="tab"
-          aria-selected={activeTab === `stage_${i}`}
-          style={{ ...s.codeTabBtn, ...(activeTab === `stage_${i}` ? s.codeTabBtnActive : {}) }}
-          onClick={() => onStage?.(i)}
-        >
-          {stage.label || `Stage ${i + 1}`}
-        </button>
-      ))}
-      {onComplete && (
-        <button
-          type="button"
-          className="ui-tab"
-          role="tab"
-          aria-selected={activeTab === 'complete'}
-          style={{ ...s.codeTabBtn, ...(activeTab === 'complete' ? s.codeTabBtnActive : {}) }}
-          onClick={onComplete}
-        >
-          {completeLabel}
-        </button>
-      )}
-      {hasStudents && onSendToAll && (
-        <div style={s.codeTabActions}>
-          <button
-            type="button"
-            style={s.sendStageBtn}
-            title="Send this stage's code to all students"
-            onClick={() => {
-              const action = activeTab === 'complete' ? 'complete' : activeTab.startsWith('stage_') ? activeTab : 'starter'
-              if (window.confirm(`Send ${activeTab === 'starter' ? starterLabel : activeTab === 'complete' ? completeLabel : stages[parseInt(activeTab.replace('stage_', ''), 10)]?.label ?? activeTab} to all students?`)) {
-                onSendToAll(action)
-              }
-            }}
-          >
-            Send to all
-          </button>
-        </div>
-      )}
-    </div>
-  )
-}
-
 const s = {
   taskTitleHeader: {
     background: 'var(--colour-primary-dark)',
@@ -697,53 +636,8 @@ const s = {
     minHeight: 0,
     gap: 0,
   },
-  codeTabStrip: {
-    display: 'flex',
-    gap: 4,
-    border: '1px solid #e5e7eb',
-    borderBottom: 0,
-    borderRadius: '8px 8px 0 0',
-    padding: '4px 4px 0',
-    background: '#e5e7eb',
-    flexShrink: 0,
-    alignSelf: 'stretch',
-    width: '100%',
-  },
-  codeTabBtn: {
-    border: 0,
-    borderRadius: '6px 6px 0 0',
-    background: 'transparent',
-    color: '#4b5563',
-    padding: '7px 14px',
-    fontFamily: 'var(--font-body)',
-    fontSize: '0.86rem',
-    fontWeight: 700,
-    cursor: 'pointer',
-  },
-  codeTabBtnActive: {
-    background: '#fafafa',
-    color: 'var(--colour-primary)',
-  },
   attachedCodeEditor: {
     borderRadius: '0 0 8px 8px',
-  },
-  codeTabActions: {
-    marginLeft: 'auto',
-    display: 'flex',
-    alignItems: 'center',
-    paddingLeft: 8,
-  },
-  sendStageBtn: {
-    fontSize: 12,
-    padding: '4px 10px',
-    background: 'rgba(124,58,237,0.12)',
-    color: 'var(--colour-primary)',
-    border: '1px solid rgba(124,58,237,0.35)',
-    borderRadius: 5,
-    cursor: 'pointer',
-    fontFamily: 'var(--font-body)',
-    fontWeight: 600,
-    whiteSpace: 'nowrap',
   },
   previewBanner: {
     display: 'flex',
