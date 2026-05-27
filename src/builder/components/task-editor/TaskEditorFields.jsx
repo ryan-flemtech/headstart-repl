@@ -4,7 +4,7 @@ import { useAssets } from '../../../shared/useAssets'
 import { SPRITE_TYPES } from '../../../app/components/ScratchWorkspace'
 import { s } from './styles'
 
-function CodeWorkspaceTabs({ activeTab, onChange, starterLabel = 'Starter code', testLabel = 'Complete code', rightAction = null }) {
+function CodeWorkspaceTabs({ activeTab, onChange, starterLabel = 'Starter code', testLabel = 'Complete code', rightAction = null, stages = [], onAddStage = null, onRemoveStage = null }) {
   return (
     <div style={s.workspaceTabs} className="ui-tabs ui-tabs--editor" role="tablist" aria-label="Code workspace">
       <button
@@ -17,6 +17,41 @@ function CodeWorkspaceTabs({ activeTab, onChange, starterLabel = 'Starter code',
       >
         {starterLabel}
       </button>
+      {stages.map((stage, i) => (
+        <div key={i} style={{ display: 'flex', alignItems: 'center' }}>
+          <button
+            type="button"
+            className="ui-tab"
+            role="tab"
+            aria-selected={activeTab === `stage_${i}`}
+            style={{ ...s.workspaceTab, ...(activeTab === `stage_${i}` ? s.workspaceTabActive : {}) }}
+            onClick={() => onChange(`stage_${i}`)}
+          >
+            {stage.label || `Stage ${i + 1}`}
+          </button>
+          {onRemoveStage && (
+            <button
+              type="button"
+              style={s.stageRemoveBtn}
+              title="Remove this stage"
+              onClick={e => { e.stopPropagation(); onRemoveStage(i) }}
+            >
+              ✕
+            </button>
+          )}
+        </div>
+      ))}
+      {onAddStage && (
+        <button
+          type="button"
+          className="ui-tab"
+          style={s.workspaceTabAdd}
+          onClick={onAddStage}
+          title="Add a code stage"
+        >
+          + Stage
+        </button>
+      )}
       <button
         type="button"
         className="ui-tab"

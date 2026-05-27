@@ -88,6 +88,7 @@ These fields can appear on tasks unless noted otherwise.
 |---|---:|---|---|
 | `starterCode` | No | string | Code loaded when no carry-through work exists. |
 | `completeCode` | No | string | Reference solution used by the builder for preview/copy-forward workflows. |
+| `codeStages` | No | stage array | Optional intermediate stages between starter and complete. Each stage has a `label` and `code`. Teacher can send any stage to students. |
 | `carryCodeFrom` | No | integer or null | Previous task ID to load saved code from. |
 | `interactionMode` | No | string | Omit or use `run` for Run button. Use `submit` for code-only checks without running. |
 
@@ -152,6 +153,7 @@ Supported combinations:
 |---|---:|---|---|
 | `starterFiles` | No | file array | Files shown as editor tabs. HTML tasks need at least one file in practice. |
 | `completeFiles` | No | file array | Reference solution files used by the builder. |
+| `codeStages` | No | stage array | Optional intermediate stages between starter and complete. Each stage has a `label`, `files`, and optional `entryFile`. Teacher can send any stage to students. |
 | `entryFile` | No | string | HTML file rendered in the iframe. Defaults to `index.html` when available. |
 | `completeEntryFile` | No | string | Entry file for `completeFiles`. |
 | `carryCodeFrom` | No | integer or null | Previous task ID to load saved files from, matched by filename. |
