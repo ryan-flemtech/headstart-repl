@@ -104,6 +104,32 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
     return JSON.parse(JSON.stringify(blocks))
   }
 
+  function getScratchSprites() {
+    return task.sprites?.length > 0 ? task.sprites : DEFAULT_SPRITES
+  }
+
+  function handleStarterSpritesChange(newSprites) {
+    const previousSprites = getScratchSprites()
+    set('sprites', newSprites)
+    const previousIds = new Set(previousSprites.map(sp => sp.id))
+    const added = newSprites.find(sp => !previousIds.has(sp.id))
+    if (added) {
+      setModalSelectedSpriteId(added.id)
+    } else if (!newSprites.find(sp => sp.id === modalSelectedSpriteId)) {
+      setModalSelectedSpriteId(newSprites[0]?.id ?? null)
+    }
+  }
+
+  function handleAddStarterSprite() {
+    const sprites = getScratchSprites()
+    let next = sprites.length + 1
+    while (sprites.some(sp => sp.id === `sprite${next}`)) next += 1
+    handleStarterSpritesChange([
+      ...sprites,
+      { id: `sprite${next}`, name: `Sprite ${next}`, type: 'cat', x: 0, y: 0, size: 100, direction: 90 },
+    ])
+  }
+
   function handleCodeTabChange(tab) {
     if (tab === codeTab) return
 
@@ -977,28 +1003,8 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                           <span style={{ ...s.collapsibleChevron, transform: sidebarSections.sprites ? 'rotate(180deg)' : 'none' }}>▾</span>
                         </button>
                         {sidebarSections.sprites && (() => {
-                          const activeSprites = task.sprites?.length > 0 ? task.sprites : DEFAULT_SPRITES
                           return (
-                            <>
-                              <div ref={setModalSpritePanelTarget} style={s.spritePanelHost} />
-                              <div style={{ padding: '10px 12px', borderTop: '1px solid #e5e7eb' }}>
-                                <SpriteManager
-                                  sprites={activeSprites}
-                                  onChange={newSprites => {
-                                    set('sprites', newSprites)
-                                    const currentIds = new Set(activeSprites.map(sp => sp.id))
-                                    const added = newSprites.find(sp => !currentIds.has(sp.id))
-                                    if (added) setModalSelectedSpriteId(added.id)
-                                    else if (!newSprites.find(sp => sp.id === modalSelectedSpriteId)) {
-                                      setModalSelectedSpriteId(newSprites[0]?.id ?? null)
-                                    }
-                                  }}
-                                  assetsPath={lesson.assetsPath ? resolveAssetsPath(lesson.assetsPath) : ''}
-                                  lessonId={lesson.id}
-                                  lessonType={lesson.type}
-                                />
-                              </div>
-                            </>
+                            <div ref={setModalSpritePanelTarget} style={s.spritePanelHost} />
                           )
                         })()}
                       </div>
@@ -1053,10 +1059,26 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
                           setModalStarterBlocks(states)
                           set('starterBlocks', states)
                         }}
+                        onSpriteStatesChange={states => {
+                          set('sprites', copyScratchSpriteStateToStarters(getScratchSprites(), states))
+                        }}
                         syncNowKey={starterBlocksSyncKey}
                         selectedSpriteId={modalSelectedSpriteId}
                         onSpriteSelect={setModalSelectedSpriteId}
                         spritePanelTarget={modalSpritePanelTarget}
+                        onAddSprite={handleAddStarterSprite}
+                        spritePanelEditor={(
+                          <SpriteManager
+                            sprites={getScratchSprites()}
+                            focusedSpriteId={modalSelectedSpriteId}
+                            hidePosition
+                            hideAdd
+                            onChange={handleStarterSpritesChange}
+                            assetsPath={lesson.assetsPath ? resolveAssetsPath(lesson.assetsPath) : ''}
+                            lessonId={lesson.id}
+                            lessonType={lesson.type}
+                          />
+                        )}
                       />
                     ) : scratchModalTab === 'complete' ? (
                       <ScratchWorkspace
