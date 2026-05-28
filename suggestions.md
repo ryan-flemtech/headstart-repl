@@ -95,17 +95,6 @@ Implemented on 26 May 2026 in [`refactor/student-task-content`](https://github.c
 - Added characterization coverage for solo restore, carry-through, starter fallback, and the existing standalone-task carry behaviour.
 - Updated maintenance inventories while leaving session effects, Firebase writes, localStorage keys, and lesson output unchanged.
 
-## Progress Update - PR #107
-
-Implemented on 27 May 2026 in [`refactor/add-characterization-tests`](https://github.com/Headstart-Coding-Launchpad/editor/pull/107):
-
-- Added focused component coverage for six previously untested classroom components: `WaitingRoom`, `JoinChoiceScreen`, `JoinSessionPrompt`, `NameEntry`, `ExplainerPanel`, and `TopBar`.
-- `NameEntry` tests cover unique name submission, whitespace trimming, duplicate-suffix confirmation flow, multiple-suffix stepping, solo link, and waiting-room mode.
-- `ExplainerPanel` tests cover collapsible toggle, `aria-expanded` state, non-collapsible mode, and content delegation to `MarkdownRenderer`.
-- `TopBar` tests cover Solo/Live/Sandbox badge selection rules, `displayName` visibility, right-slot rendering, and desktop-mode branding.
-- Updated `TESTING.md` component coverage inventory.
-- Expanded test suite from 30 files / 340 tests to 36 files / 395 tests.
-
 ## Progress Update - PR #104
 
 Implemented on 27 May 2026 in [`refactor/builder-static-styles`](https://github.com/Headstart-Coding-Launchpad/editor/pull/104):
@@ -117,6 +106,28 @@ Implemented on 27 May 2026 in [`refactor/builder-static-styles`](https://github.
 - Wrapped `AssetBrowser` in a `<div className="te-inline-browser">` because `AssetBrowser` only accepts a `style` prop.
 - Deleted `src/builder/components/task-editor/styles.js` after confirming no remaining imports.
 - All 340 tests continue to pass.
+
+## Progress Update - PR #106
+
+Implemented on 27 May 2026 in [`refactor/scratch-pure-extractions`](https://github.com/Headstart-Coding-Launchpad/editor/pull/106):
+
+- Extracted pure Scratch check evaluation helpers (`evaluateScratchCheck`, `compare`, `createSpriteState`, `DEFAULT_SPRITES`) to `src/shared/scratchChecks.js`.
+- Extracted workspace persistence and state migration helpers (`saveWorkspace`, `loadWorkspace`, `migrateBroadcastState`, `migrateVariableFields`) to `src/shared/scratchPersistence.js`, making the migration functions exported and directly testable.
+- Retained all existing barrel exports from `scratch.js` for backward compatibility — no import changes needed in callers.
+- Added 31 characterization tests covering `compare`, `evaluateScratchCheck` (block_used, sprite_property, variable_equals, edge cases), `migrateBroadcastState`, and `migrateVariableFields`.
+- Simplified `scratch.test.js` by removing inline migration logic replicas now covered in the dedicated test file.
+- Updated `CODEBASE_MAP.md` for the two new modules.
+
+## Progress Update - PR #107
+
+Implemented on 27 May 2026 in [`refactor/add-characterization-tests`](https://github.com/Headstart-Coding-Launchpad/editor/pull/107):
+
+- Added focused component coverage for six previously untested classroom components: `WaitingRoom`, `JoinChoiceScreen`, `JoinSessionPrompt`, `NameEntry`, `ExplainerPanel`, and `TopBar`.
+- `NameEntry` tests cover unique name submission, whitespace trimming, duplicate-suffix confirmation flow, multiple-suffix stepping, solo link, and waiting-room mode.
+- `ExplainerPanel` tests cover collapsible toggle, `aria-expanded` state, non-collapsible mode, and content delegation to `MarkdownRenderer`.
+- `TopBar` tests cover Solo/Live/Sandbox badge selection rules, `displayName` visibility, right-slot rendering, and desktop-mode branding.
+- Updated `TESTING.md` component coverage inventory.
+- Expanded test suite from 30 files / 340 tests to 36 files / 395 tests.
 
 ## Guiding Rules
 
