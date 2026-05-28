@@ -95,6 +95,7 @@ Implemented on 26 May 2026 in [`refactor/student-task-content`](https://github.c
 - Added characterization coverage for solo restore, carry-through, starter fallback, and the existing standalone-task carry behaviour.
 - Updated maintenance inventories while leaving session effects, Firebase writes, localStorage keys, and lesson output unchanged.
 
+<<<<<<< HEAD
 ## Progress Update - PR #107
 
 Implemented on 27 May 2026 in [`refactor/add-characterization-tests`](https://github.com/Headstart-Coding-Launchpad/editor/pull/107):
@@ -105,6 +106,16 @@ Implemented on 27 May 2026 in [`refactor/add-characterization-tests`](https://gi
 - `TopBar` tests cover Solo/Live/Sandbox badge selection rules, `displayName` visibility, right-slot rendering, and desktop-mode branding.
 - Updated `TESTING.md` component coverage inventory.
 - Expanded test suite from 30 files / 340 tests to 36 files / 395 tests.
+=======
+## Progress Update — PR #101
+
+Implemented on 27 May 2026 in [`refactor/teacher-code-tabs-component`](https://github.com/Headstart-Coding-Launchpad/editor/pull/101):
+
+- Extracted the inline `TeacherCodeTabs` function from `TeacherView.jsx` into `src/app/components/TeacherCodeTabs.jsx`.
+- Removed redundant inline styles on tab elements (`s.codeTabStrip`, `s.codeTabBtn`, `s.codeTabBtnActive`) — these were already overridden by the `ui-tabs--editor` / `ui-tab` / `aria-selected` CSS rules (all carrying `!important`); only the uncovered `tabActions` and `sendStageBtn` styles remain as local constants.
+- Added 8 characterization tests covering tab rendering, stage delegation, complete-tab visibility, and the `window.confirm`-gated send-to-all flow.
+- Updated `CODEBASE_MAP.md`.
+>>>>>>> refactor/teacher-code-tabs-component
 
 ## Guiding Rules
 

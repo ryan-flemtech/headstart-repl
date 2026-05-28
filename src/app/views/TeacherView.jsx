@@ -15,9 +15,12 @@ import LiveActivityToast from '../components/LiveActivityToast'
 import TeacherTimers from '../components/TeacherTimers'
 import TeacherSessionControls from '../components/TeacherSessionControls'
 import TeacherCodeTabs from '../components/TeacherCodeTabs'
+<<<<<<< HEAD
 import TeacherPreviewBanner from '../components/TeacherPreviewBanner'
 import TeacherSandboxBanner from '../components/TeacherSandboxBanner'
 import TeacherEndSessionModal from '../components/TeacherEndSessionModal'
+=======
+>>>>>>> refactor/teacher-code-tabs-component
 import { resolveAssetsPath } from '../../shared/assetPaths'
 import { cloneFiles, cloneScratchState } from '../../shared/workspaceData'
 import { buildStudentLivePayload } from '../teacherLivePayload'
@@ -504,11 +507,45 @@ export default function TeacherView({ lessonId }) {
       </div>
 
       {showEndModal && (
+<<<<<<< HEAD
         <TeacherEndSessionModal
           onClose={() => setShowEndModal(false)}
           onEnd={() => handleEndSession(false)}
           onEndAndGoHome={() => handleEndSession(true)}
         />
+=======
+        <div style={s.overlay} onClick={() => setShowEndModal(false)}>
+          <div style={s.modal} onClick={e => e.stopPropagation()}>
+            <h2 style={s.modalTitle}>End Session?</h2>
+            <p style={s.modalBody}>
+              This will end the session for all students. They will see a session-ended screen.
+            </p>
+            <div style={s.modalActions}>
+              <button
+                className="btn-ghost"
+                style={{ fontSize: 14 }}
+                onClick={() => setShowEndModal(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn-danger"
+                style={{ fontSize: 14 }}
+                onClick={() => handleEndSession(false)}
+              >
+                End Session
+              </button>
+              <button
+                className="btn-primary"
+                style={{ fontSize: 14 }}
+                onClick={() => handleEndSession(true)}
+              >
+                End &amp; Go to Home
+              </button>
+            </div>
+          </div>
+        </div>
+>>>>>>> refactor/teacher-code-tabs-component
       )}
     </div>
   )
@@ -564,6 +601,53 @@ const s = {
   attachedCodeEditor: {
     borderRadius: '0 0 8px 8px',
   },
+<<<<<<< HEAD
+=======
+  previewBanner: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    background: '#eff6ff',
+    border: '1px solid #93c5fd',
+    borderRadius: 8,
+    padding: '10px 14px',
+    flexShrink: 0,
+    flexWrap: 'wrap',
+  },
+  previewBannerText: {
+    fontFamily: 'var(--font-body)',
+    fontWeight: 600,
+    fontSize: '0.88rem',
+    color: '#1e40af',
+  },
+  previewBannerBtn: {
+    fontSize: 13,
+    padding: '5px 12px',
+  },
+  sandboxBanner: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    background: '#fef3c7',
+    border: '1px solid #fcd34d',
+    borderRadius: 8,
+    padding: '10px 14px',
+    flexShrink: 0,
+    flexWrap: 'wrap',
+  },
+  sandboxBannerText: {
+    fontFamily: 'var(--font-body)',
+    fontWeight: 600,
+    fontSize: '0.88rem',
+    color: '#92400e',
+  },
+  sandboxBannerBtn: {
+    fontSize: 13,
+    padding: '5px 12px',
+  },
+>>>>>>> refactor/teacher-code-tabs-component
   right: {
     background: '#fff',
     borderLeft: '1px solid #e5e7eb',
