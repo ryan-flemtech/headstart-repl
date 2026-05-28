@@ -94,7 +94,6 @@ function assetManifestPlugin() {
 
 export default defineConfig({
   plugins: [react(), assetManifestPlugin()],
-  envDir: path.resolve(__dirname, '..'),
   base: '/editor/',
   resolve: {
     dedupe: ['react', 'react-dom'],
