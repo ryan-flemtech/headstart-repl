@@ -202,6 +202,7 @@ export function normalizeTasksForExport(tasks) {
       }
       if (task.estimatedMinutes != null) exported.estimatedMinutes = task.estimatedMinutes
       if ((task.informationType ?? 'standard') !== 'standard') exported.informationType = task.informationType
+      if (task.leftContent) exported.leftContent = task.leftContent
       if (task.taskMode && task.taskMode !== 'both') exported.taskMode = task.taskMode
       return exported
     }

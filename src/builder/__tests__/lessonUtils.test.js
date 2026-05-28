@@ -137,4 +137,22 @@ describe('normalizeTasksForExport', () => {
       estimatedMinutes: 2,
     }])
   })
+
+  it('exports recap (two-pane) information tasks including leftContent', () => {
+    expect(normalizeTasksForExport([{
+      id: 4,
+      taskType: 'information',
+      informationType: 'recap',
+      title: 'Recap',
+      leftContent: 'Can you explain X?',
+      explainer: 'Here is the answer.',
+    }])).toEqual([{
+      id: 1,
+      taskType: 'information',
+      informationType: 'recap',
+      title: 'Recap',
+      leftContent: 'Can you explain X?',
+      explainer: 'Here is the answer.',
+    }])
+  })
 })
