@@ -74,7 +74,8 @@
             "type": "answer_equals",
             "value": "d"
           },
-          "carryBlocksFrom": null
+          "carryBlocksFrom": null,
+          "estimatedMinutes": 1
         },
         {
           "id": 7,
@@ -102,7 +103,8 @@
               "value": "count = 0",
               "hint": "try `python:count = 0`"
             }
-          ]
+          ],
+          "estimatedMinutes": 1
         },
         {
           "id": 10,
@@ -118,7 +120,8 @@
               "value": "while count < 5:",
               "hint": "Try adding `python:while count < 5:`"
             }
-          ]
+          ],
+          "estimatedMinutes": 1
         },
         {
           "id": 11,
@@ -128,13 +131,14 @@
           "carryCodeFrom": 10,
           "check": [
             {
-              "type": "code_matches_regex",
-              "value": "while\\s+.*:\\s+(?:.*\\n)*?\\s+print\\(\\s*[\"'](.+?)[\"']\\s*\\)",
-              "hint": "Have you got your **indentation**?\nHave you got your **quotation marks**?"
+              "type": "code_contains",
+              "value": "print(\"*\")",
+              "hint": "Have you got your **quotation marks**?"
             }
           ],
           "interactionMode": "submit",
-          "completeCode": "count = 0\n\nwhile count < 5:\n  print(\"Ryan\")"
+          "completeCode": "count = 0\n\nwhile count < 5:\n  print(\"Ryan\")",
+          "estimatedMinutes": 1
         },
         {
           "id": 12,
@@ -148,7 +152,8 @@
               "value": "5"
             }
           ],
-          "completeCode": "count = 0\n\nwhile count < 5:\n  print(\"Ryan\")\n  count += 1"
+          "completeCode": "count = 0\n\nwhile count < 5:\n  print(\"Ryan\")\n  count += 1",
+          "estimatedMinutes": 1
         },
         {
           "id": 13,
@@ -173,7 +178,8 @@
               "value": "print(\"1\")\nprint(\"2\")\nprint(\"3\")\nprint(\"4\")\nprint(\"5\")\nprint(\"6\")\nprint(\"7\")\nprint(\"8\")\nprint(\"9\")\nprint(\"10\")",
               "hint": "You need to use a `python:while` loop and print a **variable**!"
             }
-          ]
+          ],
+          "estimatedMinutes": 1
         },
         {
           "id": 14,
@@ -208,7 +214,8 @@
             "type": "answer_equals",
             "value": "b"
           },
-          "carryBlocksFrom": null
+          "carryBlocksFrom": null,
+          "estimatedMinutes": 1
         }
       ]
     },
@@ -250,7 +257,8 @@
               "hint": "Write `python:for`"
             }
           ],
-          "completeCode": "for"
+          "completeCode": "for",
+          "estimatedMinutes": 1
         },
         {
           "id": 19,
@@ -266,7 +274,8 @@
               "hint": "Write `python:i` after `python:for`"
             }
           ],
-          "completeCode": "for i"
+          "completeCode": "for i",
+          "estimatedMinutes": 1
         },
         {
           "id": 20,
@@ -282,7 +291,8 @@
               "hint": "Write `python:in` after `python:i`"
             }
           ],
-          "completeCode": "for i in"
+          "completeCode": "for i in",
+          "estimatedMinutes": 1
         },
         {
           "id": 21,
@@ -298,7 +308,8 @@
               "hint": "Write `python:range()` after `python:in`"
             }
           ],
-          "completeCode": "for i in range()"
+          "completeCode": "for i in range()",
+          "estimatedMinutes": 1
         },
         {
           "id": 22,
@@ -326,7 +337,8 @@
               "hint": "Put `python:5` inside the brackets of `python:range()` and don't forget to add a **colon**"
             }
           ],
-          "completeCode": "for i in range(5):"
+          "completeCode": "for i in range(5):",
+          "estimatedMinutes": 1
         },
         {
           "id": 25,
@@ -347,7 +359,8 @@
               "hint": "Make sure your `python:print()` is **indented** and inside the `python:for` loop"
             }
           ],
-          "completeCode": "for i in range(5):\n  print(\"Hello!\")"
+          "completeCode": "for i in range(5):\n  print(\"Hello!\")",
+          "estimatedMinutes": 1
         }
       ]
     },
@@ -364,7 +377,8 @@
           "value": "Looping!\n0\nLooping!\n1\nLooping!\n2",
           "hint": "Make sure your `python:print(i)` is indented!"
         }
-      ]
+      ],
+      "estimatedMinutes": 3
     },
     {
       "id": 28,
@@ -384,7 +398,8 @@
           "hint": "You need to use a `python:for` loop!"
         }
       ],
-      "completeCode": "for i in range(4):\n  print(\"Ryan\")"
+      "completeCode": "for i in range(4):\n  print(\"Ryan\")",
+      "estimatedMinutes": 5
     },
     {
       "id": 29,
@@ -404,7 +419,8 @@
           "type": "code_no_error",
           "hint": "Are you turning the `python:input()` into an **Integer**?"
         }
-      ]
+      ],
+      "estimatedMinutes": 4
     },
     {
       "id": 30,
@@ -432,7 +448,8 @@
           "value": "for",
           "hint": "You need to loop **for** a number of times..."
         }
-      ]
+      ],
+      "estimatedMinutes": 5
     },
     {
       "id": 32,
@@ -453,7 +470,8 @@
           "value": "for",
           "hint": "Do we know how many times we want to loop?"
         }
-      ]
+      ],
+      "estimatedMinutes": 5
     },
     {
       "id": "g-1779555853696",
@@ -500,7 +518,8 @@
             "type": "answer_equals",
             "value": "c"
           },
-          "carryBlocksFrom": null
+          "carryBlocksFrom": null,
+          "estimatedMinutes": 1
         },
         {
           "id": 35,
@@ -535,7 +554,8 @@
             "type": "answer_equals",
             "value": "d"
           },
-          "carryBlocksFrom": null
+          "carryBlocksFrom": null,
+          "estimatedMinutes": 1
         },
         {
           "id": 36,
@@ -568,11 +588,13 @@
               "prompt": "`python:for`",
               "answer": "When you have a fixed amount of times to loop"
             }
-          ]
+          ],
+          "estimatedMinutes": 1
         }
       ]
     }
   ],
   "level": "Level 2",
-  "assetsPath": "/assets/python-2-4/"
+  "assetsPath": "/assets/python-2-4/",
+  "sandboxStarter": "# This is a sandbox to do as you please!"
 }
