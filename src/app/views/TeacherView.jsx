@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSession, decodeFileKey } from '../hooks/useSession'
-import { flattenTasks } from '../../shared/taskUtils'
+import { flattenTasks, filterTasksByMode } from '../../shared/taskUtils'
 import TopBar from '../components/TopBar'
 import TaskNavigator from '../components/TaskNavigator'
 import PythonEditor from '../components/PythonEditor'
@@ -280,7 +280,8 @@ export default function TeacherView({ lessonId }) {
 
   const isSandbox = session?.state === 'sandbox'
   const isInSandbox = isSandbox || sandboxStaging
-  const flatTasks = flattenTasks(lesson?.tasks ?? [])
+  const visibleTasks = filterTasksByMode(lesson?.tasks ?? [], 'live')
+  const flatTasks = flattenTasks(visibleTasks)
   // displayTaskId: what the teacher's centre panel is currently showing
   const displayTaskId = previewTaskId ?? currentTaskId
   const task = flatTasks.find(t => t.id === displayTaskId)
@@ -337,7 +338,7 @@ export default function TeacherView({ lessonId }) {
           />
         }
       />
-      <TeacherTimers session={session} task={currentTask} tasks={lesson.tasks} />
+      <TeacherTimers session={session} task={currentTask} tasks={visibleTasks} />
       <LiveActivityToast activity={editorActivity} showClicks={false} />
 
 
@@ -346,7 +347,7 @@ export default function TeacherView({ lessonId }) {
         {/* Left — Task Navigator */}
         <aside style={s.left}>
           <TaskNavigator
-            tasks={lesson.tasks}
+            tasks={visibleTasks}
             currentTaskId={currentTaskId}
             previewTaskId={previewTaskId}
             session={session}

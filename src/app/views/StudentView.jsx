@@ -5,7 +5,7 @@ import { useIdentity } from '../hooks/useIdentity'
 import { initPyodide, runPython, stopPython, provideInput, isPyodideReady } from '../../shared/pyodide'
 import { buildIframeSrc, waitForIframeText } from '../../shared/iframe'
 import { evaluateCheck, evaluateCheckWithCode, getFirstFailedCheckHint, getIncorrectCheckHint } from '../../shared/checks'
-import { flattenTasks, findTaskById } from '../../shared/taskUtils'
+import { flattenTasks, findTaskById, filterTasksByMode } from '../../shared/taskUtils'
 import TopBar from '../components/TopBar'
 import NameEntry from '../components/NameEntry'
 import WaitingRoom from '../components/WaitingRoom'
@@ -558,8 +558,7 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
 
   function handleSoloNavigate(taskId) {
     if (teacherPresentation) {
-      const availableTasks = flattenTasks(lesson?.tasks ?? [])
-      if (!availableTasks.some(t => t.id === taskId)) return
+      if (!flatTasks.some(t => t.id === taskId)) return
       setTaskId(taskId)
       setCurrentTaskId(taskId)
       setViewingTaskId(null)
@@ -574,9 +573,8 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
     if (!identity) return
     const currentTask = findTaskById(lesson?.tasks, currentTaskId)
     if (phase === 'solo') {
-      const tasks = flattenTasks(lesson?.tasks ?? [])
-      const targetIdx = tasks.findIndex(t => t.id === taskId)
-      const currIdx = tasks.findIndex(t => t.id === currentTaskId)
+      const targetIdx = flatTasks.findIndex(t => t.id === taskId)
+      const currIdx = flatTasks.findIndex(t => t.id === currentTaskId)
       if (targetIdx > currIdx) {
         const canAdvance = !currentTask?.check || currentTask?.taskType === 'information' || checkPassed
         if (!canAdvance || targetIdx > currIdx + 1) return
@@ -969,7 +967,9 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
     )
   }
 
-  const flatTasks = flattenTasks(lesson.tasks)
+  const taskDisplayMode = phase === 'solo' ? 'solo' : phase === 'lesson' ? 'live' : null
+  const visibleTasks = filterTasksByMode(lesson.tasks, taskDisplayMode)
+  const flatTasks = flattenTasks(visibleTasks)
   const currentIndex = flatTasks.findIndex(t => t.id === currentTaskId)
   const {
     isPresentationStudentViewer,
@@ -1078,7 +1078,7 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
   ) : (
     !isSandbox && (
       <TaskProgressDots
-        tasks={lesson.tasks}
+        tasks={visibleTasks}
         currentTaskId={currentTaskId}
         viewingTaskId={viewingTaskId}
         isSolo={isSolo}

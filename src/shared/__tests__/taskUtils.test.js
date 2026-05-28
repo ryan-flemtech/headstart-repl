@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   flattenTasks,
+  filterTasksByMode,
   getEstimatedMinutes,
   getTotalEstimatedMinutes,
   formatEstimatedMinutes,
@@ -264,5 +265,70 @@ describe('updateSubtaskTitles', () => {
     expect(result.subtasks[0].title).toBe('NewName - 1')
     expect(result.subtasks[1].title).toBe('Custom')
     expect(result.subtasks[2].title).toBe('NewName - 2')
+  })
+})
+
+// ─── filterTasksByMode ────────────────────────────────────────────────────────
+
+describe('filterTasksByMode', () => {
+  const both = { id: 1, title: 'Both' }
+  const liveOnly = { id: 2, title: 'Live', taskMode: 'live' }
+  const soloOnly = { id: 3, title: 'Solo', taskMode: 'solo' }
+  const explicit = { id: 4, title: 'Explicit Both', taskMode: 'both' }
+
+  it('returns all tasks when mode is null', () => {
+    const tasks = [both, liveOnly, soloOnly]
+    expect(filterTasksByMode(tasks, null)).toBe(tasks)
+  })
+
+  it('returns empty array for null tasks', () => {
+    expect(filterTasksByMode(null, 'live')).toEqual([])
+  })
+
+  it('includes tasks with no taskMode in both modes', () => {
+    expect(filterTasksByMode([both], 'live')).toEqual([both])
+    expect(filterTasksByMode([both], 'solo')).toEqual([both])
+  })
+
+  it('includes tasks with taskMode "both" in both modes', () => {
+    expect(filterTasksByMode([explicit], 'live')).toEqual([explicit])
+    expect(filterTasksByMode([explicit], 'solo')).toEqual([explicit])
+  })
+
+  it('includes live-only tasks in live mode only', () => {
+    expect(filterTasksByMode([liveOnly], 'live')).toEqual([liveOnly])
+    expect(filterTasksByMode([liveOnly], 'solo')).toEqual([])
+  })
+
+  it('includes solo-only tasks in solo mode only', () => {
+    expect(filterTasksByMode([soloOnly], 'solo')).toEqual([soloOnly])
+    expect(filterTasksByMode([soloOnly], 'live')).toEqual([])
+  })
+
+  it('filters a mixed task list correctly for live mode', () => {
+    const result = filterTasksByMode([both, liveOnly, soloOnly], 'live')
+    expect(result.map(t => t.id)).toEqual([1, 2])
+  })
+
+  it('filters a mixed task list correctly for solo mode', () => {
+    const result = filterTasksByMode([both, liveOnly, soloOnly], 'solo')
+    expect(result.map(t => t.id)).toEqual([1, 3])
+  })
+
+  it('keeps group when some subtasks pass the filter', () => {
+    const g = { id: 'g1', type: 'group', title: 'G', subtasks: [both, liveOnly, soloOnly] }
+    const [result] = filterTasksByMode([g], 'live')
+    expect(result.subtasks.map(t => t.id)).toEqual([1, 2])
+  })
+
+  it('drops a group when all its subtasks are filtered out', () => {
+    const g = { id: 'g1', type: 'group', title: 'G', subtasks: [soloOnly] }
+    expect(filterTasksByMode([g], 'live')).toEqual([])
+  })
+
+  it('returns a new group object when subtasks are filtered', () => {
+    const g = { id: 'g1', type: 'group', title: 'G', subtasks: [both, liveOnly] }
+    const [result] = filterTasksByMode([g], 'live')
+    expect(result).not.toBe(g)
   })
 })

@@ -561,6 +561,29 @@ export default function TaskEditor({ task, lesson, onUpdate, parentGroup }) {
         />
       </Field>
 
+      <Field label="Available in">
+        <div className="te-info-type-grid">
+          {[
+            { value: 'both', label: 'Both', hint: 'Live and solo mode' },
+            { value: 'live', label: 'Live only', hint: 'During live sessions' },
+            { value: 'solo', label: 'Solo only', hint: 'In solo mode' },
+          ].map(option => {
+            const active = (task.taskMode ?? 'both') === option.value
+            return (
+              <button
+                key={option.value}
+                type="button"
+                className={active ? 'te-info-type-btn te-info-type-btn--active' : 'te-info-type-btn'}
+                onClick={() => set('taskMode', option.value === 'both' ? undefined : option.value)}
+              >
+                <span className="te-info-type-label">{option.label}</span>
+                <span className="te-info-type-hint">{option.hint}</span>
+              </button>
+            )
+          })}
+        </div>
+      </Field>
+
       <Field label="Task format">
         <div className="te-task-format-grid">
           {[
