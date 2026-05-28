@@ -106,35 +106,17 @@ Implemented on 27 May 2026 in [`refactor/add-characterization-tests`](https://gi
 - Updated `TESTING.md` component coverage inventory.
 - Expanded test suite from 30 files / 340 tests to 36 files / 395 tests.
 
-<<<<<<< HEAD
-## Progress Update - PR #107
+## Progress Update - PR #104
 
-Implemented on 27 May 2026 in [`refactor/add-characterization-tests`](https://github.com/Headstart-Coding-Launchpad/editor/pull/107):
+Implemented on 27 May 2026 in [`refactor/builder-static-styles`](https://github.com/Headstart-Coding-Launchpad/editor/pull/104):
 
-- Added focused component coverage for six previously untested classroom components: `WaitingRoom`, `JoinChoiceScreen`, `JoinSessionPrompt`, `NameEntry`, `ExplainerPanel`, and `TopBar`.
-- `NameEntry` tests cover unique name submission, whitespace trimming, duplicate-suffix confirmation flow, multiple-suffix stepping, solo link, and waiting-room mode.
-- `ExplainerPanel` tests cover collapsible toggle, `aria-expanded` state, non-collapsible mode, and content delegation to `MarkdownRenderer`.
-- `TopBar` tests cover Solo/Live/Sandbox badge selection rules, `displayName` visibility, right-slot rendering, and desktop-mode branding.
-- Updated `TESTING.md` component coverage inventory.
-- Expanded test suite from 30 files / 340 tests to 36 files / 395 tests.
-=======
-## Progress Update — PR #101
-
-Implemented on 27 May 2026 in [`refactor/teacher-code-tabs-component`](https://github.com/Headstart-Coding-Launchpad/editor/pull/101):
-
-- Extracted the inline `TeacherCodeTabs` function from `TeacherView.jsx` into `src/app/components/TeacherCodeTabs.jsx`.
-- Removed redundant inline styles on tab elements (`s.codeTabStrip`, `s.codeTabBtn`, `s.codeTabBtnActive`) — these were already overridden by the `ui-tabs--editor` / `ui-tab` / `aria-selected` CSS rules (all carrying `!important`); only the uncovered `tabActions` and `sendStageBtn` styles remain as local constants.
-- Added 8 characterization tests covering tab rendering, stage delegation, complete-tab visibility, and the `window.confirm`-gated send-to-all flow.
-
-## Progress Update — PR #102
-
-Implemented on 27 May 2026 in [`refactor/teacher-centre-banners`](https://github.com/Headstart-Coding-Launchpad/editor/pull/102):
-
-- Extracted the inline task-preview notice into `src/app/components/TeacherPreviewBanner.jsx` and the sandbox staging/live notice into `src/app/components/TeacherSandboxBanner.jsx`.
-- Moved all static banner styles into named CSS classes (`.teacher-preview-banner`, `.teacher-sandbox-banner`, and their element classes) in `src/index.css`, removing the corresponding entries from `TeacherView`'s local `s` object.
-- Added 4 tests for `TeacherPreviewBanner` and 9 tests for `TeacherSandboxBanner` covering staging/live states, conditional Scratch buttons, and all callback paths.
-- Updated `CODEBASE_MAP.md`.
->>>>>>> refactor/teacher-code-tabs-component
+- Moved all static inline style objects from `src/builder/components/task-editor/styles.js` into CSS classes under the `/* ── Builder task editor ──── */` section of `src/index.css`, covering all five task-editor component files.
+- Replaced every `style={s.xxx}` and `style={{ ...s.xxx, ... }}` usage in `TaskEditorFields.jsx`, `CheckEditors.jsx`, `QuizEditors.jsx`, `ScratchEditors.jsx`, and `TaskEditor.jsx` with `className="te-xxx"` or `className="te-xxx te-xxx--active"` patterns.
+- Kept truly dynamic values (transforms, runtime colours, dimension overrides) as narrow inline `style` props on top of the base CSS class.
+- Kept `CodeEditor` `style` props inline because `CodeEditor` only accepts a `style` prop.
+- Wrapped `AssetBrowser` in a `<div className="te-inline-browser">` because `AssetBrowser` only accepts a `style` prop.
+- Deleted `src/builder/components/task-editor/styles.js` after confirming no remaining imports.
+- All 340 tests continue to pass.
 
 ## Guiding Rules
 
