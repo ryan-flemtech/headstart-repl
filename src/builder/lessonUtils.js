@@ -202,11 +202,13 @@ export function normalizeTasksForExport(tasks) {
       }
       if (task.estimatedMinutes != null) exported.estimatedMinutes = task.estimatedMinutes
       if ((task.informationType ?? 'standard') !== 'standard') exported.informationType = task.informationType
+      if (task.taskMode && task.taskMode !== 'both') exported.taskMode = task.taskMode
       return exported
     }
 
     const { _checkTested, _customTitle, hints: _hints, ...rest } = task
     const exported = { ...rest, id: idMap[task.id] }
+    if (exported.taskMode === 'both') delete exported.taskMode
     if (exported.carryCodeFrom != null) exported.carryCodeFrom = idMap[exported.carryCodeFrom] ?? exported.carryCodeFrom
     if (exported.carryBlocksFrom != null) exported.carryBlocksFrom = idMap[exported.carryBlocksFrom] ?? exported.carryBlocksFrom
     if (Array.isArray(exported.check)) exported.check = exported.check.map(normalizeCheckForExport)

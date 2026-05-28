@@ -50,6 +50,7 @@ These fields can appear on tasks unless noted otherwise.
 | `title` | Yes | string | Short task title. |
 | `explainer` | Yes | string | Markdown shown to students. |
 | `estimatedMinutes` | No | positive integer | Approximate duration; totaled in the builder and used for the teacher countdown. |
+| `taskMode` | No | string | Controls where the task is visible. Omit or use `both` (default) to show in all modes. Use `live` to show only during live sessions. Use `solo` to show only in solo mode. |
 | `taskType` | No | string | Omit for normal code tasks. Use `information` or `quiz` for non-code tasks. |
 | `hints` | No | string array | Optional hints shown by the hint panel. Empty strings are stripped on export. |
 | `check` | No | object or array | Completion check. Arrays require every check to pass. |

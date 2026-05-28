@@ -48,6 +48,24 @@ export function getProgressItems(tasks) {
   )
 }
 
+// Filter tasks (including groups) to only those visible in a given mode.
+// mode: 'live' | 'solo' | null (null = no filtering, return all)
+// A task is included when taskMode is absent, 'both', or matches the current mode.
+export function filterTasksByMode(tasks, mode) {
+  if (!tasks || !mode) return tasks ?? []
+  const allowed = t => !t.taskMode || t.taskMode === 'both' || t.taskMode === mode
+  const result = []
+  for (const item of tasks) {
+    if (item.type === 'group') {
+      const subtasks = (item.subtasks ?? []).filter(allowed)
+      if (subtasks.length > 0) result.push({ ...item, subtasks })
+    } else if (allowed(item)) {
+      result.push(item)
+    }
+  }
+  return result
+}
+
 // Update a task anywhere in the lesson tasks array (including inside groups).
 export function updateTaskInTasks(tasks, updatedTask) {
   return tasks.map(item => {
