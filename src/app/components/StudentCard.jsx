@@ -103,6 +103,11 @@ export default function StudentCard({ student, lesson, lessonId, session, onRena
               Failed
             </span>
           )}
+          {student.inPersonalSandbox && (
+            <span style={{ ...s.checkBadge, ...s.checkBadgeSandbox }} title="Student is in their personal sandbox">
+              Sandbox
+            </span>
+          )}
         </div>
       </div>
 
@@ -252,6 +257,10 @@ const s = {
   },
   checkBadgeFailed: {
     background: '#ef4444',
+    color: '#fff',
+  },
+  checkBadgeSandbox: {
+    background: '#7c3aed',
     color: '#fff',
   },
   checkBadgeIcon: {

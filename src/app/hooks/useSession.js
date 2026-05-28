@@ -259,6 +259,10 @@ export function useSession(lessonId) {
     }
   }
 
+  async function writeStudentPersonalSandbox(anonymousId, inPersonalSandbox) {
+    await set(ref(db, `sessions/${lessonId}/students/${anonymousId}/inPersonalSandbox`), inPersonalSandbox || null)
+  }
+
   return {
     session,
     loading,
@@ -268,6 +272,6 @@ export function useSession(lessonId) {
     setTaskId, enterSandbox, exitSandbox, pushSandboxCode, pushSandboxFiles,
     setPaused, setActiveStudentView, setTeacherLive, updateTeacherLive, renameStudent, removeStudent, pushResetToStudent,
     // student
-    registerPresence, joinSession, writeStudentRun, writeStudentCode, writeStudentFiles, writeStudentOutput, writeStudentInteraction,
+    registerPresence, joinSession, writeStudentRun, writeStudentCode, writeStudentFiles, writeStudentOutput, writeStudentInteraction, writeStudentPersonalSandbox,
   }
 }

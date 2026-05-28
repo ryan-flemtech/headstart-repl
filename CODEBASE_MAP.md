@@ -34,7 +34,7 @@ Referenced from AGENTS.md. Use this for navigation before opening files.
 
 | File | Role |
 |---|---|
-| `studentStorage.js` | Student task/file localStorage key construction and saved-work persistence helpers |
+| `studentStorage.js` | Student task/file localStorage key construction and saved-work persistence helpers; personal sandbox load/save helpers |
 | `studentTaskContent.js` | Pure student task-content selection and carry-through precedence helpers |
 | `studentLiveDisplay.js` | Pure student teacher-live/view display selection and live HTML file conversion helpers |
 | `studentQuizContent.js` | Pure quiz suggestion helpers: maps wrong answers to option/task/check hint feedback |
