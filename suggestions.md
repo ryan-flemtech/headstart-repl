@@ -95,15 +95,16 @@ Implemented on 26 May 2026 in [`refactor/student-task-content`](https://github.c
 - Added characterization coverage for solo restore, carry-through, starter fallback, and the existing standalone-task carry behaviour.
 - Updated maintenance inventories while leaving session effects, Firebase writes, localStorage keys, and lesson output unchanged.
 
-## Progress Update - PR #105
+## Progress Update - PR #106
 
-Implemented on 27 May 2026 in [`refactor/student-view-extract-components`](https://github.com/Headstart-Coding-Launchpad/editor/pull/105):
+Implemented on 27 May 2026 in [`refactor/scratch-pure-extractions`](https://github.com/Headstart-Coding-Launchpad/editor/pull/106):
 
-- Extracted `TaskSlideTransition` to `src/app/components/TaskSlideTransition.jsx` — self-contained animated task-switch component; `TASK_TRANSITION_MS` moved inside the file as an implementation detail.
-- Extracted `StudentEditorHeader` to `src/app/components/StudentEditorHeader.jsx` — stateless header bar used by HTML task editors; static styles moved to `.sv-editor-header`, `.sv-editor-title`, `.sv-editor-actions`, `.sv-editor-primary-btn`, `.sv-reset-btn` CSS classes.
-- Extracted `LoadingScreen` to `src/app/components/LoadingScreen.jsx` — centred message screen for session loading/error phases; static layout moved to `.sv-centre-screen` CSS class.
-- Added characterization tests for all three extracted components (18 new tests).
-- Updated `CODEBASE_MAP.md` for the three new components.
+- Extracted pure Scratch check evaluation helpers (`evaluateScratchCheck`, `compare`, `createSpriteState`, `DEFAULT_SPRITES`) to `src/shared/scratchChecks.js`.
+- Extracted workspace persistence and state migration helpers (`saveWorkspace`, `loadWorkspace`, `migrateBroadcastState`, `migrateVariableFields`) to `src/shared/scratchPersistence.js`, making the migration functions exported and directly testable.
+- Retained all existing barrel exports from `scratch.js` for backward compatibility — no import changes needed in callers.
+- Added 31 characterization tests covering `compare`, `evaluateScratchCheck` (block_used, sprite_property, variable_equals, edge cases), `migrateBroadcastState`, and `migrateVariableFields`.
+- Simplified `scratch.test.js` by removing inline migration logic replicas now covered in the dedicated test file.
+- Updated `CODEBASE_MAP.md` for the two new modules.
 
 ## Guiding Rules
 

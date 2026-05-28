@@ -1,5 +1,9 @@
 // Shared Scratch module: Blockly setup, block definitions, a small interpreter,
 // check evaluation, and serialization helpers used by the app and builder.
+// Pure check/state helpers are in scratchChecks.js; persistence helpers are in scratchPersistence.js.
+// Re-exported here for backward compatibility.
+export { DEFAULT_SPRITES, createSpriteState, evaluateScratchCheck, compare } from './scratchChecks'
+export { saveWorkspace, loadWorkspace, migrateBroadcastState, migrateVariableFields } from './scratchPersistence'
 
 let _Blockly = null
 let audioContext = null
@@ -1221,102 +1225,3 @@ function bounceIfNeeded(state) {
   }
 }
 
-export function createSpriteState() {
-  return { x: 0, y: 0, direction: 90, size: 100, visible: true, bubble: '', bubbleType: 'say', rotationStyle: 'all around', costume: null }
-}
-
-export const DEFAULT_SPRITES = [
-  { id: 'sprite1', name: 'Sprite 1', type: 'cat', x: 0, y: 0, size: 100, direction: 90 },
-]
-
-export function evaluateScratchCheck(check, workspace, spriteState, runState = null) {
-  if (!check?.type) return false
-  try {
-    switch (check.type) {
-      case 'sprite_property':
-        return spriteState ? compare(spriteState[check.property], check.operator, check.value) : false
-      case 'variable_equals':
-        return compare(runState?.variables?.[check.variableName ?? check.name ?? 'score'], 'equals', check.value)
-      case 'block_used':
-        return workspace ? workspace.getAllBlocks(false).some(b => b.type === check.opcode) : false
-      default:
-        return false
-    }
-  } catch {
-    return false
-  }
-}
-
-function compare(actual, operator, expected) {
-  const a = Number(actual)
-  const e = Number(expected)
-  if (!Number.isNaN(a) && !Number.isNaN(e)) {
-    if (operator === 'equals') return a === e
-    if (operator === 'greater_than') return a > e
-    if (operator === 'less_than') return a < e
-  }
-  return operator === 'equals' && String(actual) === String(expected)
-}
-
-export function saveWorkspace(Blockly, workspace) {
-  return Blockly.serialization.workspaces.save(workspace)
-}
-
-export function loadWorkspace(Blockly, workspace, state) {
-  Blockly.serialization.workspaces.load(migrateVariableFields(migrateBroadcastState(state)), workspace)
-}
-
-// Converts old input_value+shadow format for broadcast blocks to the new field_input format.
-// Needed for workspaces saved before the broadcast block definition changed.
-function migrateBroadcastState(state) {
-  if (!state?.blocks?.blocks) return state
-  const clone = JSON.parse(JSON.stringify(state))
-  for (const block of clone.blocks.blocks) migrateBroadcastBlock(block)
-  return clone
-}
-
-function migrateBroadcastBlock(block) {
-  if (!block) return
-  if (block.type === 'event_broadcast' || block.type === 'event_broadcastandwait') {
-    const text = block.inputs?.BROADCAST_INPUT?.shadow?.fields?.TEXT
-    if (text != null && block.fields?.BROADCAST_INPUT == null) {
-      block.fields = { ...(block.fields ?? {}), BROADCAST_INPUT: String(text) }
-      delete block.inputs.BROADCAST_INPUT
-      if (!Object.keys(block.inputs).length) delete block.inputs
-    }
-  }
-  if (block.next?.block) migrateBroadcastBlock(block.next.block)
-  for (const inp of Object.values(block.inputs ?? {})) {
-    if (inp?.block) migrateBroadcastBlock(inp.block)
-  }
-}
-
-// Converts old field_variable format { id, name } to plain name string for field_dropdown.
-function migrateVariableFields(state) {
-  if (!state?.blocks?.blocks?.length) return state
-  const varMap = {}
-  for (const v of state.variables ?? []) {
-    if (v.id && v.name) varMap[v.id] = v.name
-  }
-  const clone = JSON.parse(JSON.stringify(state))
-  delete clone.variables
-  for (const block of clone.blocks.blocks) migrateVariableBlock(block, varMap)
-  return clone
-}
-
-function migrateVariableBlock(block, varMap) {
-  if (!block) return
-  if (block.type === 'data_variable' || block.type === 'data_setvariableto' || block.type === 'data_changevariableby') {
-    const field = block.fields?.VARIABLE
-    if (field && typeof field === 'object') {
-      block.fields.VARIABLE = field.name ?? varMap[field.id] ?? 'score'
-    } else if (typeof field === 'string' && varMap[field]) {
-      block.fields.VARIABLE = varMap[field]
-    }
-  }
-  if (block.next?.block) migrateVariableBlock(block.next.block, varMap)
-  for (const inp of Object.values(block.inputs ?? {})) {
-    if (inp?.block) migrateVariableBlock(inp.block, varMap)
-    if (inp?.shadow) migrateVariableBlock(inp.shadow, varMap)
-  }
-}
