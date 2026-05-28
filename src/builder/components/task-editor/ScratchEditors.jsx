@@ -1,6 +1,5 @@
 import React from 'react'
 import { MarkdownFieldEditor } from '../ExplainerEditor'
-import { s } from './styles'
 
 const SCRATCH_TOOLBOX_GROUPS = [
   {
@@ -171,8 +170,8 @@ export function ScratchToolboxPicker({ toolbox, onChange }) {
   }
 
   return (
-    <div style={s.toolboxPicker}>
-      <label style={s.toolboxAllRow}>
+    <div className="te-toolbox-picker">
+      <label className="te-toolbox-all-row">
         <input
           type="checkbox"
           checked={usesAllBlocks}
@@ -181,27 +180,27 @@ export function ScratchToolboxPicker({ toolbox, onChange }) {
         <span>All blocks</span>
       </label>
 
-      <div style={usesAllBlocks ? s.toolboxDisabled : s.toolboxGroups}>
+      <div className={usesAllBlocks ? 'te-toolbox-disabled' : 'te-toolbox-groups'}>
         {SCRATCH_TOOLBOX_GROUPS.map(group => {
           const groupTypes = group.blocks.map(([type]) => type)
           const checkedCount = groupTypes.filter(type => selectedTypes.has(type)).length
           const groupChecked = checkedCount === groupTypes.length
 
           return (
-            <div key={group.name} style={s.toolboxGroup}>
-              <label style={s.toolboxGroupHeader}>
+            <div key={group.name} className="te-toolbox-group">
+              <label className="te-toolbox-group__header">
                 <input
                   type="checkbox"
                   checked={groupChecked}
                   disabled={usesAllBlocks}
                   onChange={e => toggleGroup(group, e.target.checked)}
                 />
-                <span style={{ ...s.toolboxGroupSwatch, background: group.colour }} />
+                <span className="te-toolbox-group__swatch" style={{ background: group.colour }} />
                 <span>{group.name}</span>
               </label>
-              <div style={s.toolboxBlockGrid}>
+              <div className="te-toolbox-block-grid">
                 {group.blocks.map(([type, label]) => (
-                  <label key={type} style={s.toolboxBlockItem}>
+                  <label key={type} className="te-toolbox-block-item">
                     <input
                       type="checkbox"
                       checked={usesAllBlocks || selectedTypes.has(type)}
@@ -236,7 +235,7 @@ function ScratchCheckListEditor({ checks, onChange, sprites }) {
       {checks.map((check, index) => (
         <div key={index} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
           {checks.length > 1 && (
-            <span style={{ ...s.checkIndexLabel, paddingTop: 10 }}>#{index + 1}</span>
+            <span className="te-check-index" style={{ paddingTop: 10 }}>#{index + 1}</span>
           )}
           <div style={{ flex: 1, minWidth: 0 }}>
             <ScratchCheckEditor
@@ -246,11 +245,11 @@ function ScratchCheckListEditor({ checks, onChange, sprites }) {
             />
           </div>
           {checks.length > 1 && (
-            <button type="button" style={{ ...s.removeCheckBtn, marginTop: 8 }} onClick={() => removeCheck(index)} title="Remove check">×</button>
+            <button type="button" className="te-check-remove-btn" onClick={() => removeCheck(index)} title="Remove check">×</button>
           )}
         </div>
       ))}
-      <button type="button" className="btn-ghost" style={s.addCheckBtn} onClick={addCheck}>
+      <button type="button" className="btn-ghost te-add-check-btn" onClick={addCheck}>
         + Add check
       </button>
     </div>
@@ -289,15 +288,15 @@ function ScratchCheckEditor({ check, onChange, sprites = [{ id: 'sprite1', name:
   }
 
   return (
-    <div style={s.scratchCheckEditor}>
-      <select style={s.select} value={type} onChange={e => changeType(e.target.value)}>
+    <div className="te-scratch-check-editor">
+      <select className="te-select" value={type} onChange={e => changeType(e.target.value)}>
         <option value="block_used">block_used</option>
         <option value="sprite_property">sprite_property</option>
         <option value="variable_equals">variable_equals</option>
       </select>
 
       <select
-        style={s.select}
+        className="te-select"
         value={check.evaluation ?? (type === 'block_used' ? 'manual' : 'after_run')}
         onChange={e => onChange({ ...check, evaluation: e.target.value })}
       >
@@ -307,7 +306,7 @@ function ScratchCheckEditor({ check, onChange, sprites = [{ id: 'sprite1', name:
 
       {type === 'block_used' ? (
         <select
-          style={s.select}
+          className="te-select"
           value={check.opcode ?? ''}
           onChange={e => onChange({ ...check, opcode: e.target.value })}
         >
@@ -318,13 +317,13 @@ function ScratchCheckEditor({ check, onChange, sprites = [{ id: 'sprite1', name:
       ) : type === 'variable_equals' ? (
         <>
           <input
-            style={s.input}
+            className="te-input"
             value={check.variableName ?? 'score'}
             onChange={e => onChange({ ...check, variableName: e.target.value })}
             placeholder="Variable name"
           />
           <input
-            style={s.input}
+            className="te-input"
             value={check.value ?? ''}
             onChange={e => onChange({ ...check, value: e.target.value })}
             placeholder="Expected value"
@@ -333,14 +332,14 @@ function ScratchCheckEditor({ check, onChange, sprites = [{ id: 'sprite1', name:
       ) : (
         <>
           <select
-            style={s.select}
+            className="te-select"
             value={check.spriteName ?? sprites[0]?.name ?? 'Sprite 1'}
             onChange={e => onChange({ ...check, spriteName: e.target.value })}
           >
             {sprites.map(sp => <option key={sp.id} value={sp.name}>{sp.name}</option>)}
           </select>
           <select
-            style={s.select}
+            className="te-select"
             value={check.property ?? 'x'}
             onChange={e => onChange({ ...check, property: e.target.value })}
           >
@@ -351,7 +350,7 @@ function ScratchCheckEditor({ check, onChange, sprites = [{ id: 'sprite1', name:
             <option value="visible">visible</option>
           </select>
           <select
-            style={s.select}
+            className="te-select"
             value={check.operator ?? 'equals'}
             onChange={e => onChange({ ...check, operator: e.target.value })}
           >
@@ -360,7 +359,7 @@ function ScratchCheckEditor({ check, onChange, sprites = [{ id: 'sprite1', name:
             <option value="less_than">less_than</option>
           </select>
           <input
-            style={s.input}
+            className="te-input"
             value={check.value ?? ''}
             onChange={e => onChange({ ...check, value: e.target.value })}
             placeholder="Expected value"
@@ -398,14 +397,15 @@ export function VariableManager({ variables, onChange }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       {vars.map((v, i) => (
-        <div key={i} style={s.variableRow}>
+        <div key={i} className="te-variable-row">
           <input
-            style={{ ...s.input, flex: 1, minWidth: 0 }}
+            className="te-input"
+            style={{ flex: 1, minWidth: 0 }}
             value={v.name}
             onChange={e => updateVariable(i, { name: e.target.value })}
             placeholder="Variable name"
           />
-          <label style={s.variableStageLabel} title="Show on stage">
+          <label className="te-variable-stage-label" title="Show on stage">
             <input
               type="checkbox"
               checked={!!v.showOnStage}
@@ -415,7 +415,8 @@ export function VariableManager({ variables, onChange }) {
           </label>
           <button
             type="button"
-            style={{ ...s.removeCheckBtn, marginTop: 0 }}
+            className="te-check-remove-btn"
+            style={{ marginTop: 0 }}
             onClick={() => removeVariable(i)}
             title="Remove variable"
           >
@@ -423,7 +424,7 @@ export function VariableManager({ variables, onChange }) {
           </button>
         </div>
       ))}
-      <button type="button" className="btn-ghost" style={s.addCheckBtn} onClick={addVariable}>
+      <button type="button" className="btn-ghost te-add-check-btn" onClick={addVariable}>
         + Add variable
       </button>
     </div>

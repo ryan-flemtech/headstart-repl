@@ -4,17 +4,15 @@ import { useAssets } from '../../../shared/useAssets'
 import { resolveAssetFileUrl } from '../../../shared/assetPaths'
 import { SPRITE_TYPES } from '../../../app/components/ScratchWorkspace'
 import { createSpriteFromPreset, normalizeSpritePresets, SPRITE_PRESETS_PATH } from '../../spritePresets'
-import { s } from './styles'
 
 function CodeWorkspaceTabs({ activeTab, onChange, starterLabel = 'Starter code', testLabel = 'Complete code', rightAction = null, stages = [], onAddStage = null, onRemoveStage = null }) {
   return (
-    <div style={s.workspaceTabs} className="ui-tabs ui-tabs--editor" role="tablist" aria-label="Code workspace">
+    <div className="ui-tabs ui-tabs--editor" role="tablist" aria-label="Code workspace">
       <button
         type="button"
         className="ui-tab"
         role="tab"
         aria-selected={activeTab === 'starter'}
-        style={{ ...s.workspaceTab, ...(activeTab === 'starter' ? s.workspaceTabActive : {}) }}
         onClick={() => onChange('starter')}
       >
         {starterLabel}
@@ -26,7 +24,6 @@ function CodeWorkspaceTabs({ activeTab, onChange, starterLabel = 'Starter code',
             className="ui-tab"
             role="tab"
             aria-selected={activeTab === `stage_${i}`}
-            style={{ ...s.workspaceTab, ...(activeTab === `stage_${i}` ? s.workspaceTabActive : {}) }}
             onClick={() => onChange(`stage_${i}`)}
           >
             {stage.label || `Stage ${i + 1}`}
@@ -34,7 +31,7 @@ function CodeWorkspaceTabs({ activeTab, onChange, starterLabel = 'Starter code',
           {onRemoveStage && (
             <button
               type="button"
-              style={s.stageRemoveBtn}
+              className="te-stage-remove-btn"
               title="Remove this stage"
               onClick={e => { e.stopPropagation(); onRemoveStage(i) }}
             >
@@ -46,8 +43,7 @@ function CodeWorkspaceTabs({ activeTab, onChange, starterLabel = 'Starter code',
       {onAddStage && (
         <button
           type="button"
-          className="ui-tab"
-          style={s.workspaceTabAdd}
+          className="ui-tab te-workspace-tab-add"
           onClick={onAddStage}
           title="Add a code stage"
         >
@@ -59,25 +55,24 @@ function CodeWorkspaceTabs({ activeTab, onChange, starterLabel = 'Starter code',
         className="ui-tab"
         role="tab"
         aria-selected={activeTab === 'complete'}
-        style={{ ...s.workspaceTab, ...(activeTab === 'complete' ? s.workspaceTabActive : {}) }}
         onClick={() => onChange('complete')}
       >
         {testLabel}
       </button>
-      {rightAction && <div style={s.workspaceTabActions}>{rightAction}</div>}
+      {rightAction && <div className="te-workspace-tab-actions">{rightAction}</div>}
     </div>
   )
 }
 
 function Modal({ title, children, onClose }) {
   return (
-    <div style={s.modalBackdrop} role="dialog" aria-modal="true">
-      <div style={s.modal}>
-        <div style={s.modalHeader}>
-          <span style={s.modalTitle}>{title}</span>
-          <button style={s.closeBtn} onClick={onClose} title="Close">x</button>
+    <div className="te-modal-backdrop" role="dialog" aria-modal="true">
+      <div className="te-modal">
+        <div className="te-modal__header">
+          <span className="te-modal__title">{title}</span>
+          <button className="te-modal__close" onClick={onClose} title="Close">x</button>
         </div>
-        <div style={s.modalBody}>
+        <div className="te-modal__body">
           {children}
         </div>
       </div>
@@ -132,62 +127,54 @@ function CarryThroughPicker({ task, lesson, onUpdate, isScratch, isPython }) {
 
   return (
     <Field label={isScratch ? 'Carry blocks from task' : 'Carry code from task'}>
-      <div style={s.carryRadioGroup}>
-        <label style={{
-          ...s.optionChoiceCard,
-          ...(mode === 'last' ? s.optionChoiceCardActive : {}),
-          ...(!prevTask ? s.optionChoiceCardDisabled : {}),
-        }}>
+      <div className="te-carry-radio-group">
+        <label className={`te-option-choice-card${mode === 'last' ? ' te-option-choice-card--active' : ''}${!prevTask ? ' te-option-choice-card--disabled' : ''}`}>
           <input
             type="radio"
             name={radioName}
             checked={mode === 'last'}
             disabled={!prevTask}
             onChange={() => prevTask && copyCompleteCode(prevTask)}
-            style={s.optionChoiceInput}
+            className="te-option-choice-input"
           />
-          <span style={s.optionChoiceTitle}>Carry from last task</span>
-          <span style={{ ...s.optionChoiceText, ...(mode === 'last' ? s.optionChoiceTextActive : {}) }}>
+          <span className="te-option-choice-title">Carry from last task</span>
+          <span className={mode === 'last' ? 'te-option-choice-text te-option-choice-text--active' : 'te-option-choice-text'}>
             {prevTask ? `${prevTask.id}. ${prevTask.title || 'Untitled'}` : 'No previous task'}
           </span>
         </label>
 
-        <label style={{ ...s.optionChoiceCard, ...(mode === 'new' ? s.optionChoiceCardActive : {}) }}>
+        <label className={`te-option-choice-card${mode === 'new' ? ' te-option-choice-card--active' : ''}`}>
           <input
             type="radio"
             name={radioName}
             checked={mode === 'new'}
             onChange={handleNewStarterCode}
-            style={s.optionChoiceInput}
+            className="te-option-choice-input"
           />
-          <span style={s.optionChoiceTitle}>New starter code</span>
-          <span style={{ ...s.optionChoiceText, ...(mode === 'new' ? s.optionChoiceTextActive : {}) }}>
+          <span className="te-option-choice-title">New starter code</span>
+          <span className={mode === 'new' ? 'te-option-choice-text te-option-choice-text--active' : 'te-option-choice-text'}>
             Start this task from its own starter content.
           </span>
         </label>
 
-        <label style={{
-          ...s.optionChoiceCard,
-          ...(mode === 'other' ? s.optionChoiceCardActive : {}),
-          ...(otherTasks.length === 0 ? s.optionChoiceCardDisabled : {}),
-        }}>
+        <label className={`te-option-choice-card${mode === 'other' ? ' te-option-choice-card--active' : ''}${otherTasks.length === 0 ? ' te-option-choice-card--disabled' : ''}`}>
           <input
             type="radio"
             name={radioName}
             checked={mode === 'other'}
             disabled={otherTasks.length === 0}
             onChange={handleOther}
-            style={s.optionChoiceInput}
+            className="te-option-choice-input"
           />
-          <span style={s.optionChoiceTitle}>From other task</span>
-          <span style={{ ...s.optionChoiceText, ...(mode === 'other' ? s.optionChoiceTextActive : {}) }}>
+          <span className="te-option-choice-title">From other task</span>
+          <span className={mode === 'other' ? 'te-option-choice-text te-option-choice-text--active' : 'te-option-choice-text'}>
             Copy complete code from a chosen task.
           </span>
         </label>
 
         {mode === 'other' && (
           <select
-            style={s.select}
+            className="te-select"
             value={carryFrom ?? ''}
             onChange={e => {
               const sourceTask = lesson.tasks.find(t => t.id === parseInt(e.target.value, 10))
@@ -350,42 +337,43 @@ export function SpriteManager({ sprites, onChange, assetsPath = '', lessonId, le
   }
 
   return (
-    <div style={s.spriteManager}>
+    <div className="te-sprite-manager">
       {displayedSprites.map(sp => (
         <div key={sp.id}>
-          <div style={s.spriteRow}>
+          <div className="te-sprite-row">
             <input
-              style={{ ...s.input, width: 120, flex: '0 0 120px' }}
+              className="te-input"
+              style={{ width: 120, flex: '0 0 120px' }}
               value={sp.name}
               onChange={e => update(sp.id, 'name', e.target.value)}
               placeholder="Name"
             />
-            <select style={{ ...s.select, flex: '0 0 auto' }} value={sp.type ?? 'cat'} onChange={e => update(sp.id, 'type', e.target.value)}>
+            <select className="te-select" style={{ flex: '0 0 auto' }} value={sp.type ?? 'cat'} onChange={e => update(sp.id, 'type', e.target.value)}>
               {SPRITE_TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
             {!hidePosition && (
               <>
-                <label style={s.spriteField}>
-                  <span style={s.spriteFieldLabel}>X</span>
-                  <input style={{ ...s.input, width: 56 }} type="number" value={sp.x ?? 0} onChange={e => update(sp.id, 'x', Number(e.target.value))} />
+                <label className="te-sprite-field">
+                  <span className="te-sprite-field__label">X</span>
+                  <input className="te-input" style={{ width: 56 }} type="number" value={sp.x ?? 0} onChange={e => update(sp.id, 'x', Number(e.target.value))} />
                 </label>
-                <label style={s.spriteField}>
-                  <span style={s.spriteFieldLabel}>Y</span>
-                  <input style={{ ...s.input, width: 56 }} type="number" value={sp.y ?? 0} onChange={e => update(sp.id, 'y', Number(e.target.value))} />
+                <label className="te-sprite-field">
+                  <span className="te-sprite-field__label">Y</span>
+                  <input className="te-input" style={{ width: 56 }} type="number" value={sp.y ?? 0} onChange={e => update(sp.id, 'y', Number(e.target.value))} />
                 </label>
-                <label style={s.spriteField}>
-                  <span style={s.spriteFieldLabel}>Size</span>
-                  <input style={{ ...s.input, width: 60 }} type="number" min="10" max="500" value={sp.size ?? 100} onChange={e => update(sp.id, 'size', Number(e.target.value))} />
+                <label className="te-sprite-field">
+                  <span className="te-sprite-field__label">Size</span>
+                  <input className="te-input" style={{ width: 60 }} type="number" min="10" max="500" value={sp.size ?? 100} onChange={e => update(sp.id, 'size', Number(e.target.value))} />
                 </label>
-                <label style={s.spriteField}>
-                  <span style={s.spriteFieldLabel}>Dir</span>
-                  <input style={{ ...s.input, width: 56 }} type="number" value={sp.direction ?? 90} onChange={e => update(sp.id, 'direction', Number(e.target.value))} />
+                <label className="te-sprite-field">
+                  <span className="te-sprite-field__label">Dir</span>
+                  <input className="te-input" style={{ width: 56 }} type="number" value={sp.direction ?? 90} onChange={e => update(sp.id, 'direction', Number(e.target.value))} />
                 </label>
               </>
             )}
             <button
               type="button"
-              style={s.costumeToggleBtn}
+              className="te-costume-toggle-btn"
               onClick={() => toggleCostumes(sp.id)}
               title="Edit costumes"
             >
@@ -393,7 +381,7 @@ export function SpriteManager({ sprites, onChange, assetsPath = '', lessonId, le
             </button>
             <button
               type="button"
-              style={s.removeBtn}
+              className="te-remove-btn"
               onClick={() => removeSprite(sp.id)}
               disabled={sprites.length <= 1}
               title="Remove sprite"
@@ -415,9 +403,10 @@ export function SpriteManager({ sprites, onChange, assetsPath = '', lessonId, le
         </div>
       ))}
       {!hideAdd && (
-        <div style={s.addSpriteRow}>
+        <div className="te-add-sprite-row">
           <select
-            style={{ ...s.select, minWidth: 168 }}
+            className="te-select"
+            style={{ minWidth: 168 }}
             aria-label="Choose sprite preset"
             value={selectedPresetId}
             onChange={event => setSelectedPresetId(event.target.value)}
@@ -428,7 +417,7 @@ export function SpriteManager({ sprites, onChange, assetsPath = '', lessonId, le
               <option key={preset.id} value={preset.id}>{preset.name}</option>
             ))}
           </select>
-          <button type="button" className="btn-ghost" style={s.addSpriteBtn} onClick={addSprite}>
+          <button type="button" className="btn-ghost te-add-sprite-btn" onClick={addSprite}>
             + Add sprite
           </button>
         </div>
@@ -443,25 +432,27 @@ function CostumeManager({ costumes, assetsPath, lessonId, lessonType, onAdd, onR
   const assets = lessonAssets(lessonId, lessonType)
 
   return (
-    <div style={s.costumeManager}>
+    <div className="te-costume-manager">
       {costumes.length === 0 && (
-        <p style={s.costumeEmpty}>No costumes — sprite uses its built-in shape. Add a costume to use an image from the assets folder.</p>
+        <p className="te-costume-empty">No costumes — sprite uses its built-in shape. Add a costume to use an image from the assets folder.</p>
       )}
       {costumes.map((c, idx) => {
         const resolvedUrl = resolveAssetFileUrl(assetsPath, c.image)
         const isBrowsing = browsingIdx === idx
         return (
-          <div key={idx} style={s.costumeBlock}>
-            <div style={s.costumeRow}>
-              {idx === 0 && <span style={s.costumeTag}>Default</span>}
+          <div key={idx} className="te-costume-block">
+            <div className="te-costume-row">
+              {idx === 0 && <span className="te-costume-tag">Default</span>}
               <input
-                style={{ ...s.input, flex: '1 1 100px', minWidth: 0 }}
+                className="te-input"
+                style={{ flex: '1 1 100px', minWidth: 0 }}
                 value={c.name}
                 onChange={e => onUpdate(idx, 'name', e.target.value)}
                 placeholder="Costume name"
               />
               <input
-                style={{ ...s.input, flex: '2 1 120px', minWidth: 0, fontFamily: 'var(--font-code)', fontSize: '0.8rem' }}
+                className="te-input"
+                style={{ flex: '2 1 120px', minWidth: 0, fontFamily: 'var(--font-code)', fontSize: '0.8rem' }}
                 value={c.image ?? ''}
                 onChange={e => onUpdate(idx, 'image', e.target.value)}
                 placeholder="e.g. sprites/cat1.png"
@@ -469,7 +460,7 @@ function CostumeManager({ costumes, assetsPath, lessonId, lessonType, onAdd, onR
               {assets.length > 0 && (
                 <button
                   type="button"
-                  style={{ ...s.browseToggleBtn, ...(isBrowsing ? s.browseToggleBtnActive : {}) }}
+                  className={isBrowsing ? 'te-browse-toggle-btn te-browse-toggle-btn--active' : 'te-browse-toggle-btn'}
                   onClick={() => setBrowsingIdx(isBrowsing ? null : idx)}
                   title="Browse assets"
                 >
@@ -480,31 +471,32 @@ function CostumeManager({ costumes, assetsPath, lessonId, lessonType, onAdd, onR
                 <img
                   src={resolvedUrl}
                   alt=""
-                  style={s.costumeThumb}
+                  className="te-costume-thumb"
                   onError={e => { e.target.style.display = 'none' }}
                   onLoad={e => { e.target.style.display = 'block' }}
                 />
               )}
               <button
                 type="button"
-                style={s.removeBtn}
+                className="te-remove-btn"
                 onClick={() => onRemove(idx)}
                 title="Remove costume"
               >✕</button>
             </div>
             {isBrowsing && assetsPath && assets.length > 0 && (
-              <AssetBrowser
-                assetsPath={assetsPath}
-                assets={assets}
-                mode="select"
-                onSelect={path => { onUpdate(idx, 'image', path); setBrowsingIdx(null) }}
-                style={s.inlineBrowser}
-              />
+              <div className="te-inline-browser">
+                <AssetBrowser
+                  assetsPath={assetsPath}
+                  assets={assets}
+                  mode="select"
+                  onSelect={path => { onUpdate(idx, 'image', path); setBrowsingIdx(null) }}
+                />
+              </div>
             )}
           </div>
         )
       })}
-      <button type="button" className="btn-ghost" style={s.addSpriteBtn} onClick={onAdd}>
+      <button type="button" className="btn-ghost te-add-sprite-btn" onClick={onAdd}>
         + Add costume
       </button>
     </div>
@@ -529,23 +521,25 @@ export function BackdropManager({ backdrops, onChange, assetsPath, lessonId, les
   }
 
   return (
-    <div style={s.backdropManager}>
+    <div className="te-backdrop-manager">
       {backdrops.map((b, i) => {
         const isImage = b.image !== undefined
         const resolvedUrl = isImage ? resolveAssetFileUrl(assetsPath, b.image) : ''
         const isBrowsing = browsingId === b.id
         return (
-          <div key={b.id} style={s.backdropBlock}>
-            <div style={s.backdropRow}>
-              {i === 0 && <span style={s.backdropTag}>Default</span>}
+          <div key={b.id} className="te-backdrop-block">
+            <div className="te-backdrop-row">
+              {i === 0 && <span className="te-backdrop-tag">Default</span>}
               <input
-                style={{ ...s.input, flex: '1 1 110px', minWidth: 0 }}
+                className="te-input"
+                style={{ flex: '1 1 110px', minWidth: 0 }}
                 value={b.name}
                 onChange={e => update(b.id, { name: e.target.value })}
                 placeholder="Name"
               />
               <select
-                style={{ ...s.select, flex: '0 0 auto' }}
+                className="te-select"
+                style={{ flex: '0 0 auto' }}
                 value={isImage ? 'image' : 'colour'}
                 onChange={e => {
                   if (e.target.value === 'image') update(b.id, { image: '', colour: undefined })
@@ -558,7 +552,8 @@ export function BackdropManager({ backdrops, onChange, assetsPath, lessonId, les
               {isImage ? (
                 <>
                   <input
-                    style={{ ...s.input, flex: '2 1 120px', minWidth: 0, fontFamily: 'var(--font-code)', fontSize: '0.8rem' }}
+                    className="te-input"
+                    style={{ flex: '2 1 120px', minWidth: 0, fontFamily: 'var(--font-code)', fontSize: '0.8rem' }}
                     value={b.image ?? ''}
                     onChange={e => update(b.id, { image: e.target.value })}
                     placeholder="e.g. backdrops/sky.png"
@@ -566,7 +561,7 @@ export function BackdropManager({ backdrops, onChange, assetsPath, lessonId, les
                   {assets.length > 0 && (
                     <button
                       type="button"
-                      style={{ ...s.browseToggleBtn, ...(isBrowsing ? s.browseToggleBtnActive : {}) }}
+                      className={isBrowsing ? 'te-browse-toggle-btn te-browse-toggle-btn--active' : 'te-browse-toggle-btn'}
                       onClick={() => setBrowsingId(isBrowsing ? null : b.id)}
                       title="Browse assets"
                     >
@@ -577,7 +572,7 @@ export function BackdropManager({ backdrops, onChange, assetsPath, lessonId, les
                     <img
                       src={resolvedUrl}
                       alt=""
-                      style={s.backdropThumb}
+                      className="te-backdrop-thumb"
                       onError={e => { e.target.style.display = 'none' }}
                       onLoad={e => { e.target.style.display = 'block' }}
                     />
@@ -589,32 +584,33 @@ export function BackdropManager({ backdrops, onChange, assetsPath, lessonId, les
                     type="color"
                     value={b.colour ?? '#ffffff'}
                     onChange={e => update(b.id, { colour: e.target.value })}
-                    style={s.colorInput}
+                    className="te-color-input"
                   />
-                  <div style={{ ...s.backdropSwatch, background: b.colour ?? '#ffffff' }} />
+                  <div className="te-backdrop-swatch" style={{ background: b.colour ?? '#ffffff' }} />
                 </div>
               )}
               <button
                 type="button"
-                style={s.removeBtn}
+                className="te-remove-btn"
                 onClick={() => remove(b.id)}
                 disabled={backdrops.length <= 1}
                 title="Remove backdrop"
               >✕</button>
             </div>
             {isBrowsing && assetsPath && assets.length > 0 && (
-              <AssetBrowser
-                assetsPath={assetsPath}
-                assets={assets}
-                mode="select"
-                onSelect={path => { update(b.id, { image: path }); setBrowsingId(null) }}
-                style={s.inlineBrowser}
-              />
+              <div className="te-inline-browser">
+                <AssetBrowser
+                  assetsPath={assetsPath}
+                  assets={assets}
+                  mode="select"
+                  onSelect={path => { update(b.id, { image: path }); setBrowsingId(null) }}
+                />
+              </div>
             )}
           </div>
         )
       })}
-      <button type="button" className="btn-ghost" style={s.addSpriteBtn} onClick={add}>
+      <button type="button" className="btn-ghost te-add-sprite-btn" onClick={add}>
         + Add backdrop
       </button>
     </div>
