@@ -95,16 +95,16 @@ Implemented on 26 May 2026 in [`refactor/student-task-content`](https://github.c
 - Added characterization coverage for solo restore, carry-through, starter fallback, and the existing standalone-task carry behaviour.
 - Updated maintenance inventories while leaving session effects, Firebase writes, localStorage keys, and lesson output unchanged.
 
-## Progress Update - PR #106
+## Progress Update - PR #107
 
-Implemented on 27 May 2026 in [`refactor/scratch-pure-extractions`](https://github.com/Headstart-Coding-Launchpad/editor/pull/106):
+Implemented on 27 May 2026 in [`refactor/add-characterization-tests`](https://github.com/Headstart-Coding-Launchpad/editor/pull/107):
 
-- Extracted pure Scratch check evaluation helpers (`evaluateScratchCheck`, `compare`, `createSpriteState`, `DEFAULT_SPRITES`) to `src/shared/scratchChecks.js`.
-- Extracted workspace persistence and state migration helpers (`saveWorkspace`, `loadWorkspace`, `migrateBroadcastState`, `migrateVariableFields`) to `src/shared/scratchPersistence.js`, making the migration functions exported and directly testable.
-- Retained all existing barrel exports from `scratch.js` for backward compatibility — no import changes needed in callers.
-- Added 31 characterization tests covering `compare`, `evaluateScratchCheck` (block_used, sprite_property, variable_equals, edge cases), `migrateBroadcastState`, and `migrateVariableFields`.
-- Simplified `scratch.test.js` by removing inline migration logic replicas now covered in the dedicated test file.
-- Updated `CODEBASE_MAP.md` for the two new modules.
+- Added focused component coverage for six previously untested classroom components: `WaitingRoom`, `JoinChoiceScreen`, `JoinSessionPrompt`, `NameEntry`, `ExplainerPanel`, and `TopBar`.
+- `NameEntry` tests cover unique name submission, whitespace trimming, duplicate-suffix confirmation flow, multiple-suffix stepping, solo link, and waiting-room mode.
+- `ExplainerPanel` tests cover collapsible toggle, `aria-expanded` state, non-collapsible mode, and content delegation to `MarkdownRenderer`.
+- `TopBar` tests cover Solo/Live/Sandbox badge selection rules, `displayName` visibility, right-slot rendering, and desktop-mode branding.
+- Updated `TESTING.md` component coverage inventory.
+- Expanded test suite from 30 files / 340 tests to 36 files / 395 tests.
 
 ## Guiding Rules
 
@@ -275,10 +275,10 @@ Completed in PR #66:
 
 Remaining sequence:
 
-1. Consolidate static styling for builder components moved during the TaskEditor split.
-2. Continue pure/helper and presentational extraction from `TeacherView.jsx`, then `StudentView.jsx`.
-3. Refactor Scratch presentation/runtime modules in small, test-backed pieces.
-4. Add further characterization coverage alongside each structural change.
+1. ✅ Consolidate static styling for builder components moved during the TaskEditor split. (PR #104)
+2. ✅ Continue pure/helper and presentational extraction from `TeacherView.jsx`, then `StudentView.jsx`. (PRs #101–#103, #105)
+3. ✅ Refactor Scratch presentation/runtime modules in small, test-backed pieces. (PR #106)
+4. ✅ Add further characterization coverage alongside each structural change. (PR #107)
 
 ## Explicit Non-Goals
 
