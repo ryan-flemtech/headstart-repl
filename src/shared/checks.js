@@ -99,7 +99,7 @@ export function evaluateSingleCheck(check, output, context = {}) {
       const style = context.iframeDoc.defaultView?.getComputedStyle(el)
       const raw = style?.getPropertyValue(check.property) || el.style?.getPropertyValue(check.property) || ''
       if (check.value == null || check.value === '') return String(raw).trim().length > 0
-      return wildcardEquals(normalizeOutput(raw), normalizeOutput(check.value))
+      return wildcardEquals(normalizeStyleValue(raw), normalizeStyleValue(check.value))
     } catch { return false }
   }
 
@@ -424,6 +424,16 @@ function wildcardEquals(text, pattern) {
 
 function normalizeOutput(value) {
   return String(value ?? '').replace(/\r\n?/g, '\n').trim().toLowerCase()
+}
+
+// Normalizes CSS property values for comparison: reduces url(...) to just the
+// filename so that a teacher's check value like url('cat.png') matches a
+// computed value like url("https://cdn.example.com/cat.png").
+function normalizeStyleValue(value) {
+  return normalizeOutput(value).replace(
+    /url\(\s*['"]?([^'")\s]+)['"]?\s*\)/g,
+    (_, href) => `url(${href.split('/').pop()})`,
+  )
 }
 
 function normalizeExactOutput(value) {
