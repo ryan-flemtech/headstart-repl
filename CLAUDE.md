@@ -1,5 +1,7 @@
 # CLAUDE.md — Headstart Coding Classroom REPL Platform
 
+@AGENTS.md
+
 This file provides Claude Code session instructions. For the full project quick-reference, read **AGENTS.md**. For file roles, read **CODEBASE_MAP.md**. For full technical detail, read **SPEC.md**. For lesson JSON, read **LESSON_SCHEMA.md**.
 
 ---
