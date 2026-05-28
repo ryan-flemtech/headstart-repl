@@ -76,6 +76,8 @@ Referenced from AGENTS.md. Use this for navigation before opening files.
 | `TeacherEndSessionModal.jsx` | Confirmation modal for ending a live session, with End and End+Home actions |
 =======
 >>>>>>> refactor/teacher-code-tabs-component
+| `TeacherPreviewBanner.jsx` | Status banner shown when the teacher previews a task without moving students |
+| `TeacherSandboxBanner.jsx` | Status banner shown in sandbox staging/live mode with action buttons |
 | `InformationTask.jsx` | Read-only information/introduction task rendering for lesson flow |
 | `CollapsiblePanelControls.jsx` | Shared collapse/expand tab controls for classroom and builder panels |
 | `TaskSlideTransition.jsx` | Animated slide transition wrapper used when switching between tasks |

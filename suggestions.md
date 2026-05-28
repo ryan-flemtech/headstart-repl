@@ -125,6 +125,14 @@ Implemented on 27 May 2026 in [`refactor/teacher-code-tabs-component`](https://g
 - Extracted the inline `TeacherCodeTabs` function from `TeacherView.jsx` into `src/app/components/TeacherCodeTabs.jsx`.
 - Removed redundant inline styles on tab elements (`s.codeTabStrip`, `s.codeTabBtn`, `s.codeTabBtnActive`) — these were already overridden by the `ui-tabs--editor` / `ui-tab` / `aria-selected` CSS rules (all carrying `!important`); only the uncovered `tabActions` and `sendStageBtn` styles remain as local constants.
 - Added 8 characterization tests covering tab rendering, stage delegation, complete-tab visibility, and the `window.confirm`-gated send-to-all flow.
+
+## Progress Update — PR #102
+
+Implemented on 27 May 2026 in [`refactor/teacher-centre-banners`](https://github.com/Headstart-Coding-Launchpad/editor/pull/102):
+
+- Extracted the inline task-preview notice into `src/app/components/TeacherPreviewBanner.jsx` and the sandbox staging/live notice into `src/app/components/TeacherSandboxBanner.jsx`.
+- Moved all static banner styles into named CSS classes (`.teacher-preview-banner`, `.teacher-sandbox-banner`, and their element classes) in `src/index.css`, removing the corresponding entries from `TeacherView`'s local `s` object.
+- Added 4 tests for `TeacherPreviewBanner` and 9 tests for `TeacherSandboxBanner` covering staging/live states, conditional Scratch buttons, and all callback paths.
 - Updated `CODEBASE_MAP.md`.
 >>>>>>> refactor/teacher-code-tabs-component
 

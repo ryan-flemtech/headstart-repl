@@ -601,8 +601,6 @@ const s = {
   attachedCodeEditor: {
     borderRadius: '0 0 8px 8px',
   },
-<<<<<<< HEAD
-=======
   previewBanner: {
     display: 'flex',
     alignItems: 'center',
@@ -647,7 +645,6 @@ const s = {
     fontSize: 13,
     padding: '5px 12px',
   },
->>>>>>> refactor/teacher-code-tabs-component
   right: {
     background: '#fff',
     borderLeft: '1px solid #e5e7eb',
