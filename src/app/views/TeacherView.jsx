@@ -15,6 +15,8 @@ import LiveActivityToast from '../components/LiveActivityToast'
 import TeacherTimers from '../components/TeacherTimers'
 import TeacherSessionControls from '../components/TeacherSessionControls'
 import TeacherCodeTabs from '../components/TeacherCodeTabs'
+import TeacherPreviewBanner from '../components/TeacherPreviewBanner'
+import TeacherSandboxBanner from '../components/TeacherSandboxBanner'
 import { resolveAssetsPath } from '../../shared/assetPaths'
 import { cloneFiles, cloneScratchState } from '../../shared/workspaceData'
 import { buildStudentLivePayload } from '../teacherLivePayload'
@@ -364,66 +366,24 @@ export default function TeacherView({ lessonId }) {
           )}
 
           {isPreviewing && (
-            <div style={s.previewBanner}>
-              <span style={s.previewBannerText}>
-                Preview — Task {displayIndex + 1}: {task?.title ?? ''}
-              </span>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button
-                  className="btn-ghost"
-                  style={{ ...s.previewBannerBtn, color: '#1e40af', borderColor: '#1e40af', background: 'transparent' }}
-                  onClick={() => setPreviewTaskId(null)}
-                >
-                  Back to Current Task
-                </button>
-                <button
-                  className="btn-primary"
-                  style={s.previewBannerBtn}
-                  onClick={() => handleTaskChange(previewTaskId)}
-                >
-                  Move All to This Task
-                </button>
-              </div>
-            </div>
+            <TeacherPreviewBanner
+              taskNumber={displayIndex + 1}
+              taskTitle={task?.title}
+              onCancel={() => setPreviewTaskId(null)}
+              onConfirm={() => handleTaskChange(previewTaskId)}
+            />
           )}
 
           {isInSandbox && (
-            <div style={s.sandboxBanner}>
-              <span style={s.sandboxBannerText}>
-                {sandboxStaging
-                  ? 'Sandbox preview — students are still on the lesson'
-                  : 'Sandbox is LIVE — students can see this'}
-              </span>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {sandboxStaging ? (
-                  <>
-                    <button className="btn-ghost" style={{ ...s.sandboxBannerBtn, color: '#92400e', borderColor: '#92400e', background: 'transparent' }} onClick={handleCancelSandbox}>
-                      Cancel
-                    </button>
-                    <button className="btn-ghost" style={{ ...s.sandboxBannerBtn, color: '#92400e', borderColor: '#92400e', background: 'transparent' }} onClick={handleResetSandboxStarter}>
-                      Reset to Sandbox Starter
-                    </button>
-                    <button className="btn-primary" style={s.sandboxBannerBtn} onClick={handleGoLiveSandbox}>
-                      Go Live &amp; Send to Students
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    {lesson.type === 'scratch' && (
-                      <button className="btn-primary" style={s.sandboxBannerBtn} onClick={handlePushScratchSandbox}>
-                        Push to All
-                      </button>
-                    )}
-                    <button className="btn-ghost" style={{ ...s.sandboxBannerBtn, background: 'transparent' }} onClick={handleResetSandboxStarter}>
-                      Reset to Sandbox Starter
-                    </button>
-                    <button className="btn-danger" style={s.sandboxBannerBtn} onClick={handleDeactivateSandbox}>
-                      Deactivate Sandbox
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
+            <TeacherSandboxBanner
+              staging={sandboxStaging}
+              isScratch={lesson.type === 'scratch'}
+              onCancel={handleCancelSandbox}
+              onReset={handleResetSandboxStarter}
+              onGoLive={handleGoLiveSandbox}
+              onPushScratch={handlePushScratchSandbox}
+              onDeactivate={handleDeactivateSandbox}
+            />
           )}
 
           {!isInSandbox && isInformationTask ? (
@@ -638,50 +598,6 @@ const s = {
   },
   attachedCodeEditor: {
     borderRadius: '0 0 8px 8px',
-  },
-  previewBanner: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-    background: '#eff6ff',
-    border: '1px solid #93c5fd',
-    borderRadius: 8,
-    padding: '10px 14px',
-    flexShrink: 0,
-    flexWrap: 'wrap',
-  },
-  previewBannerText: {
-    fontFamily: 'var(--font-body)',
-    fontWeight: 600,
-    fontSize: '0.88rem',
-    color: '#1e40af',
-  },
-  previewBannerBtn: {
-    fontSize: 13,
-    padding: '5px 12px',
-  },
-  sandboxBanner: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-    background: '#fef3c7',
-    border: '1px solid #fcd34d',
-    borderRadius: 8,
-    padding: '10px 14px',
-    flexShrink: 0,
-    flexWrap: 'wrap',
-  },
-  sandboxBannerText: {
-    fontFamily: 'var(--font-body)',
-    fontWeight: 600,
-    fontSize: '0.88rem',
-    color: '#92400e',
-  },
-  sandboxBannerBtn: {
-    fontSize: 13,
-    padding: '5px 12px',
   },
   right: {
     background: '#fff',

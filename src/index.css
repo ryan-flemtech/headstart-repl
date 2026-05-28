@@ -579,6 +579,61 @@ select {
   font-size: 12px;
 }
 
+/* Teacher centre banners */
+.teacher-preview-banner,
+.teacher-sandbox-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-radius: 8px;
+  padding: 10px 14px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.teacher-preview-banner {
+  background: #eff6ff;
+  border: 1px solid #93c5fd;
+}
+
+.teacher-sandbox-banner {
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+}
+
+.teacher-preview-banner__text {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: #1e40af;
+}
+
+.teacher-sandbox-banner__text {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: #92400e;
+}
+
+.teacher-preview-banner__btn,
+.teacher-sandbox-banner__btn {
+  font-size: 13px;
+  padding: 5px 12px;
+}
+
+.teacher-preview-banner__btn.btn-ghost {
+  color: #1e40af;
+  border-color: #1e40af;
+  background: transparent;
+}
+
+.teacher-sandbox-banner__btn--warn.btn-ghost {
+  color: #92400e;
+  border-color: #92400e;
+  background: transparent;
+}
+
 /* Task transition animation */
 @keyframes taskSlideFromRight {
   from {
