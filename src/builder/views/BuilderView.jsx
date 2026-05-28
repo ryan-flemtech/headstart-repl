@@ -759,7 +759,7 @@ export default function BuilderView({ lesson, dirty, onUpdate, onNew, onMarkSave
             onReorder={handleReorder}
             onReorderSubtask={handleReorderSubtask}
           />
-          <ValidationPanel errors={errors} warnings={warnings} />
+          <ValidationPanel key={selectedTaskId ?? 'none'} errors={errors} warnings={warnings} />
         </aside>
 
         <main style={s.main}>
@@ -814,14 +814,17 @@ export default function BuilderView({ lesson, dirty, onUpdate, onNew, onMarkSave
 function ValidationPanel({ errors, warnings }) {
   const [open, setOpen] = useState(false)
   const [activeTab, setActiveTab] = useState(errors.length ? 'errors' : 'warnings')
+  const [ignoredWarnings, setIgnoredWarnings] = useState(() => new Set())
+
+  const visibleWarnings = warnings.filter(w => !ignoredWarnings.has(w))
 
   const summaryParts = []
   if (errors.length) summaryParts.push(`${errors.length} error${errors.length !== 1 ? 's' : ''}`)
-  if (warnings.length) summaryParts.push(`${warnings.length} warning${warnings.length !== 1 ? 's' : ''}`)
+  if (visibleWarnings.length) summaryParts.push(`${visibleWarnings.length} warning${visibleWarnings.length !== 1 ? 's' : ''}`)
   const summary = summaryParts.join(', ') || 'No issues'
 
-  const items = activeTab === 'errors' ? errors : warnings
-  const count = activeTab === 'errors' ? errors.length : warnings.length
+  const items = activeTab === 'errors' ? errors : visibleWarnings
+  const count = activeTab === 'errors' ? errors.length : visibleWarnings.length
 
   return (
     <section style={s.validation}>
@@ -832,7 +835,7 @@ function ValidationPanel({ errors, warnings }) {
         aria-expanded={open}
       >
         <span style={s.validationHeaderTitle}>Validation</span>
-        <span style={{ ...s.validationSummary, color: errors.length ? '#ef4444' : warnings.length ? '#f59e0b' : '#22c55e' }}>
+        <span style={{ ...s.validationSummary, color: errors.length ? '#ef4444' : visibleWarnings.length ? '#f59e0b' : '#22c55e' }}>
           {summary}
         </span>
         <span style={{ ...s.optionsChevron, transform: open ? 'rotate(180deg)' : 'none' }}>▾</span>
@@ -851,7 +854,7 @@ function ValidationPanel({ errors, warnings }) {
               style={{ ...s.validationTab, ...(activeTab === 'warnings' ? s.validationTabActive : {}) }}
               onClick={() => setActiveTab('warnings')}
             >
-              Warnings <span style={s.countBadge}>{warnings.length}</span>
+              Warnings <span style={s.countBadge}>{visibleWarnings.length}</span>
             </button>
           </div>
 
@@ -863,7 +866,17 @@ function ValidationPanel({ errors, warnings }) {
             ) : (
               items.map((item, i) => (
                 <div key={`${activeTab}-${i}`} style={activeTab === 'errors' ? s.errorItem : s.warningItem}>
-                  {item}
+                  <span style={{ flex: 1 }}>{item}</span>
+                  {activeTab === 'warnings' && (
+                    <button
+                      type="button"
+                      style={s.ignoreBtn}
+                      onClick={() => setIgnoredWarnings(prev => new Set([...prev, item]))}
+                      title="Ignore this warning until you change task"
+                    >
+                      Ignore
+                    </button>
+                  )}
                 </div>
               ))
             )}
@@ -1074,5 +1087,20 @@ const s = {
     fontFamily: 'var(--font-body)',
     fontSize: '0.84rem',
     lineHeight: 1.45,
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  ignoreBtn: {
+    flexShrink: 0,
+    padding: '2px 8px',
+    background: 'transparent',
+    border: '1px solid #d97706',
+    borderRadius: 4,
+    color: '#92400e',
+    fontFamily: 'var(--font-body)',
+    fontSize: '0.76rem',
+    cursor: 'pointer',
+    lineHeight: 1.4,
   },
 }
