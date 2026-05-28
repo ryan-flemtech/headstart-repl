@@ -468,13 +468,7 @@ function FillBlankQuiz({ task, selectedAnswer, onSelectAnswer, submitted, checkP
         <div style={sm.fillText}>
           {segments.map((seg, i) => {
             if (seg.type === 'text') {
-              return (
-                <MarkdownRenderer
-                  key={i}
-                  content={seg.text}
-                  style={sm.fillMarkdownSegment}
-                />
-              )
+              return <span key={i}><InlineMarkdown content={seg.text} /></span>
             }
 
             const { blankId } = seg
@@ -880,11 +874,6 @@ const sm = {
     fontSize: '1.1rem',
     lineHeight: 2.2,
     color: 'var(--colour-text)',
-  },
-  fillMarkdownSegment: {
-    display: 'inline',
-    fontSize: 'inherit',
-    lineHeight: 'inherit',
   },
   fillBlank: {
     display: 'inline-flex',
