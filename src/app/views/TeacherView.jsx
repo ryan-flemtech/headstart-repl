@@ -15,12 +15,9 @@ import LiveActivityToast from '../components/LiveActivityToast'
 import TeacherTimers from '../components/TeacherTimers'
 import TeacherSessionControls from '../components/TeacherSessionControls'
 import TeacherCodeTabs from '../components/TeacherCodeTabs'
-<<<<<<< HEAD
 import TeacherPreviewBanner from '../components/TeacherPreviewBanner'
 import TeacherSandboxBanner from '../components/TeacherSandboxBanner'
 import TeacherEndSessionModal from '../components/TeacherEndSessionModal'
-=======
->>>>>>> refactor/teacher-code-tabs-component
 import { resolveAssetsPath } from '../../shared/assetPaths'
 import { cloneFiles, cloneScratchState } from '../../shared/workspaceData'
 import { buildStudentLivePayload } from '../teacherLivePayload'
@@ -507,45 +504,11 @@ export default function TeacherView({ lessonId }) {
       </div>
 
       {showEndModal && (
-<<<<<<< HEAD
         <TeacherEndSessionModal
           onClose={() => setShowEndModal(false)}
           onEnd={() => handleEndSession(false)}
           onEndAndGoHome={() => handleEndSession(true)}
         />
-=======
-        <div style={s.overlay} onClick={() => setShowEndModal(false)}>
-          <div style={s.modal} onClick={e => e.stopPropagation()}>
-            <h2 style={s.modalTitle}>End Session?</h2>
-            <p style={s.modalBody}>
-              This will end the session for all students. They will see a session-ended screen.
-            </p>
-            <div style={s.modalActions}>
-              <button
-                className="btn-ghost"
-                style={{ fontSize: 14 }}
-                onClick={() => setShowEndModal(false)}
-              >
-                Cancel
-              </button>
-              <button
-                className="btn-danger"
-                style={{ fontSize: 14 }}
-                onClick={() => handleEndSession(false)}
-              >
-                End Session
-              </button>
-              <button
-                className="btn-primary"
-                style={{ fontSize: 14 }}
-                onClick={() => handleEndSession(true)}
-              >
-                End &amp; Go to Home
-              </button>
-            </div>
-          </div>
-        </div>
->>>>>>> refactor/teacher-code-tabs-component
       )}
     </div>
   )
