@@ -387,7 +387,10 @@ function FillBlankQuiz({ task, selectedAnswer, onSelectAnswer, submitted, checkP
   function publishState(next) {
     const allFilled = blanks.every(b => next[b.id] !== undefined)
     if (allFilled) {
-      const allCorrect = blanks.every(b => next[b.id] === b.id)
+      const allCorrect = blanks.every(b => {
+        const placedTile = tilePool.find(t => t.id === next[b.id])
+        return placedTile?.text === b.answer
+      })
       onSelectAnswer?.(next, allCorrect)
     } else {
       onSelectAnswer?.(next, null)
@@ -482,7 +485,7 @@ function FillBlankQuiz({ task, selectedAnswer, onSelectAnswer, submitted, checkP
 
             const isBlankCorrect = revealAnswers && placedTileId && (
               mode === 'drag'
-                ? placedTileId === blankId
+                ? tilePool.find(t => t.id === placedTileId)?.text === blank?.answer
                 : String(placedTileId ?? '').trim().toLowerCase() === String(blank?.answer ?? '').trim().toLowerCase()
             )
             const isBlankWrong = revealAnswers && placedTileId && !isBlankCorrect
