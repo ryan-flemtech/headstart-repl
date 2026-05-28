@@ -189,7 +189,8 @@ Both apps import from `src/shared/`. Never duplicate this logic.
           "checkPassed": true,
           "lastRunAt": 1234567890,
           "remoteResetAction": "starter | complete | stage_0 | stage_1 | ...",
-          "remoteResetPushedAt": 1234567890
+          "remoteResetPushedAt": 1234567890,
+          "inPersonalSandbox": "true | null"
         }
       }
     }
@@ -207,6 +208,7 @@ Both apps import from `src/shared/`. Never duplicate this logic.
 - Student (when watched — Python): `currentCode` per keystroke, `currentOutput` line by line during run, `currentSelection`/`currentActivity` editor interactions
 - Student (when watched — HTML): `currentFiles` per active-tab keystroke, `currentActiveFile`/`currentSelection`/`currentActivity` editor interactions
 - Student (quiz): `currentAnswer` on submit
+- Student (personal sandbox): own `inPersonalSandbox` — set to `true` on entry, `null` on exit
 - Firebase v1 security rules are open read/write — do not add authentication logic
 
 ### onDisconnect handlers
@@ -227,6 +229,8 @@ Both apps import from `src/shared/`. Never duplicate this logic.
 | `headstart_identity` | `{ anonymousId, displayName, lastSessionTimestamp }` |
 | `headstart_{lessonId}_{taskId}_{anonymousId}` | `{ code?, output?, runStatus?, state? }` — Python/Scratch |
 | `headstart_{lessonId}_{taskId}_{filename}_{anonymousId}` | `{ content }` — HTML per-file |
+| `headstart_{lessonId}_personalsandbox_{anonymousId}` | `{ code?, state? }` — personal sandbox Python/Scratch |
+| `headstart_{lessonId}_personalsandbox_{filename}_{anonymousId}` | `{ content }` — personal sandbox HTML per-file |
 | `headstart_builder_current` | Full lesson JSON object |
 
 ---
@@ -308,6 +312,16 @@ No room IDs. One session per lesson. `?teacher=true` is the only auth mechanism.
 - Sandbox content discarded on return to lesson — never saved to localStorage
 - `sandboxCodePushedAt` / `sandboxFilesUpdatedAt` timestamps used as change triggers (not the values)
 - HTML sandbox: files stored with `__dot__` encoding in Firebase
+
+### Personal sandbox
+- Separate from the teacher-forced `sandbox` session state — available in both `lesson` and `solo` phases
+- Uses `lesson.sandboxStarterCode` / `lesson.sandboxStarterFiles` as initial content on first entry; only offered when the lesson has these fields
+- State persists in localStorage using a special pseudo-task-id key `personalsandbox` — survives task changes and teacher sandbox pushes
+- **Solo mode**: "Open Sandbox" button in the nav bar; "Close Sandbox" returns to the lesson task
+- **Live mode**: offered via `CheckFeedbackBanner` after a check passes; teacher moving to the next task automatically pulls the student back to the lesson
+- Student writes `inPersonalSandbox: true` to their Firebase node on entry (cleared to `null` on exit) — visible to teacher in `StudentCard` as a purple "Sandbox" badge
+- Task localStorage saves are skipped during personal sandbox; saves go to the `personalsandbox` key instead
+- Checks still run (teacher can watch output) but results do not affect lesson progress
 
 ### Pyodide
 - Runs in a Web Worker — never blocks the main thread

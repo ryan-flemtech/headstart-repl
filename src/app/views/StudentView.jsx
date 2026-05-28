@@ -22,7 +22,7 @@ import CheckFeedbackBanner from '../components/CheckFeedbackBanner'
 import LiveActivityToast from '../components/LiveActivityToast'
 import SplitPane from '../../shared/SplitPane'
 import { resolveAssetsPath } from '../../shared/assetPaths'
-import { loadSavedCode, loadSavedFile, saveCode, saveFile } from '../studentStorage'
+import { loadSavedCode, loadSavedFile, saveCode, saveFile, loadPersonalSandboxCode, savePersonalSandboxCode, loadPersonalSandboxFile, savePersonalSandboxFile } from '../studentStorage'
 import { selectHtmlTaskFiles, selectPythonTaskCode, selectScratchInitialProject } from '../studentTaskContent'
 import { deriveStudentLiveDisplay, toTeacherLiveFiles } from '../studentLiveDisplay'
 import { getQuizSuggestion } from '../studentQuizContent'
@@ -34,7 +34,7 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
   const lessonId = lessonIdProp ?? lessonProp?.id ?? 'preview'
   const {
     session, loading: sessionLoading, registerPresence, joinSession,
-    writeStudentRun, writeStudentCode, writeStudentFiles, writeStudentOutput, writeStudentInteraction,
+    writeStudentRun, writeStudentCode, writeStudentFiles, writeStudentOutput, writeStudentInteraction, writeStudentPersonalSandbox,
     setTaskId, setTeacherLive, updateTeacherLive, removeStudent,
   } = useSession(lessonId)
   const { identity, loaded: identityLoaded, createIdentity, updateTimestamp, updateDisplayName } = useIdentity()
@@ -65,6 +65,7 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
   const [scratchExternalState, setScratchExternalState] = useState(null)
   const [editorSelection, setEditorSelection] = useState(null)
   const [editorActivity, setEditorActivity] = useState(null)
+  const [inPersonalSandbox, setInPersonalSandbox] = useState(false)
   const isMobile = useIsMobile()
   const iframeRef = useRef(null)
   const appendOutputRef = useRef(null)
@@ -91,6 +92,8 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
   editorSelectionRef.current = editorSelection
   const editorActivityRef = useRef(editorActivity)
   editorActivityRef.current = editorActivity
+  const inPersonalSandboxRef = useRef(inPersonalSandbox)
+  inPersonalSandboxRef.current = inPersonalSandbox
 
   function currentTeacherLivePayload(extra = {}) {
     const filesMap = Object.fromEntries(filesRef.current.map(f => [f.name, f.content]))
@@ -152,6 +155,7 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
     const currentLesson = lessonRef.current
     const taskId = currentTaskIdRef.current
     if (!id || teacherPresentation || !currentLesson) return
+    if (inPersonalSandboxRef.current) return // personal sandbox state is saved separately
 
     const task = flattenTasks(currentLesson.tasks).find(t => t.id === taskId)
     if (task?.taskType === 'quiz' || task?.taskType === 'information') return
@@ -333,6 +337,12 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
   useEffect(() => {
     if (!session?.currentTaskId || phase !== 'lesson') return
     if (session.currentTaskId !== currentTaskId) {
+      // If student was in personal sandbox, save their sandbox state and pull them back to the lesson
+      if (inPersonalSandboxRef.current) {
+        savePersonalSandboxSnapshot()
+        setInPersonalSandbox(false)
+        if (identity?.anonymousId) writeStudentPersonalSandbox(identity.anonymousId, false)
+      }
       saveCurrentWorkSnapshot()
       setCurrentTaskId(session.currentTaskId)
       setViewingTaskId(null)
@@ -494,6 +504,16 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teacherPresentation, session?.teacherLive?.active, session?.teacherLive?.sourceStudentId, identity?.anonymousId, currentTaskId, code, files, activeFile, output, runStatus, checkPassed, checkAttempted])
 
+  // When phase leaves lesson/solo, exit personal sandbox silently
+  useEffect(() => {
+    if (phase === 'lesson' || phase === 'solo') return
+    if (!inPersonalSandboxRef.current) return
+    savePersonalSandboxSnapshot()
+    setInPersonalSandbox(false)
+    if (identity?.anonymousId) writeStudentPersonalSandbox(identity.anonymousId, false)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase])
+
   // Register Firebase presence so the teacher sees who is connected live
   useEffect(() => {
     if (teacherPresentation) return
@@ -534,6 +554,56 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.activeStudentView])
+
+  // ─── Personal sandbox ──────────────────────────────────────────────────────
+
+  function savePersonalSandboxSnapshot() {
+    const id = identityRef.current
+    if (!id || teacherPresentation || !lessonRef.current) return
+    if (lessonRef.current.type === 'python') {
+      savePersonalSandboxCode(lessonId, id.anonymousId, { code: codeRef.current })
+    } else if (lessonRef.current.type === 'html') {
+      filesRef.current.forEach(f => savePersonalSandboxFile(lessonId, f.name, id.anonymousId, f.content))
+    } else if (lessonRef.current.type === 'scratch') {
+      // Scratch saves incrementally via handleScratchChange so nothing to do here
+    }
+  }
+
+  function handleEnterPersonalSandbox() {
+    if (!identity || teacherPresentation || !lesson) return
+    const id = identity.anonymousId
+    if (lesson.type === 'python') {
+      const saved = loadPersonalSandboxCode(lessonId, id)
+      setCode(saved?.code ?? lesson.sandboxStarterCode ?? '')
+    } else if (lesson.type === 'html') {
+      const starterFiles = lesson.sandboxStarterFiles ?? []
+      const sandboxFiles = starterFiles.map(f => {
+        const savedContent = loadPersonalSandboxFile(lessonId, f.name, id)
+        return { ...f, content: savedContent ?? f.content }
+      })
+      const withContent = sandboxFiles.length > 0 ? sandboxFiles : starterFiles.map(f => ({ ...f }))
+      setFiles(withContent)
+      setActiveFile(withContent[0]?.name ?? '')
+    }
+    setOutput('')
+    setRunStatus(null)
+    setIframeSrc(null)
+    resetCheckFeedback()
+    setInPersonalSandbox(true)
+    if (session) writeStudentPersonalSandbox(id, true)
+  }
+
+  function handleLeavePersonalSandbox() {
+    if (!identity) return
+    savePersonalSandboxSnapshot()
+    setInPersonalSandbox(false)
+    if (session) writeStudentPersonalSandbox(identity.anonymousId, false)
+    setOutput('')
+    setRunStatus(null)
+    setIframeSrc(null)
+    resetCheckFeedback()
+    loadTaskContent(currentTaskId)
+  }
 
   // ─── Event handlers ────────────────────────────────────────────────────────
 
@@ -672,9 +742,13 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
         publishTeacherLive({ output: accumulated, runStatus: status, checkPassed: passed, checkAttempted: !!task?.check, checkSuggestion: suggestion })
       }
       if (!teacherPresentation) {
-        saveCode(lessonId, currentTaskId, actor.anonymousId, { code, output: accumulated, runStatus: status })
+        if (inPersonalSandboxRef.current) {
+          savePersonalSandboxCode(lessonId, actor.anonymousId, { code })
+        } else {
+          saveCode(lessonId, currentTaskId, actor.anonymousId, { code, output: accumulated, runStatus: status })
+        }
       }
-      if (!teacherPresentation && (phase === 'lesson' || phase === 'sandbox' || isWatched)) {
+      if (!teacherPresentation && (phase === 'lesson' || phase === 'sandbox' || inPersonalSandboxRef.current || isWatched)) {
         await writeStudentRun(actor.anonymousId, { code, output: accumulated, status, checkPassed: passed })
       }
       setRunning(false)
@@ -701,11 +775,17 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
       if (canPublishTeacherLive()) {
         publishTeacherLive({ runStatus: 'success', checkPassed: passed, checkAttempted: !!task?.check, checkSuggestion: suggestion, files: Object.fromEntries(files.map(f => [f.name, f.content])) })
       }
-      if (!teacherPresentation && (phase === 'lesson' || phase === 'sandbox' || isWatched)) {
+      if (!teacherPresentation && (phase === 'lesson' || phase === 'sandbox' || inPersonalSandboxRef.current || isWatched)) {
         const filesMap = Object.fromEntries(files.map(f => [f.name, f.content]))
         writeStudentRun(actor.anonymousId, { files: filesMap, status: 'success', checkPassed: passed })
       }
-      if (!teacherPresentation) files.forEach(f => saveFile(lessonId, currentTaskId, f.name, actor.anonymousId, f.content))
+      if (!teacherPresentation) {
+        if (inPersonalSandboxRef.current) {
+          files.forEach(f => savePersonalSandboxFile(lessonId, f.name, actor.anonymousId, f.content))
+        } else {
+          files.forEach(f => saveFile(lessonId, currentTaskId, f.name, actor.anonymousId, f.content))
+        }
+      }
     })
     setRunning(false)
   }
@@ -727,7 +807,11 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
     }
     if (teacherPresentation) return
     if (identity && lesson?.type === 'python') {
-      saveCode(lessonId, currentTaskId, identity.anonymousId, { code: newCode, output, runStatus })
+      if (inPersonalSandboxRef.current) {
+        savePersonalSandboxCode(lessonId, identity.anonymousId, { code: newCode })
+      } else {
+        saveCode(lessonId, currentTaskId, identity.anonymousId, { code: newCode, output, runStatus })
+      }
     }
     if (session?.activeStudentView === identity?.anonymousId) {
       writeStudentCode(identity.anonymousId, newCode)
@@ -781,7 +865,11 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
     }
     if (teacherPresentation) return
     if (identity && lesson?.type === 'html') {
-      saveFile(lessonId, currentTaskId, filename, identity.anonymousId, content)
+      if (inPersonalSandboxRef.current) {
+        savePersonalSandboxFile(lessonId, filename, identity.anonymousId, content)
+      } else {
+        saveFile(lessonId, currentTaskId, filename, identity.anonymousId, content)
+      }
     }
     if (session?.activeStudentView === identity?.anonymousId) {
       const filesMap = Object.fromEntries(
@@ -797,7 +885,11 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
     }
     if (teacherPresentation) return
     if (!identity) return
-    saveCode(lessonId, currentTaskId, identity.anonymousId, { state: workspaceStates })
+    if (inPersonalSandboxRef.current) {
+      savePersonalSandboxCode(lessonId, identity.anonymousId, { state: workspaceStates })
+    } else {
+      saveCode(lessonId, currentTaskId, identity.anonymousId, { state: workspaceStates })
+    }
     if (activeStudentViewRef.current === identity.anonymousId) {
       writeStudentCode(identity.anonymousId, JSON.stringify(workspaceStates))
     }
@@ -821,6 +913,21 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
   }
 
   function handleResetCode() {
+    if (inPersonalSandboxRef.current) {
+      if (!window.confirm('Reset sandbox to the starter code? Your sandbox work will be lost.')) return
+      if (lesson.type === 'python') {
+        setCode(lesson.sandboxStarterCode ?? '')
+        setOutput('')
+        setRunStatus(null)
+      } else if (lesson.type === 'html') {
+        const starterFiles = (lesson.sandboxStarterFiles ?? []).map(f => ({ ...f }))
+        setFiles(starterFiles)
+        setActiveFile(starterFiles[0]?.name ?? '')
+        setIframeSrc(null)
+        setRunStatus(null)
+      }
+      return
+    }
     if (!window.confirm('Reset your code to the starter code? Your current work will be lost.')) return
     const task = findTaskById(lesson?.tasks, currentTaskId)
     if (lesson.type === 'python') {
@@ -1020,6 +1127,14 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
     ? !!task?.completeBlocks
     : (task?.completeFiles?.length > 0)
   const canOfferCompleteSolution = isSolo && hasCompleteSolution && !displayCheckPassed && repeatedSuggestionCount >= 2
+  const hasPersonalSandbox = lesson.type === 'python'
+    ? !!(lesson.sandboxStarterCode != null)
+    : lesson.type === 'html'
+    ? !!(lesson.sandboxStarterFiles?.length > 0)
+    : lesson.type === 'scratch'
+    ? !!(lesson.sandboxStarterCode != null)
+    : false
+  const canOfferPersonalSandbox = (phase === 'lesson' || isSolo) && hasPersonalSandbox && displayCheckPassed && !inPersonalSandbox && !isForcedTeacherLive
   const taskContentStyle = isQuizTask
     ? styles.taskContentQuiz
     : isInformationTask
@@ -1141,22 +1256,36 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
         </div>
       )}
 
+      {inPersonalSandbox && (
+        <div style={styles.personalSandboxBanner}>
+          <span>Personal Sandbox — your lesson progress is saved</span>
+          <button
+            className="btn-secondary"
+            style={{ marginLeft: 16, padding: '4px 12px', fontSize: 13 }}
+            onClick={handleLeavePersonalSandbox}
+          >
+            Close Sandbox
+          </button>
+        </div>
+      )}
+
       <div style={isSolo && (isQuizTask || isInformationTask) ? { ...styles.body, overflow: 'hidden' } : styles.body}>
         <TaskSlideTransition
-          transitionKey={`${phase}-${viewingTaskId ?? currentTaskId}`}
+          transitionKey={`${phase}-${inPersonalSandbox ? 'personal-sandbox' : (viewingTaskId ?? currentTaskId)}`}
           style={taskContentStyle}
         >
-          {task?.explainer && !isSandbox && !isQuizTask && !isInformationTask && (
+          {task?.explainer && !isSandbox && !inPersonalSandbox && !isQuizTask && !isInformationTask && (
             <ExplainerPanel title={task.title} content={task.explainer} topicType={lesson.type} />
           )}
 
         <div style={editorAreaStyle} className={isForcedTeacherLive ? 'live-view-active' : undefined}>
-          {(task?.check || isAutoEvaluatedQuiz) && displayCheckAttempted && (
+          {!inPersonalSandbox && (task?.check || isAutoEvaluatedQuiz) && displayCheckAttempted && (
             <CheckFeedbackBanner
               passed={displayCheckPassed}
               failureMessage={isQuizTask ? 'Not quite right, try again.' : undefined}
               suggestion={displayCheckSuggestion}
               onShowCompleteCode={canOfferCompleteSolution ? handleShowCompleteCode : undefined}
+              onGoPersonalSandbox={canOfferPersonalSandbox ? handleEnterPersonalSandbox : undefined}
             />
           )}
           {isInformationTask ? (
@@ -1173,14 +1302,17 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
               showResult={false}
             />
           ) : lesson.type === 'scratch' ? (() => {
-            const initialProject = selectScratchInitialProject({
+            const personalSandboxScratchState = inPersonalSandbox
+              ? (loadPersonalSandboxCode(lessonId, identity?.anonymousId)?.state ?? lesson.sandboxStarterCode ?? null)
+              : null
+            const initialProject = inPersonalSandbox ? null : selectScratchInitialProject({
               task,
               taskId: viewingTaskId ?? currentTaskId,
               readSavedCode: sourceTaskId => loadSavedCode(lessonId, sourceTaskId, identity?.anonymousId),
             })
             return (
               <>
-                {!isViewingPrev && !isSandbox && !isForcedTeacherLive && (
+                {!isViewingPrev && !isSandbox && !inPersonalSandbox && !isForcedTeacherLive && (
                   <div style={{ display: 'flex', flexShrink: 0, paddingBottom: 4 }}>
                     <button
                       className="btn-ghost-outline"
@@ -1193,15 +1325,15 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
                   </div>
                 )}
                 <ScratchWorkspace
-                  key={`scratch-${viewingTaskId ?? currentTaskId}-${isSandbox ? 'sandbox' : 'task'}`}
-                  task={task}
+                  key={`scratch-${viewingTaskId ?? currentTaskId}-${isSandbox ? 'sandbox' : inPersonalSandbox ? 'personal-sandbox' : 'task'}`}
+                  task={inPersonalSandbox ? null : task}
                   readOnly={isViewingPrev || isForcedTeacherLive}
-                  unrestricted={isSandbox}
+                  unrestricted={isSandbox || inPersonalSandbox}
                   assetsPath={resolveAssetsPath(lesson.assetsPath) || undefined}
                   initialState={initialProject}
                   onStateChange={isViewingPrev || isForcedTeacherLive ? undefined : handleScratchChange}
-                  onCheckResult={isViewingPrev || isForcedTeacherLive ? undefined : handleScratchCheck}
-                  externalState={isSandbox ? scratchSandboxProject : scratchExternalState}
+                  onCheckResult={isViewingPrev || isForcedTeacherLive || inPersonalSandbox ? undefined : handleScratchCheck}
+                  externalState={isSandbox ? scratchSandboxProject : inPersonalSandbox ? personalSandboxScratchState : scratchExternalState}
                   syncNowKey={session?.activeStudentView === identity?.anonymousId ? session?.activeStudentView : null}
                 />
               </>
@@ -1416,31 +1548,49 @@ export default function StudentView({ lessonId: lessonIdProp, soloMode = false, 
       </div>
       {isSolo && (
         <div style={styles.soloNav}>
-          <button
-            className="btn-secondary"
-            style={styles.soloNavBtn}
-            disabled={currentIndex <= 0}
-            onClick={() => handleSoloNavigate(flatTasks[currentIndex - 1]?.id)}
-          >
-            Previous
-          </button>
-          <span style={styles.soloNavLabel}>
-            Task {currentIndex + 1} of {flatTasks.length}
-          </span>
-          <button
-            className={`btn-secondary${checkPassed && currentIndex < flatTasks.length - 1 ? ' btn-next-success' : ''}`}
-            style={{
-              ...styles.soloNavBtn,
-              ...(canAdvanceSolo && currentIndex < flatTasks.length - 1
-                ? { fontSize: 18, padding: '14px 36px' }
-                : {}),
-            }}
-            disabled={currentIndex >= flatTasks.length - 1 || !canAdvanceSolo}
-            onClick={() => handleSoloNavigate(flatTasks[currentIndex + 1]?.id)}
-            title={!canAdvanceSolo ? 'Pass the completion check before moving on' : 'Next task'}
-          >
-            Next
-          </button>
+          {!inPersonalSandbox && (
+            <button
+              className="btn-secondary"
+              style={styles.soloNavBtn}
+              disabled={currentIndex <= 0}
+              onClick={() => handleSoloNavigate(flatTasks[currentIndex - 1]?.id)}
+            >
+              Previous
+            </button>
+          )}
+          {inPersonalSandbox ? (
+            <span style={styles.soloNavLabel}>Personal Sandbox</span>
+          ) : (
+            <span style={styles.soloNavLabel}>
+              Task {currentIndex + 1} of {flatTasks.length}
+            </span>
+          )}
+          {inPersonalSandbox ? null : hasPersonalSandbox && !isQuizTask && !isInformationTask && (
+            <button
+              className="btn-ghost-outline"
+              style={{ ...styles.soloNavBtn, fontSize: 14 }}
+              onClick={handleEnterPersonalSandbox}
+              title="Open your personal sandbox to experiment freely"
+            >
+              Open Sandbox
+            </button>
+          )}
+          {!inPersonalSandbox && (
+            <button
+              className={`btn-secondary${checkPassed && currentIndex < flatTasks.length - 1 ? ' btn-next-success' : ''}`}
+              style={{
+                ...styles.soloNavBtn,
+                ...(canAdvanceSolo && currentIndex < flatTasks.length - 1
+                  ? { fontSize: 18, padding: '14px 36px' }
+                  : {}),
+              }}
+              disabled={currentIndex >= flatTasks.length - 1 || !canAdvanceSolo}
+              onClick={() => handleSoloNavigate(flatTasks[currentIndex + 1]?.id)}
+              title={!canAdvanceSolo ? 'Pass the completion check before moving on' : 'Next task'}
+            >
+              Next
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -1670,6 +1820,18 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     fontFamily: 'var(--font-body)',
+  },
+  personalSandboxBanner: {
+    background: 'rgba(124,58,237,0.08)',
+    borderBottom: '1px solid rgba(124,58,237,0.2)',
+    padding: '8px 16px',
+    fontSize: 13,
+    color: '#5b21b6',
+    display: 'flex',
+    alignItems: 'center',
+    fontFamily: 'var(--font-body)',
+    fontWeight: 600,
+    flexShrink: 0,
   },
   soloNav: {
     display: 'flex',

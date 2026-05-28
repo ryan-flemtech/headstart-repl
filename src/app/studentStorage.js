@@ -4,6 +4,15 @@ export const studentTaskStorageKey = (lessonId, taskId, anonymousId) =>
 export const studentFileStorageKey = (lessonId, taskId, filename, anonymousId) =>
   `headstart_${lessonId}_${taskId}_${filename}_${anonymousId}`
 
+// Personal sandbox uses a fixed "personalsandbox" pseudo-task-id so the key format stays consistent
+const PERSONAL_SANDBOX_KEY = 'personalsandbox'
+
+export const personalSandboxStorageKey = (lessonId, anonymousId) =>
+  studentTaskStorageKey(lessonId, PERSONAL_SANDBOX_KEY, anonymousId)
+
+export const personalSandboxFileStorageKey = (lessonId, filename, anonymousId) =>
+  studentFileStorageKey(lessonId, PERSONAL_SANDBOX_KEY, filename, anonymousId)
+
 export function loadSavedCode(lessonId, taskId, anonymousId) {
   const raw = localStorage.getItem(studentTaskStorageKey(lessonId, taskId, anonymousId))
   return raw ? JSON.parse(raw) : null
@@ -20,4 +29,22 @@ export function loadSavedFile(lessonId, taskId, filename, anonymousId) {
 
 export function saveFile(lessonId, taskId, filename, anonymousId, content) {
   localStorage.setItem(studentFileStorageKey(lessonId, taskId, filename, anonymousId), JSON.stringify({ content }))
+}
+
+export function loadPersonalSandboxCode(lessonId, anonymousId) {
+  const raw = localStorage.getItem(personalSandboxStorageKey(lessonId, anonymousId))
+  return raw ? JSON.parse(raw) : null
+}
+
+export function savePersonalSandboxCode(lessonId, anonymousId, data) {
+  localStorage.setItem(personalSandboxStorageKey(lessonId, anonymousId), JSON.stringify(data))
+}
+
+export function loadPersonalSandboxFile(lessonId, filename, anonymousId) {
+  const raw = localStorage.getItem(personalSandboxFileStorageKey(lessonId, filename, anonymousId))
+  return raw ? JSON.parse(raw).content : null
+}
+
+export function savePersonalSandboxFile(lessonId, filename, anonymousId, content) {
+  localStorage.setItem(personalSandboxFileStorageKey(lessonId, filename, anonymousId), JSON.stringify({ content }))
 }
