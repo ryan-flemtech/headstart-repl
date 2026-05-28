@@ -341,6 +341,53 @@ function MatchQuiz({ task, selectedAnswer, onSelectAnswer, submitted, checkPasse
 
 // ─── Fill in the Blank ────────────────────────────────────────────────────────
 
+// Parses fill-blank text into tokens: {type:'text'|'code'|'blank', text?, lang?, blankId?}
+// Handles backtick code spans atomically so `python:range(___, ___)` doesn't produce
+// orphaned backticks when the ___ markers fall inside a code span.
+function parseFillBlankSegments(text, blanks) {
+  const tokens = []
+  let blankCount = 0
+  let i = 0
+
+  while (i < text.length) {
+    if (text.startsWith('___', i)) {
+      tokens.push({ type: 'blank', blankId: blanks[blankCount]?.id ?? `b${blankCount + 1}` })
+      blankCount++
+      i += 3
+      continue
+    }
+
+    const close = text[i] === '`' ? text.indexOf('`', i + 1) : -1
+    if (close !== -1) {
+      const raw = text.slice(i + 1, close)
+      const langMatch = raw.match(/^(python|html|css|js):/)
+      const lang = langMatch ? langMatch[1] : null
+      const body = lang ? raw.slice(lang.length + 1) : raw
+      if (body.includes('___')) {
+        const codeParts = body.split('___')
+        codeParts.forEach((part, j) => {
+          if (part) tokens.push({ type: 'code', lang, text: part })
+          if (j < codeParts.length - 1) {
+            tokens.push({ type: 'blank', blankId: blanks[blankCount]?.id ?? `b${blankCount + 1}` })
+            blankCount++
+          }
+        })
+      } else {
+        tokens.push({ type: 'code', lang, text: body })
+      }
+      i = close + 1
+      continue
+    }
+
+    const textStart = i
+    i++
+    while (i < text.length && !text.startsWith('___', i) && text[i] !== '`') i++
+    tokens.push({ type: 'text', text: text.slice(textStart, i) })
+  }
+
+  return tokens
+}
+
 function FillBlankQuiz({ task, selectedAnswer, onSelectAnswer, submitted, checkPassed, disabled, showQuestion, showResult, showCorrectAnswer }) {
   const blanks = task?.blanks ?? []
   const mode = task?.mode ?? 'drag'
@@ -370,16 +417,8 @@ function FillBlankQuiz({ task, selectedAnswer, onSelectAnswer, submitted, checkP
     return {}
   }, [selectedAnswer])
 
-  const segments = useMemo(() => {
-    const parts = text.split('___')
-    const result = []
-    parts.forEach((part, i) => {
-      if (part) result.push({ type: 'text', text: part })
-      if (i < parts.length - 1) result.push({ type: 'blank', blankId: blanks[i]?.id ?? `b${i + 1}` })
-    })
-    return result
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [text, blanks.length])
+  const segments = useMemo(() => parseFillBlankSegments(text, blanks), [text, JSON.stringify(blanks)])
 
   const placedIds = new Set(Object.values(state))
   const blocked = disabled || (submitted && checkPassed)
@@ -469,6 +508,10 @@ function FillBlankQuiz({ task, selectedAnswer, onSelectAnswer, submitted, checkP
           {segments.map((seg, i) => {
             if (seg.type === 'text') {
               return <span key={i}><InlineMarkdown content={seg.text} /></span>
+            }
+            if (seg.type === 'code') {
+              const mdCode = `\`${seg.lang ? seg.lang + ':' : ''}${seg.text}\``
+              return <span key={i}><InlineMarkdown content={mdCode} /></span>
             }
 
             const { blankId } = seg
