@@ -95,17 +95,15 @@ Implemented on 26 May 2026 in [`refactor/student-task-content`](https://github.c
 - Added characterization coverage for solo restore, carry-through, starter fallback, and the existing standalone-task carry behaviour.
 - Updated maintenance inventories while leaving session effects, Firebase writes, localStorage keys, and lesson output unchanged.
 
-## Progress Update - PR #104
+## Progress Update - PR #105
 
-Implemented on 27 May 2026 in [`refactor/builder-static-styles`](https://github.com/Headstart-Coding-Launchpad/editor/pull/104):
+Implemented on 27 May 2026 in [`refactor/student-view-extract-components`](https://github.com/Headstart-Coding-Launchpad/editor/pull/105):
 
-- Moved all static inline style objects from `src/builder/components/task-editor/styles.js` into CSS classes under the `/* ── Builder task editor ──── */` section of `src/index.css`, covering all five task-editor component files.
-- Replaced every `style={s.xxx}` and `style={{ ...s.xxx, ... }}` usage in `TaskEditorFields.jsx`, `CheckEditors.jsx`, `QuizEditors.jsx`, `ScratchEditors.jsx`, and `TaskEditor.jsx` with `className="te-xxx"` or `className="te-xxx te-xxx--active"` patterns.
-- Kept truly dynamic values (transforms, runtime colours, dimension overrides) as narrow inline `style` props on top of the base CSS class.
-- Kept `CodeEditor` `style` props inline because `CodeEditor` only accepts a `style` prop.
-- Wrapped `AssetBrowser` in a `<div className="te-inline-browser">` because `AssetBrowser` only accepts a `style` prop.
-- Deleted `src/builder/components/task-editor/styles.js` after confirming no remaining imports.
-- All 340 tests continue to pass.
+- Extracted `TaskSlideTransition` to `src/app/components/TaskSlideTransition.jsx` — self-contained animated task-switch component; `TASK_TRANSITION_MS` moved inside the file as an implementation detail.
+- Extracted `StudentEditorHeader` to `src/app/components/StudentEditorHeader.jsx` — stateless header bar used by HTML task editors; static styles moved to `.sv-editor-header`, `.sv-editor-title`, `.sv-editor-actions`, `.sv-editor-primary-btn`, `.sv-reset-btn` CSS classes.
+- Extracted `LoadingScreen` to `src/app/components/LoadingScreen.jsx` — centred message screen for session loading/error phases; static layout moved to `.sv-centre-screen` CSS class.
+- Added characterization tests for all three extracted components (18 new tests).
+- Updated `CODEBASE_MAP.md` for the three new components.
 
 ## Progress Update - PR #106
 
