@@ -486,6 +486,60 @@ describe('evaluateSingleCheck — variable checks', () => {
   })
 })
 
+// ─── element_style_property with url() values ────────────────────────────────
+
+describe('evaluateSingleCheck — element_style_property url() normalisation', () => {
+  function makeStyleContext(propertyValue) {
+    const el = { style: { getPropertyValue: () => '' } }
+    return {
+      iframeDoc: {
+        querySelector: () => el,
+        defaultView: { getComputedStyle: () => ({ getPropertyValue: () => propertyValue }) },
+      },
+    }
+  }
+
+  it('matches when computed url() has CDN prefix but check value uses relative filename', () => {
+    const context = makeStyleContext('url("https://cdn.example.com/skiing.jpg")')
+    expect(evaluateSingleCheck(
+      { type: 'element_style_property', selector: '.poster', property: 'background-image', value: "url('skiing.jpg')" },
+      '', context,
+    )).toBe(true)
+  })
+
+  it('matches when both sides use the same relative filename', () => {
+    const context = makeStyleContext("url('skiing.jpg')")
+    expect(evaluateSingleCheck(
+      { type: 'element_style_property', selector: '.poster', property: 'background-image', value: "url('skiing.jpg')" },
+      '', context,
+    )).toBe(true)
+  })
+
+  it('does not match when filenames differ', () => {
+    const context = makeStyleContext('url("https://cdn.example.com/skiing.jpg")')
+    expect(evaluateSingleCheck(
+      { type: 'element_style_property', selector: '.poster', property: 'background-image', value: "url('hiking.jpg')" },
+      '', context,
+    )).toBe(false)
+  })
+
+  it('matches url() without quotes', () => {
+    const context = makeStyleContext('url(https://cdn.example.com/skiing.jpg)')
+    expect(evaluateSingleCheck(
+      { type: 'element_style_property', selector: '.poster', property: 'background-image', value: 'url(skiing.jpg)' },
+      '', context,
+    )).toBe(true)
+  })
+
+  it('passes presence-only check (no value) when url() property is set', () => {
+    const context = makeStyleContext('url("https://cdn.example.com/skiing.jpg")')
+    expect(evaluateSingleCheck(
+      { type: 'element_style_property', selector: '.poster', property: 'background-image' },
+      '', context,
+    )).toBe(true)
+  })
+})
+
 // ─── guard: null/malformed check ──────────────────────────────────────────────
 
 describe('evaluateSingleCheck — guard conditions', () => {
