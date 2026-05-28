@@ -56,6 +56,37 @@ Implemented on 26 May 2026 in [`codex/refactor-teacher-presentation-controls`](h
 - Moved its static popover/control styling into the established CSS layer.
 - Added focused component coverage for navigation, share callbacks, and state-specific actions.
 
+## Progress Update — PR #101
+
+Implemented on 27 May 2026 in [`refactor/teacher-code-tabs`](https://github.com/Headstart-Coding-Launchpad/editor/pull/101):
+
+- Extracted the inline `TeacherCodeTabs` function from `TeacherView.jsx` into `src/app/components/TeacherCodeTabs.jsx`.
+- Removed dead inline style props that were fully overridden by existing `ui-tabs`/`ui-tab` CSS `!important` rules.
+- Added 8 characterization tests covering tab rendering, `aria-selected` state, stage iteration, and Send-to-all visibility.
+- Updated `CODEBASE_MAP.md` for the new component.
+
+## Progress Update — PR #102
+
+Implemented on 27 May 2026 in [`refactor/teacher-banners`](https://github.com/Headstart-Coding-Launchpad/editor/pull/102):
+
+- Extracted preview-mode and sandbox banners from `TeacherView.jsx` into `src/app/components/TeacherPreviewBanner.jsx` and `src/app/components/TeacherSandboxBanner.jsx`.
+- Moved banner static styling into CSS classes (`.teacher-preview-banner`, `.teacher-sandbox-banner`, button modifiers, `btn--warn` variant) in `src/index.css`.
+- Added 13 characterization tests covering banner text, conditional button visibility, and all callback props.
+- Updated `CODEBASE_MAP.md` for the two new components.
+
+## Progress Update — PR #103
+
+Implemented on 27 May 2026 in [`refactor/teacher-end-session-modal-and-quiz-suggestion`](https://github.com/Headstart-Coding-Launchpad/editor/pull/103):
+
+- Extracted the end-session confirmation modal from `TeacherView.jsx` into `src/app/components/TeacherEndSessionModal.jsx`.
+- Moved modal static styling into CSS classes (`.teacher-end-modal__overlay`, `.teacher-end-modal`, title/body/actions/button modifiers) in `src/index.css`.
+- Removed the now-empty `overlay`/`modal`/`modalTitle`/`modalBody`/`modalActions` keys from `TeacherView`'s `s` style object; also removed the dead `taskTitleHeader` key.
+- Extracted the inline `getQuizSuggestion` function from `StudentView.jsx` into the new pure helper module `src/app/studentQuizContent.js`, following the established pattern of `studentStorage.js`, `studentTaskContent.js`, and `studentLiveDisplay.js`.
+- Added 5 component tests for `TeacherEndSessionModal` (heading, Cancel/End/End+Home callbacks, overlay click).
+- Added 12 unit tests for `getQuizSuggestion` covering null/undefined task, option feedback/hint fallback, task-level feedback, check hint fallback, short-answer check evaluation, match/fill-blank types, and missing-quizType default.
+- Updated `CODEBASE_MAP.md` for the two new files.
+- Suite expanded from 29 files / 322 tests (pre-PR #101) to 32 files / 357 tests.
+
 ## Progress Update - PR #76
 
 Implemented on 26 May 2026 in [`refactor/student-task-content`](https://github.com/Headstart-Coding-Launchpad/editor/pull/76):

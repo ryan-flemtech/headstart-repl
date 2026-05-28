@@ -37,6 +37,7 @@ Referenced from AGENTS.md. Use this for navigation before opening files.
 | `studentStorage.js` | Student task/file localStorage key construction and saved-work persistence helpers |
 | `studentTaskContent.js` | Pure student task-content selection and carry-through precedence helpers |
 | `studentLiveDisplay.js` | Pure student teacher-live/view display selection and live HTML file conversion helpers |
+| `studentQuizContent.js` | Pure quiz suggestion helpers: maps wrong answers to option/task/check hint feedback |
 | `teacherSandboxContent.js` | Pure teacher sandbox starter/configured content selection and fallback rules |
 | `teacherLivePayload.js` | Pure student-to-teacherLive broadcast payload construction |
 
@@ -71,6 +72,7 @@ Referenced from AGENTS.md. Use this for navigation before opening files.
 | `TeacherCodeTabs.jsx` | Starter/stage/complete tab strip shown above teacher code editors; includes "Send to all" action |
 | `TeacherPreviewBanner.jsx` | Status banner shown when the teacher previews a task without moving students |
 | `TeacherSandboxBanner.jsx` | Status banner shown in sandbox staging/live mode with action buttons |
+| `TeacherEndSessionModal.jsx` | Confirmation modal for ending a live session, with End and End+Home actions |
 | `InformationTask.jsx` | Read-only information/introduction task rendering for lesson flow |
 | `CollapsiblePanelControls.jsx` | Shared collapse/expand tab controls for classroom and builder panels |
 

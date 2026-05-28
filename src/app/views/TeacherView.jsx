@@ -17,6 +17,7 @@ import TeacherSessionControls from '../components/TeacherSessionControls'
 import TeacherCodeTabs from '../components/TeacherCodeTabs'
 import TeacherPreviewBanner from '../components/TeacherPreviewBanner'
 import TeacherSandboxBanner from '../components/TeacherSandboxBanner'
+import TeacherEndSessionModal from '../components/TeacherEndSessionModal'
 import { resolveAssetsPath } from '../../shared/assetPaths'
 import { cloneFiles, cloneScratchState } from '../../shared/workspaceData'
 import { buildStudentLivePayload } from '../teacherLivePayload'
@@ -503,53 +504,17 @@ export default function TeacherView({ lessonId }) {
       </div>
 
       {showEndModal && (
-        <div style={s.overlay} onClick={() => setShowEndModal(false)}>
-          <div style={s.modal} onClick={e => e.stopPropagation()}>
-            <h2 style={s.modalTitle}>End Session?</h2>
-            <p style={s.modalBody}>
-              This will end the session for all students. They will see a session-ended screen.
-            </p>
-            <div style={s.modalActions}>
-              <button
-                className="btn-ghost"
-                style={{ fontSize: 14 }}
-                onClick={() => setShowEndModal(false)}
-              >
-                Cancel
-              </button>
-              <button
-                className="btn-danger"
-                style={{ fontSize: 14 }}
-                onClick={() => handleEndSession(false)}
-              >
-                End Session
-              </button>
-              <button
-                className="btn-primary"
-                style={{ fontSize: 14 }}
-                onClick={() => handleEndSession(true)}
-              >
-                End &amp; Go to Home
-              </button>
-            </div>
-          </div>
-        </div>
+        <TeacherEndSessionModal
+          onClose={() => setShowEndModal(false)}
+          onEnd={() => handleEndSession(false)}
+          onEndAndGoHome={() => handleEndSession(true)}
+        />
       )}
     </div>
   )
 }
 
 const s = {
-  taskTitleHeader: {
-    background: 'var(--colour-primary-dark)',
-    color: '#fff',
-    fontFamily: 'var(--font-title)',
-    fontWeight: 700,
-    fontSize: '1.1rem',
-    padding: '10px 16px',
-    letterSpacing: '0.04em',
-    flexShrink: 0,
-  },
   page: {
     display: 'flex',
     flexDirection: 'column',
@@ -603,42 +568,5 @@ const s = {
     background: '#fff',
     borderLeft: '1px solid #e5e7eb',
     overflow: 'auto',
-  },
-  overlay: {
-    position: 'fixed',
-    inset: 0,
-    background: 'rgba(0,0,0,0.45)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1000,
-  },
-  modal: {
-    background: '#fff',
-    borderRadius: 12,
-    padding: '28px 32px',
-    maxWidth: 420,
-    width: '90%',
-    boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
-  },
-  modalTitle: {
-    fontFamily: 'var(--font-title)',
-    fontWeight: 700,
-    fontSize: '1.2rem',
-    color: 'var(--colour-text)',
-    margin: '0 0 12px',
-  },
-  modalBody: {
-    fontFamily: 'var(--font-body)',
-    fontSize: '0.95rem',
-    color: 'var(--colour-text)',
-    margin: '0 0 24px',
-    lineHeight: 1.5,
-  },
-  modalActions: {
-    display: 'flex',
-    gap: 10,
-    justifyContent: 'flex-end',
-    flexWrap: 'wrap',
   },
 }
