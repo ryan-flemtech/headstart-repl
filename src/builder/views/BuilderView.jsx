@@ -1,4 +1,8 @@
 import React, { useState } from 'react'
+import { unified } from 'unified'
+import remarkParse from 'remark-parse'
+import remarkBreaks from 'remark-breaks'
+import remarkRehype from 'remark-rehype'
 import LessonMetaPanel from '../components/LessonMetaPanel'
 import TaskList from '../components/TaskList'
 import TaskEditor from '../components/TaskEditor'
@@ -69,6 +73,39 @@ function esc(str) {
     .replace(/"/g, '&quot;')
 }
 
+const VOID_TAGS = new Set(['area','base','br','col','embed','hr','img','input','link','meta','param','source','track','wbr'])
+const HAST_PROP_ATTR = { className: 'class', htmlFor: 'for', httpEquiv: 'http-equiv' }
+
+function hastToHtml(node) {
+  if (!node) return ''
+  if (node.type === 'text') return esc(node.value)
+  if (node.type === 'raw') return node.value
+  if (node.type === 'root') return (node.children || []).map(hastToHtml).join('')
+  if (node.type === 'element') {
+    const attrParts = Object.entries(node.properties || {}).flatMap(([key, val]) => {
+      const attr = HAST_PROP_ATTR[key] ?? key
+      if (val === false || val == null) return []
+      if (val === true) return [attr]
+      if (Array.isArray(val)) { const s = val.join(' '); return s ? [`${attr}="${esc(s)}"`] : [] }
+      return [`${attr}="${esc(String(val))}"`]
+    })
+    const attrStr = attrParts.length ? ' ' + attrParts.join(' ') : ''
+    const inner = (node.children || []).map(hastToHtml).join('')
+    return VOID_TAGS.has(node.tagName)
+      ? `<${node.tagName}${attrStr}>`
+      : `<${node.tagName}${attrStr}>${inner}</${node.tagName}>`
+  }
+  return ''
+}
+
+const _mdProc = unified().use(remarkParse).use(remarkBreaks).use(remarkRehype)
+
+function mdToHtml(text) {
+  if (!text) return ''
+  try { return hastToHtml(_mdProc.runSync(_mdProc.parse(text))) }
+  catch { return esc(text) }
+}
+
 function renderCheckHtml(check) {
   if (!check) return '<em>None</em>'
   const checks = Array.isArray(check) ? check : [check]
@@ -103,10 +140,10 @@ function buildPrintHtml(lesson) {
     if (badges.length) parts.push(`<div class="badges">${badges.join('')}</div>`)
 
     if (task.explainer) {
-      parts.push(`<div class="field"><div class="field-label">Explainer</div><div class="field-value markdown">${esc(task.explainer)}</div></div>`)
+      parts.push(`<div class="field"><div class="field-label">Explainer</div><div class="field-value markdown">${mdToHtml(task.explainer)}</div></div>`)
     }
     if (task.leftContent) {
-      parts.push(`<div class="field"><div class="field-label">Left Content (Recap)</div><div class="field-value markdown">${esc(task.leftContent)}</div></div>`)
+      parts.push(`<div class="field"><div class="field-label">Left Content (Recap)</div><div class="field-value markdown">${mdToHtml(task.leftContent)}</div></div>`)
     }
 
     if (task.taskType === 'quiz') {
@@ -246,7 +283,7 @@ function buildPrintHtml(lesson) {
     const hints = (task.hints || []).filter(Boolean)
     if (hints.length) {
       parts.push(`<div class="field"><div class="field-label">Hints</div><ol>`)
-      for (const h of hints) parts.push(`<li>${esc(h)}</li>`)
+      for (const h of hints) parts.push(`<li class="markdown">${mdToHtml(h)}</li>`)
       parts.push(`</ol></div>`)
     }
 
@@ -298,7 +335,21 @@ h1 { font-size: 1.5em; margin-bottom: 6px; }
 .field { margin-top: 10px; }
 .field-label { font-size: 0.72em; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
 .field-value { font-size: 0.88em; color: #333; word-break: break-word; }
-.markdown { white-space: pre-wrap; line-height: 1.55; }
+.markdown { line-height: 1.6; font-size: 0.88em; color: #333; }
+.markdown p { margin: 0 0 7px; }
+.markdown p:last-child { margin-bottom: 0; }
+.markdown ul, .markdown ol { margin: 4px 0 7px 20px; }
+.markdown li { margin-bottom: 2px; }
+.markdown h1, .markdown h2, .markdown h3, .markdown h4 { font-weight: 700; margin: 8px 0 4px; }
+.markdown h1 { font-size: 1.1em; }
+.markdown h2 { font-size: 1.0em; }
+.markdown h3, .markdown h4 { font-size: 0.95em; }
+.markdown code { background: #f5f5f5; border: 1px solid #e5e7eb; border-radius: 3px; padding: 1px 4px; font-family: 'Consolas', 'Courier New', monospace; font-size: 0.88em; }
+.markdown pre { background: #f5f5f5; border: 1px solid #e5e7eb; border-radius: 4px; padding: 8px 10px; font-size: 0.8em; font-family: 'Consolas', 'Courier New', monospace; white-space: pre-wrap; overflow-wrap: break-word; margin: 6px 0; }
+.markdown pre code { background: none; border: none; padding: 0; }
+.markdown blockquote { border-left: 3px solid #6200ea; padding-left: 10px; color: #555; margin: 6px 0; }
+.markdown strong { font-weight: 700; }
+.markdown a { color: #6200ea; }
 .code-block { background: #f5f5f5; border: 1px solid #e5e7eb; border-radius: 4px; padding: 8px 10px; font-size: 0.8em; font-family: 'Consolas', 'Courier New', monospace; white-space: pre-wrap; word-break: break-all; line-height: 1.45; }
 .file-block { margin-bottom: 6px; }
 .file-name { font-size: 0.78em; font-weight: 700; color: #6200ea; margin-bottom: 2px; }
@@ -321,7 +372,7 @@ ol { margin-left: 20px; font-size: 0.88em; line-height: 1.8; }
 <div class="lesson-meta">
   ID: <strong>${esc(lesson.id)}</strong>&ensp;|&ensp;Type: <strong>${esc(typeLabel)}</strong>${lesson.level != null ? `&ensp;|&ensp;Level: <strong>${esc(String(lesson.level))}</strong>` : ''}&ensp;|&ensp;Tasks: <strong>${esc(String(lesson.tasks?.length ?? 0))}</strong>
 </div>
-${lesson.description ? `<p class="lesson-desc">${esc(lesson.description)}</p>` : ''}
+${lesson.description ? `<div class="lesson-desc markdown">${mdToHtml(lesson.description)}</div>` : ''}
 ${taskSections.join('\n')}
 </body>
 </html>`
